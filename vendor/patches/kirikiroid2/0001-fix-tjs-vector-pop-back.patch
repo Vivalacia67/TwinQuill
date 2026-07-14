@@ -1,0 +1,17 @@
+From: TwinQuill contributors
+Subject: [PATCH] Fix TJS vector pop_back use with libc++
+
+Kirikiroid2's custom vector wrapper previously returned the removed element,
+but the current source resolves these calls to std::vector, whose pop_back()
+returns void. Read the element first and then remove it.
+
+--- a/src/core/tjs2/tjsUtils.h
++++ b/src/core/tjs2/tjsUtils.h
+@@
+-		int currentIndex = UnusedIndexStack.pop_back();
++		int currentIndex = UnusedIndexStack.back();
++		UnusedIndexStack.pop_back();
+@@
+-		int currentIndex = UnusedIndexStack.pop_back();
++		int currentIndex = UnusedIndexStack.back();
++		UnusedIndexStack.pop_back();
