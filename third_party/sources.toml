@@ -21,6 +21,17 @@ license = "LicenseRef-Kirikiri-composite"
 license_files = ["LICENSE", "vcproj/license.txt"]
 
 [[sources]]
+id = "oniguruma-cf93dc"
+source_type = "git-archive"
+destination = "vendor/deps/krkr/oniguruma"
+url = "https://github.com/krkrz/oniguruma.git"
+commit = "cf93dc215068860343dc49b104806d50f967fada"
+tree = "8f269e21d4d1191ff25356b463551780bc0fdbac"
+archive_sha256 = "e9b8cc8de41f86eef6bafa2f9840369dc218dc7bc976c7362e2c52a86561e74c"
+license = "BSD-2-Clause"
+license_files = ["COPYING"]
+
+[[sources]]
 id = "onscripter-yuri"
 destination = "vendor/onscripter-yuri"
 url = "https://github.com/ShallCanyon/OnscripterYuri.git"
@@ -63,13 +74,6 @@ parent = "krkrz"
 path = "external/lpng"
 url = "https://github.com/krkrz/libpng.git"
 commit = "9ab8fac867750b7e1c506cb641d94562241ab451"
-status = "not-yet-imported"
-
-[[gitlinks]]
-parent = "krkrz"
-path = "external/onig"
-url = "https://github.com/krkrz/oniguruma.git"
-commit = "cf93dc215068860343dc49b104806d50f967fada"
 status = "not-yet-imported"
 
 [[gitlinks]]
