@@ -120,3 +120,88 @@ path = "src/onsyuri_libretro/deps/lua"
 url = "https://github.com/lua/lua.git"
 commit = "75ea9ccbea7c4886f30da147fb67b693b2624c26"
 status = "not-yet-imported"
+
+[[sources]]
+id = "sdl2-2.26.3"
+source_type = "release-archive"
+destination = "vendor/deps/ons/SDL2-2.26.3"
+url = "https://github.com/libsdl-org/SDL/releases/download/release-2.26.3/SDL2-2.26.3.tar.gz"
+archive_sha256 = "c661205a553b7d252425f4b751ff13209e5e020b876bbfa1598494af61790057"
+license = "Zlib"
+license_files = ["LICENSE.txt"]
+
+[[sources]]
+id = "sdl2-image-2.6.3"
+source_type = "release-archive"
+destination = "vendor/deps/ons/SDL2_image-2.6.3"
+url = "https://github.com/libsdl-org/SDL_image/releases/download/release-2.6.3/SDL2_image-2.6.3.tar.gz"
+archive_sha256 = "931c9be5bf1d7c8fae9b7dc157828b7eee874e23c7f24b44ba7eff6b4836312c"
+license = "LicenseRef-SDL2-image-composite"
+license_files = ["LICENSE.txt"]
+excluded_files = [
+    "VisualC/external/optional/x86/libtiff-5.dll",
+    "VisualC/external/optional/x86/libwebp-7.dll",
+    "VisualC/external/optional/x64/libtiff-5.dll",
+    "VisualC/external/optional/x64/libwebp-7.dll",
+]
+excluded_paths = [
+    "Xcode/macOS/SDL2.framework/**",
+    "Xcode/iOS/SDL2.framework/**",
+    "Xcode/tvOS/SDL2.framework/**",
+]
+
+[[sources]]
+id = "sdl2-ttf-2.20.2"
+source_type = "release-archive"
+destination = "vendor/deps/ons/SDL2_ttf-2.20.2"
+url = "https://github.com/libsdl-org/SDL_ttf/releases/download/release-2.20.2/SDL2_ttf-2.20.2.tar.gz"
+archive_sha256 = "9dc71ed93487521b107a2c4a9ca6bf43fb62f6bddd5c26b055e6b91418a22053"
+license = "LicenseRef-SDL2-ttf-composite"
+license_files = ["LICENSE.txt", "external/freetype/LICENSE.TXT", "external/harfbuzz/COPYING"]
+excluded_paths = [
+    "Xcode/macOS/SDL2.framework/**",
+    "Xcode/iOS/SDL2.framework/**",
+    "Xcode/tvOS/SDL2.framework/**",
+]
+
+[[sources]]
+id = "sdl2-mixer-2.6.3"
+source_type = "release-archive"
+destination = "vendor/deps/ons/SDL2_mixer-2.6.3"
+url = "https://github.com/libsdl-org/SDL_mixer/releases/download/release-2.6.3/SDL2_mixer-2.6.3.tar.gz"
+archive_sha256 = "7a6ba86a478648ce617e3a5e9277181bc67f7ce9876605eea6affd4a0d6eea8f"
+license = "LicenseRef-SDL2-mixer-composite"
+license_files = ["LICENSE.txt", "src/codecs/dr_libs/LICENSE", "src/codecs/timidity/COPYING"]
+excluded_files = [
+    "VisualC/external/optional/x86/libmodplug-1.dll",
+    "VisualC/external/optional/x86/libopus-0.dll",
+    "VisualC/external/optional/x86/libogg-0.dll",
+    "VisualC/external/optional/x86/libopusfile-0.dll",
+    "VisualC/external/optional/x64/libmodplug-1.dll",
+    "VisualC/external/optional/x64/libopus-0.dll",
+    "VisualC/external/optional/x64/libogg-0.dll",
+    "VisualC/external/optional/x64/libopusfile-0.dll",
+]
+excluded_paths = [
+    "Xcode/macOS/SDL2.framework/**",
+    "Xcode/iOS/SDL2.framework/**",
+    "Xcode/tvOS/SDL2.framework/**",
+]
+
+[[sources]]
+id = "lua-5.4.4"
+source_type = "release-archive"
+destination = "vendor/deps/ons/lua-5.4.4"
+url = "https://www.lua.org/ftp/lua-5.4.4.tar.gz"
+archive_sha256 = "164c7849653b80ae67bec4b7473b884bf5cc8d2dca05653475ec2ed27b9ebf61"
+license = "MIT"
+license_files = ["README"]
+
+[[sources]]
+id = "bzip2-1.0.8"
+source_type = "release-archive"
+destination = "vendor/deps/ons/bzip2-1.0.8"
+url = "https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz"
+archive_sha256 = "ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269"
+license = "bzip2-1.0.6"
+license_files = ["LICENSE"]

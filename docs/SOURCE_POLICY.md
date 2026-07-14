@@ -7,14 +7,19 @@ ignored build directories or CI artifacts.
 
 ## Source snapshots
 
-Upstream repositories are imported under `vendor/` as source-only snapshots.
-Their `.git` directories and local untracked files are never copied. Every
-snapshot entry in `third_party/sources.toml` records:
+Upstream repositories and official release archives are imported under
+`vendor/` as source-only snapshots. Repository `.git` directories and local
+untracked files are never copied. Every snapshot entry in
+`third_party/sources.toml` records:
 
 - the canonical upstream URL;
-- the exact commit and Git tree object;
-- the SHA-256 of `git archive --format=tar <commit>`;
+- the exact commit and Git tree object for a repository snapshot;
+- the SHA-256 of `git archive --format=tar <commit>` or of the official release
+  archive;
 - the destination path and applicable license files.
+
+If an official release archive bundles precompiled libraries, the manifest
+must list those exclusions and the files must be omitted during import.
 
 Git submodules are not treated as implicitly trusted content. Each gitlink is
 listed separately and must receive its own source snapshot, checksum, and
