@@ -4,8 +4,17 @@ TwinQuill is a GPL Android runtime that will manage ONScripter and
 Kirikiri/Kirikiri Z games in one launcher and execute each engine in an
 isolated Android process.
 
-The project is currently in milestone M0. The checked-in native libraries are
-source-build probes only; no game engine is playable yet.
+The project is currently in milestone M0. It has source-built runtime probes,
+not a general-purpose playable release:
+
+- ONScripterYuri runs a self-authored minimal `0.txt` fixture.
+- Kirikiroid2's TJS2 core runs loose `startup.tjs` and an unprotected,
+  uncompressed XP3 fixture.
+- Both engine entry points run in app-private Android processes.
+
+Game compatibility, SAF-backed storage, launcher UI, save redirection, full
+KAG/Cocos rendering, compressed XP3 support, media, and plugin handling remain
+future milestones. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Modules
 
@@ -27,6 +36,19 @@ Create an ignored `local.properties` that points at the Android SDK, then run:
 
 ```shell
 ./gradlew assembleDebug
+```
+
+On Windows, use `gradlew.bat`. A clean build compiles every packaged native
+library from the pinned source snapshots; generated `.so` files remain ignored
+build products.
+
+Repository and build-output gates can be run with:
+
+```shell
+python scripts/check_repository_hygiene.py
+python scripts/verify_source_snapshots.py
+python -m unittest discover -s tests -v
+python scripts/check_apk_native_libraries.py <debug.apk> <release.apk>
 ```
 
 ## License
