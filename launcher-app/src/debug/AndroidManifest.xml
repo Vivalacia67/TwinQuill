@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  M0 device smoke-test hook. Release variants retain engine-ons' non-exported
+  Activity; only locally signed debug APKs may be started directly by adb.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application>
+        <activity
+            android:name="io.github.twinquill.engine.ons.OnsEngineActivity"
+            android:exported="true"
+            tools:replace="android:exported" />
+    </application>
+</manifest>
