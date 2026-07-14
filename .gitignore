@@ -1,0 +1,57 @@
+# Agent and local automation state
+/.agent-work/
+/.agents/
+/.codex/
+/.codegraph/
+/.omo/
+/AGENT.md
+/AGENTS.md
+/PROJECT_PLAN.md
+/task_plan.md
+/findings.md
+/progress.md
+
+# Local Android and Gradle configuration
+/local.properties
+/.gradle/
+/.kotlin/
+/.idea/
+*.iml
+
+# Build products and native intermediates
+**/build/
+**/out/
+**/.cxx/
+**/.externalNativeBuild/
+**/CMakeFiles/
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/build.ninja
+**/.ninja_deps
+**/.ninja_log
+*.apk
+*.aab
+*.so
+*.so.*
+*.a
+*.o
+*.obj
+*.dll
+*.dylib
+*.lib
+
+# Signing material and secrets
+*.jks
+*.keystore
+sign.properties
+keystore.properties
+.env
+.env.*
+
+# Logs, editor state, and operating-system metadata
+*.log
+*.swp
+*.tmp
+*~
+.DS_Store
+Thumbs.db
