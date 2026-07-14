@@ -1,0 +1,122 @@
+schema = 1
+
+[[sources]]
+id = "kirikiroid2"
+destination = "vendor/kirikiroid2"
+url = "https://github.com/ShallCanyon/Kirikiroid2.git"
+commit = "d1c2b1259423542c893e0b65eaeb46c848848f2b"
+tree = "fc0bf7616b23ce5978eaeaa2eaa4cc92d9cf1fa6"
+archive_sha256 = "655295e9b5d4d506cdb1ee058cfe575bbb4bbe237504a6e5ac0a5cc22c596e3d"
+license = "LicenseRef-Kirikiri-composite"
+license_files = ["LICENSE"]
+
+[[sources]]
+id = "krkrz"
+destination = "vendor/krkrz"
+url = "https://github.com/ShallCanyon/krkrz.git"
+commit = "fd5c4baa6a2ef5978db1bd043634351f48667daf"
+tree = "59aacbce5b06ed1f0f20d31d52d82083510ac182"
+archive_sha256 = "a475c1973ee004ff2e5bed9716c6edc8508a2bfe35621cfe20580e1e0acbbf8b"
+license = "LicenseRef-Kirikiri-composite"
+license_files = ["LICENSE", "vcproj/license.txt"]
+
+[[sources]]
+id = "onscripter-yuri"
+destination = "vendor/onscripter-yuri"
+url = "https://github.com/ShallCanyon/OnscripterYuri.git"
+commit = "c8000ef0a4763e8e9c37e8a98bf3fdc72360d3de"
+tree = "374bee686e5c02ea57c04439216f768e5d3fd739"
+archive_sha256 = "8fa348146ac27ab02d7421b1f231c2b248691467de62f23c0dc1377c2b9aeaf5"
+license = "GPL-2.0-or-later"
+license_files = ["LICENSE", "src/onsyuri/COPYING"]
+
+[[gitlinks]]
+parent = "krkrz"
+path = "external/baseclasses"
+url = "https://github.com/krkrz/baseclasses.git"
+commit = "2b1aabf2c5a75f8557aa8bcd6147f07b11bb89c2"
+status = "not-yet-imported"
+
+[[gitlinks]]
+parent = "krkrz"
+path = "external/freetype"
+url = "https://github.com/krkrz/freetype.git"
+commit = "e3b890ac1da14762c50390dd732db5271f04b832"
+status = "not-yet-imported"
+
+[[gitlinks]]
+parent = "krkrz"
+path = "external/jxrlib"
+url = "https://github.com/krkrz/jxrlib.git"
+commit = "ce26e4f2e35dd97c3a3c29676762c57a3082db72"
+status = "not-yet-imported"
+
+[[gitlinks]]
+parent = "krkrz"
+path = "external/libjpeg-turbo"
+url = "https://github.com/krkrz/libjpeg-turbo.git"
+commit = "526f821267b9457b1d075ba385a28055b9bb4bfe"
+status = "not-yet-imported"
+
+[[gitlinks]]
+parent = "krkrz"
+path = "external/lpng"
+url = "https://github.com/krkrz/libpng.git"
+commit = "9ab8fac867750b7e1c506cb641d94562241ab451"
+status = "not-yet-imported"
+
+[[gitlinks]]
+parent = "krkrz"
+path = "external/onig"
+url = "https://github.com/krkrz/oniguruma.git"
+commit = "cf93dc215068860343dc49b104806d50f967fada"
+status = "not-yet-imported"
+
+[[gitlinks]]
+parent = "krkrz"
+path = "external/zlib"
+url = "https://github.com/krkrz/zlib.git"
+commit = "16fe0db79aa40a1ecae686cef84481b83013bb8c"
+status = "not-yet-imported"
+
+[[gitlinks]]
+parent = "onscripter-yuri"
+path = "src/onsyuri_libretro/deps/SDL"
+url = "https://github.com/libsdl-org/SDL.git"
+commit = "da19244f7f529c9a4bfe3f1d62d2c002afd91f1e"
+status = "not-yet-imported"
+
+[[gitlinks]]
+parent = "onscripter-yuri"
+path = "src/onsyuri_libretro/deps/SDL_image"
+url = "https://github.com/libsdl-org/SDL_image.git"
+commit = "0583551f2f504bd446d07089423020cd358e4037"
+status = "not-yet-imported"
+
+[[gitlinks]]
+parent = "onscripter-yuri"
+path = "src/onsyuri_libretro/deps/SDL_mixer"
+url = "https://github.com/libsdl-org/SDL_mixer.git"
+commit = "a294d5827dd0bf13e6f972d6441c96f1b752cc6d"
+status = "not-yet-imported"
+
+[[gitlinks]]
+parent = "onscripter-yuri"
+path = "src/onsyuri_libretro/deps/SDL_ttf"
+url = "https://github.com/libsdl-org/SDL_ttf.git"
+commit = "6c5ae379ed593ca8cb65bfabb8bc816c03e9579d"
+status = "not-yet-imported"
+
+[[gitlinks]]
+parent = "onscripter-yuri"
+path = "src/onsyuri_libretro/deps/bzip2"
+url = "https://github.com/libarchive/bzip2.git"
+commit = "1ea1ac188ad4b9cb662e3f8314673c63df95a589"
+status = "not-yet-imported"
+
+[[gitlinks]]
+parent = "onscripter-yuri"
+path = "src/onsyuri_libretro/deps/lua"
+url = "https://github.com/lua/lua.git"
+commit = "75ea9ccbea7c4886f30da147fb67b693b2624c26"
+status = "not-yet-imported"
