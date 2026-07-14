@@ -48,7 +48,10 @@ target_include_directories(twinquill_krkr_tjs2 PUBLIC
 )
 target_link_libraries(twinquill_krkr_tjs2 PUBLIC onig)
 
-add_library(twinquill_engine_krkr SHARED krkr_tjs_probe.cpp)
+add_library(twinquill_engine_krkr SHARED
+    krkr_jni.cpp
+    krkr_tjs_probe.cpp
+)
 target_compile_features(twinquill_engine_krkr PRIVATE cxx_std_17)
 target_compile_options(twinquill_engine_krkr PRIVATE -fvisibility=hidden)
 target_link_libraries(twinquill_engine_krkr PRIVATE
