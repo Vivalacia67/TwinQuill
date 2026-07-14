@@ -83,6 +83,21 @@ set(CMAKE_SYSTEM_NAME Android)
 include_directories("${BZ2_DIR}" "${LUA_SRC_DIR}")
 add_subdirectory("${ONSYURI_DIR}" "${CMAKE_BINARY_DIR}/onscripter-yuri")
 
+# ONScripterYuri's JNI entry points use a configurable package prefix but its
+# upstream Android package is embedded in the pinned snapshot's CMake file.
+# Replace only that build definition; the vendor source remains byte-for-byte
+# identical to the recorded upstream snapshot.
+get_target_property(ONSYURI_COMPILE_DEFINITIONS onsyuri COMPILE_DEFINITIONS)
+list(REMOVE_ITEM ONSYURI_COMPILE_DEFINITIONS
+    "SDL_JAVA_PACKAGE_PATH=com_yuri_onscripter"
+)
+set_property(TARGET onsyuri PROPERTY
+    COMPILE_DEFINITIONS "${ONSYURI_COMPILE_DEFINITIONS}"
+)
+target_compile_definitions(onsyuri PRIVATE
+    SDL_JAVA_PACKAGE_PATH=io_github_twinquill_engine_ons
+)
+
 set_target_properties(
     onsyuri
     PROPERTIES

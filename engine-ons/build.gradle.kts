@@ -29,4 +29,14 @@ android {
     buildFeatures {
         prefab = true
     }
+
+    sourceSets {
+        getByName("main") {
+            // Compile SDL's Android glue from the pinned source snapshot. This
+            // is source input, not a prebuilt Android or native dependency.
+            java.directories.add(
+                "../vendor/deps/ons/SDL2-2.26.3/android-project/app/src/main/java"
+            )
+        }
+    }
 }
