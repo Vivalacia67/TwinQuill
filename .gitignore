@@ -51,6 +51,10 @@ keystore.properties
 # Logs, editor state, and operating-system metadata
 *.log
 *.swp
+
+# Local script caches
+__pycache__/
+*.py[cod]
 *.tmp
 *~
 .DS_Store
