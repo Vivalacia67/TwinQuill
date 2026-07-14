@@ -1,9 +1,5 @@
 * text=auto eol=lf
 
-# Vendored snapshots must retain the upstream archive's exact bytes.
-/vendor/** -text
-/vendor/patches/** text eol=lf
-
 # Deterministic project metadata and scripts use LF on every platform.
 /.github/** text eol=lf
 /docs/** text eol=lf
@@ -20,3 +16,8 @@
 
 # Windows launchers remain conventional CRLF files.
 *.bat text eol=crlf
+
+# Keep this after every extension rule: vendored snapshots must retain the
+# upstream archive's exact bytes. TwinQuill-authored patch files are LF text.
+/vendor/** -text
+/vendor/patches/** text eol=lf
