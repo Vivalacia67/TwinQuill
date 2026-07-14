@@ -13,6 +13,7 @@
 
 #include "tjs.h"
 #include "tjsError.h"
+#include "krkr_xp3.h"
 
 namespace {
 
@@ -55,6 +56,34 @@ private:
 
 }  // namespace
 
+int run_tjs_source(const std::string& source) {
+    const std::u16string script = ascii_to_tjs(source);
+
+    AndroidConsoleOutput output;
+    TJS::tTJS* engine = new TJS::tTJS();
+    engine->SetConsoleOutput(&output);
+    int result_code = 0;
+    try {
+        engine->ExecScript(
+            reinterpret_cast<const TJS::tjs_char*>(script.c_str()),
+            nullptr,
+            nullptr,
+            TJS_W("startup.tjs"));
+        TJS::tTJSVariant result;
+        engine->EvalExpression(TJS_W("global.twinQuillM0Result"), &result);
+        if (result.AsInteger() != 42) {
+            result_code = 12;
+        }
+        engine->Shutdown();
+        engine->Release();
+    } catch (...) {
+        engine->Shutdown();
+        engine->Release();
+        throw;
+    }
+    return result_code;
+}
+
 namespace TJS {
 
 void TVPConsoleLog(const tjs_char* message) {
@@ -88,31 +117,7 @@ int twinquill_engine_krkr_run_loose_startup(const char* startup_path) {
         const std::string source(
             (std::istreambuf_iterator<char>(input)),
             std::istreambuf_iterator<char>());
-        const std::u16string script = ascii_to_tjs(source);
-
-        AndroidConsoleOutput output;
-        TJS::tTJS* engine = new TJS::tTJS();
-        engine->SetConsoleOutput(&output);
-        int result_code = 0;
-        try {
-            engine->ExecScript(
-                reinterpret_cast<const TJS::tjs_char*>(script.c_str()),
-                nullptr,
-                nullptr,
-                TJS_W("startup.tjs"));
-            TJS::tTJSVariant result;
-            engine->EvalExpression(TJS_W("global.twinQuillM0Result"), &result);
-            if (result.AsInteger() != 42) {
-                result_code = 12;
-            }
-            engine->Shutdown();
-            engine->Release();
-        } catch (...) {
-            engine->Shutdown();
-            engine->Release();
-            throw;
-        }
-        return result_code;
+        return run_tjs_source(source);
     } catch (const TJS::eTJS& exception) {
         AndroidConsoleOutput output;
         output.ExceptionPrint(exception.GetMessage().c_str());
@@ -122,6 +127,28 @@ int twinquill_engine_krkr_run_loose_startup(const char* startup_path) {
         return 21;
     } catch (...) {
         __android_log_print(ANDROID_LOG_ERROR, kLogTag, "Unknown TJS probe failure");
+        return 22;
+    }
+}
+
+extern "C" __attribute__((visibility("default")))
+int twinquill_engine_krkr_run_xp3_startup(const char* archive_path) {
+    try {
+        std::string source;
+        const int read_result = twinquill::krkr::read_raw_xp3_startup(archive_path, &source);
+        if (read_result != 0) {
+            return read_result;
+        }
+        return run_tjs_source(source);
+    } catch (const TJS::eTJS& exception) {
+        AndroidConsoleOutput output;
+        output.ExceptionPrint(exception.GetMessage().c_str());
+        return 20;
+    } catch (const std::exception& exception) {
+        __android_log_print(ANDROID_LOG_ERROR, kLogTag, "%s", exception.what());
+        return 21;
+    } catch (...) {
+        __android_log_print(ANDROID_LOG_ERROR, kLogTag, "Unknown XP3 probe failure");
         return 22;
     }
 }
