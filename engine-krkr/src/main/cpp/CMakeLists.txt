@@ -6,7 +6,7 @@ set(KRKR2_CORE "${TWINQUILL_ROOT}/vendor/kirikiroid2/src/core")
 set(TJS2_DIR "${KRKR2_CORE}/tjs2")
 set(ONIG_DIR "${TWINQUILL_ROOT}/vendor/deps/krkr/oniguruma")
 
-set(BUILD_SHARED_LIBS OFF)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build Krkr dependencies statically" FORCE)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 add_subdirectory("${ONIG_DIR}" "${CMAKE_BINARY_DIR}/third_party/oniguruma")
 
