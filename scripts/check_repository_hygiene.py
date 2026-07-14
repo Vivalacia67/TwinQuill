@@ -81,6 +81,9 @@ def scan_worktree(root: Path) -> list[str]:
         lower_parts = set(lower_sequence)
         if lower_sequence[0] == ".git":
             continue
+        if candidate.is_symlink():
+            violations.append(f"{relative.as_posix()}: symbolic link present in source tree")
+            continue
         if candidate.is_dir() and candidate.name.lower() == ".git":
             violations.append(f"{relative.as_posix()}: nested Git metadata")
             continue
