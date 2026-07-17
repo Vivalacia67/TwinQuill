@@ -32,7 +32,7 @@ final class Xp3ArchiveProbe {
                 return false;
             }
             DataInputStream input = new DataInputStream(new BufferedInputStream(raw));
-            byte[] mark = input.readNBytes(XP3_MARK.length);
+            byte[] mark = readBytes(input, XP3_MARK.length);
             if (!Arrays.equals(mark, XP3_MARK)) {
                 return false;
             }
@@ -49,7 +49,7 @@ final class Xp3ArchiveProbe {
             if (indexSize < 0 || indexSize > MAX_INDEX_SIZE) {
                 return false;
             }
-            byte[] index = input.readNBytes((int) indexSize);
+            byte[] index = readBytes(input, (int) indexSize);
             if (index.length != (int) indexSize) {
                 return false;
             }
@@ -148,10 +148,31 @@ final class Xp3ArchiveProbe {
     }
 
     private static long readU64(DataInputStream input) throws IOException {
-        byte[] data = input.readNBytes(8);
+        byte[] data = readBytes(input, 8);
         if (data.length != 8) {
             throw new EOFException();
         }
         return readU64(data, 0);
+    }
+
+    private static byte[] readBytes(InputStream input, int size) throws IOException {
+        byte[] data = new byte[size];
+        int position = 0;
+        while (position < size) {
+            int read = input.read(data, position, size - position);
+            if (read < 0) {
+                return Arrays.copyOf(data, position);
+            }
+            if (read == 0) {
+                int value = input.read();
+                if (value < 0) {
+                    return Arrays.copyOf(data, position);
+                }
+                data[position++] = (byte) value;
+            } else {
+                position += read;
+            }
+        }
+        return data;
     }
 }
