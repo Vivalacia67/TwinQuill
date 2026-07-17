@@ -102,10 +102,10 @@ public abstract class ONScripter extends SDLActivity {
 
         File gameRoot = requireDirectory(intent.getStringExtra(OnsEngineActivity.EXTRA_GAME_ROOT));
         String gameId = requireSafeGameId(intent.getStringExtra(OnsEngineActivity.EXTRA_GAME_ID));
-        File saveRoot = new File(getFilesDir(), "saves" + File.separator + gameId);
-        if (!saveRoot.isDirectory() && !saveRoot.mkdirs()) {
-            throw new IllegalStateException("Unable to create private save directory");
-        }
+        File saveRoot = requirePrivateSaveDirectory(
+            intent.getStringExtra(OnsEngineActivity.EXTRA_SAVE_ROOT),
+            gameId
+        );
 
         List<String> arguments = new ArrayList<>();
         arguments.add("--root");
@@ -169,6 +169,27 @@ public abstract class ONScripter extends SDLActivity {
             throw new IllegalArgumentException("Invalid ONS game ID");
         }
         return gameId;
+    }
+
+    private File requirePrivateSaveDirectory(String requestedPath, String gameId) {
+        try {
+            File saveBase = new File(getFilesDir(), "saves").getCanonicalFile();
+            File expected = new File(saveBase, gameId).getCanonicalFile();
+            File requested = requestedPath == null || requestedPath.isBlank()
+                ? expected
+                : new File(requestedPath).getCanonicalFile();
+            if (!requested.equals(expected)) {
+                throw new IllegalArgumentException(
+                    "ONS save directory must match the game-private directory"
+                );
+            }
+            if (!requested.isDirectory() && !requested.mkdirs()) {
+                throw new IllegalStateException("Unable to create private save directory");
+            }
+            return requested;
+        } catch (IOException exception) {
+            throw new IllegalArgumentException("Invalid ONS save directory", exception);
+        }
     }
 
     private void enterImmersiveMode() {

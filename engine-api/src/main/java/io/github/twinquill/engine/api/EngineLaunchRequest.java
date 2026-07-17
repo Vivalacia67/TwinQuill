@@ -26,7 +26,7 @@ public final class EngineLaunchRequest implements Parcelable {
         EngineType engineType,
         Bundle arguments
     ) {
-        this.gameId = requireText(gameId, "gameId");
+        this.gameId = requireGameId(gameId);
         this.gameRootUri = Objects.requireNonNull(gameRootUri, "gameRootUri");
         this.saveDirectoryPath = requireText(saveDirectoryPath, "saveDirectoryPath");
         this.engineType = Objects.requireNonNull(engineType, "engineType");
@@ -37,7 +37,7 @@ public final class EngineLaunchRequest implements Parcelable {
     }
 
     private EngineLaunchRequest(Parcel source) {
-        gameId = Objects.requireNonNull(source.readString());
+        gameId = requireGameId(source.readString());
         gameRootUri = Objects.requireNonNull(source.readParcelable(
             Uri.class.getClassLoader(),
             Uri.class
@@ -53,6 +53,14 @@ public final class EngineLaunchRequest implements Parcelable {
             throw new IllegalArgumentException(name + " must not be blank");
         }
         return value;
+    }
+
+    private static String requireGameId(String value) {
+        String gameId = requireText(value, "gameId");
+        if (!gameId.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,127}")) {
+            throw new IllegalArgumentException("gameId is not a safe path segment");
+        }
+        return gameId;
     }
 
     public String gameId() {

@@ -6,8 +6,15 @@ package io.github.twinquill.engine.krkr;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
+
+import io.github.twinquill.engine.api.EngineContract;
+import io.github.twinquill.engine.api.EngineLaunchRequest;
+import io.github.twinquill.engine.api.EngineResult;
+import io.github.twinquill.engine.api.EngineType;
+import io.github.twinquill.nativevfs.NativeVfs;
 
 import java.io.File;
 import java.io.IOException;
@@ -24,10 +31,6 @@ public final class KrkrEngineActivity extends Activity {
 
     private static final String LOG_TAG = "TwinQuill/KrkrActivity";
 
-    static {
-        System.loadLibrary("twinquill_engine_krkr");
-    }
-
     private static native int nativeRunLooseStartup(String startupPath);
     private static native int nativeRunXp3Startup(String archivePath);
 
@@ -37,10 +40,20 @@ public final class KrkrEngineActivity extends Activity {
 
         final LaunchTarget target;
         try {
-            target = resolveStartup(getIntent().getStringExtra(EXTRA_GAME_ROOT));
+            String gameRoot = gameRoot(getIntent());
+            if (gameRoot == null) {
+                finishWithResult(EngineResult.VFS_UNAVAILABLE, null);
+                return;
+            }
+            target = resolveStartup(gameRoot);
+            System.loadLibrary("twinquill_engine_krkr");
         } catch (IOException | IllegalArgumentException exception) {
             Log.e(LOG_TAG, "Invalid loose game root", exception);
-            finishWithResult(14);
+            finishWithResult(EngineResult.INVALID_REQUEST, null);
+            return;
+        } catch (RuntimeException | LinkageError exception) {
+            Log.e(LOG_TAG, "Unable to initialize the Krkr VFS", exception);
+            finishWithResult(EngineResult.VFS_UNAVAILABLE, null);
             return;
         }
 
@@ -50,9 +63,55 @@ public final class KrkrEngineActivity extends Activity {
                 : nativeRunLooseStartup(target.file.getAbsolutePath());
             Log.i(LOG_TAG, (target.xp3 ? "XP3" : "Loose")
                 + " startup completed with result " + result);
-            runOnUiThread(() -> finishWithResult(result));
+            EngineResult category =
+                result == 0 ? EngineResult.NORMAL_EXIT : EngineResult.SCRIPT_ERROR;
+            runOnUiThread(() -> finishWithResult(category, result));
         }, "TwinQuill-Krkr-M0");
         runner.start();
+    }
+
+    private String gameRoot(Intent intent) throws IOException {
+        EngineLaunchRequest request = EngineContract.launchRequest(intent);
+        if (request == null) {
+            if (intent == null) {
+                throw new IllegalArgumentException("Krkr launch intent is required");
+            }
+            String legacyRoot = intent.getStringExtra(EXTRA_GAME_ROOT);
+            if (legacyRoot == null || legacyRoot.isBlank()) {
+                throw new IllegalArgumentException("Missing Krkr game root");
+            }
+            return legacyRoot;
+        }
+        if (request.engineType() != EngineType.KRKR) {
+            throw new IllegalArgumentException("Krkr received a non-Krkr request");
+        }
+
+        NativeVfs.install(this);
+        requirePrivateSaveDirectory(request);
+        Uri root = request.gameRootUri();
+        if ("content".equals(root.getScheme())) {
+            Log.i(LOG_TAG, "Krkr SAF runtime integration is scheduled for M3");
+            return null;
+        }
+        if (!"file".equals(root.getScheme()) || root.getPath() == null) {
+            throw new IllegalArgumentException("Unsupported Krkr game root URI");
+        }
+        return root.getPath();
+    }
+
+    private void requirePrivateSaveDirectory(EngineLaunchRequest request)
+        throws IOException {
+        File saveBase = new File(getFilesDir(), "saves").getCanonicalFile();
+        File expected = new File(saveBase, request.gameId()).getCanonicalFile();
+        File requested = new File(request.saveDirectoryPath()).getCanonicalFile();
+        if (!requested.equals(expected)) {
+            throw new IllegalArgumentException(
+                "Krkr save directory must match the game-private directory"
+            );
+        }
+        if (!requested.isDirectory() && !requested.mkdirs()) {
+            throw new IOException("Unable to create private save directory");
+        }
     }
 
     private static LaunchTarget resolveStartup(String gameRoot) throws IOException {
@@ -81,9 +140,12 @@ public final class KrkrEngineActivity extends Activity {
         return new LaunchTarget(archive, true);
     }
 
-    private void finishWithResult(int result) {
-        Intent data = new Intent().putExtra(EXTRA_RESULT_CODE, result);
-        setResult(result == 0 ? RESULT_OK : RESULT_CANCELED, data);
+    private void finishWithResult(EngineResult result, Integer diagnosticCode) {
+        Intent data = EngineContract.resultData(result);
+        if (diagnosticCode != null) {
+            data.putExtra(EXTRA_RESULT_CODE, diagnosticCode);
+        }
+        setResult(result == EngineResult.NORMAL_EXIT ? RESULT_OK : RESULT_CANCELED, data);
         finish();
     }
 

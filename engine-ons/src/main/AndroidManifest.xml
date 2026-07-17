@@ -3,6 +3,11 @@
     <application>
         <activity
             android:name=".OnsEngineActivity"
+            android:exported="false"
+            android:process=":ons"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+        <activity
+            android:name=".OnsRuntimeActivity"
             android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
             android:exported="false"
             android:hardwareAccelerated="true"
