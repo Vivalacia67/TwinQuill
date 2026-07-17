@@ -11,7 +11,13 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 1
-        versionName = "0.0.1-m0"
+        versionName = "0.1.0-m1"
+
+        javaCompileOptions {
+            annotationProcessorOptions {
+                argument("room.schemaLocation", "$projectDir/schemas")
+            }
+        }
     }
 
     compileOptions {
@@ -29,4 +35,8 @@ dependencies {
     implementation(project(":native-vfs"))
     implementation(project(":engine-ons"))
     implementation(project(":engine-krkr"))
+
+    implementation("androidx.lifecycle:lifecycle-livedata:2.9.4")
+    implementation("androidx.room:room-runtime:2.8.4")
+    annotationProcessor("androidx.room:room-compiler:2.8.4")
 }
