@@ -1,4 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">TwinQuill</string>
+    <string name="launcher_title">TwinQuill 游戏库</string>
+    <string name="add_game">添加游戏</string>
+    <string name="empty_title">还没有游戏</string>
+    <string name="empty_message">选择包含 0.txt、startup.tjs 或受支持 XP3 的目录。</string>
+    <string name="choose_engine">选择运行引擎</string>
+    <string name="engine_ons">ONS</string>
+    <string name="engine_krkr">Kirikiri</string>
+    <string name="change_cover">封面</string>
+    <string name="delete_game">删除</string>
+    <string name="cancel">取消</string>
+    <string name="unknown_engine">无法自动判断引擎，请手动选择。</string>
 </resources>
