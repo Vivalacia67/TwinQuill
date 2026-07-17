@@ -46,9 +46,13 @@ public final class EngineProcessProtocolInstrumentedTest {
     public void startHost() {
         instrumentation = InstrumentationRegistry.getInstrumentation();
         context = instrumentation.getTargetContext();
+        host = createHost();
+    }
+
+    private EngineProtocolTestHostActivity createHost() {
         Intent intent = new Intent(context, EngineProtocolTestHostActivity.class)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        host = (EngineProtocolTestHostActivity) instrumentation.startActivitySync(intent);
+        return (EngineProtocolTestHostActivity) instrumentation.startActivitySync(intent);
     }
 
     @After
@@ -103,6 +107,54 @@ public final class EngineProcessProtocolInstrumentedTest {
         }
     }
 
+    @Test
+    public void engineProcessDeathLeavesLauncherAndOtherEngineUsable()
+        throws Exception {
+        int mainPid = android.os.Process.myPid();
+        Intent crash = new Intent(context, EngineCrashTestActivity.class);
+        instrumentation.runOnMainSync(() -> host.launchEngine(crash));
+        assertTrue(
+            waitForProcessToDisappear(context.getPackageName() + ":krkr", 10_000)
+        );
+        assertEquals(mainPid, android.os.Process.myPid());
+
+        Intent ons =
+            requestIntent(OnsEngineActivity.class, EngineType.ONS, "post-crash-ons")
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        context.startActivity(ons);
+        int onsPid = waitForProcessToAppear(
+            context.getPackageName() + ":ons",
+            10_000
+        );
+        assertNotEquals(0, onsPid);
+        assertNotEquals(mainPid, onsPid);
+    }
+
+    private boolean waitForProcessToDisappear(String processName, long timeoutMillis)
+        throws InterruptedException {
+        long deadline = android.os.SystemClock.elapsedRealtime() + timeoutMillis;
+        while (android.os.SystemClock.elapsedRealtime() < deadline) {
+            if (findProcessPid(processName) == 0) {
+                return true;
+            }
+            Thread.sleep(50);
+        }
+        return findProcessPid(processName) == 0;
+    }
+
+    private int waitForProcessToAppear(String processName, long timeoutMillis)
+        throws InterruptedException {
+        long deadline = android.os.SystemClock.elapsedRealtime() + timeoutMillis;
+        while (android.os.SystemClock.elapsedRealtime() < deadline) {
+            int pid = findProcessPid(processName);
+            if (pid != 0) {
+                return pid;
+            }
+            Thread.sleep(50);
+        }
+        return findProcessPid(processName);
+    }
+
     private Intent requestIntent(
         Class<? extends Activity> activity,
         EngineType engine,
@@ -138,6 +190,14 @@ public final class EngineProcessProtocolInstrumentedTest {
     }
 
     private int requireProcessPid(String processName) {
+        int pid = findProcessPid(processName);
+        if (pid != 0) {
+            return pid;
+        }
+        throw new AssertionError("Missing engine process " + processName);
+    }
+
+    private int findProcessPid(String processName) {
         ActivityManager manager =
             (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
         for (ActivityManager.RunningAppProcessInfo process :
@@ -146,6 +206,6 @@ public final class EngineProcessProtocolInstrumentedTest {
                 return process.pid;
             }
         }
-        throw new AssertionError("Missing engine process " + processName);
+        return 0;
     }
 }

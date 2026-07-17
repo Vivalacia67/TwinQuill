@@ -130,7 +130,12 @@ public final class GameRepository implements AutoCloseable {
     }
 
     public void refreshPermissions() {
+        refreshPermissions(null);
+    }
+
+    public void refreshPermissions(Callback<Integer> callback) {
         executor.execute(() -> {
+            int changes = 0;
             List<GameEntity> snapshot = games.getAll();
             for (GameEntity game : snapshot) {
                 boolean valid = UriPermissionManager.hasReadPermission(
@@ -139,8 +144,10 @@ public final class GameRepository implements AutoCloseable {
                 );
                 if (valid != game.permissionValid) {
                     games.setPermissionValid(game.id, valid);
+                    changes++;
                 }
             }
+            deliver(callback, changes, null);
         });
     }
 

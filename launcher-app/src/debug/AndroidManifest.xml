@@ -17,5 +17,9 @@
         <activity
             android:name="io.github.twinquill.launcher.EngineProtocolTestHostActivity"
             android:exported="false" />
+        <activity
+            android:name="io.github.twinquill.launcher.EngineCrashTestActivity"
+            android:exported="false"
+            android:process=":krkr" />
     </application>
 </manifest>

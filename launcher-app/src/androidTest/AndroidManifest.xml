@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: GPL-2.0-or-later
+  Copyright (C) 2026 TwinQuill contributors
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <provider
+            android:name="io.github.twinquill.launcher.LauncherFixtureDocumentsProvider"
+            android:authorities="io.github.twinquill.test.documents"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS" />
+        <provider
+            android:name="io.github.twinquill.launcher.LauncherGrantBrokerProvider"
+            android:authorities="io.github.twinquill.test.grants"
+            android:exported="true" />
+    </application>
+</manifest>
