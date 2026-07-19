@@ -40,6 +40,9 @@ tree = "374bee686e5c02ea57c04439216f768e5d3fd739"
 archive_sha256 = "8fa348146ac27ab02d7421b1f231c2b248691467de62f23c0dc1377c2b9aeaf5"
 license = "GPL-2.0-or-later"
 license_files = ["LICENSE", "src/onsyuri/COPYING"]
+patches = [
+    "vendor/patches/onscripter-yuri/0001-android-return-from-sdl-main.patch",
+]
 
 [[gitlinks]]
 parent = "krkrz"

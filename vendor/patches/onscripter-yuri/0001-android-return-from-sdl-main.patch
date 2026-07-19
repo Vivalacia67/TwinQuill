@@ -1,0 +1,63 @@
+From: TwinQuill contributors
+Subject: [PATCH] android: return from SDL main instead of terminating process
+
+ONScripter's process-wide exit() races Android framework threads and prevents
+the dispatcher Activity from returning an EngineResult. Convert startup
+failures into return codes and unwind the script end command to SDL_main on
+Android. Other platforms retain the upstream exit behavior.
+
+Applied by engine-ons/src/main/cpp/ApplyOnsPatches.cmake to ignored build
+copies. The pinned upstream snapshot remains byte-for-byte unchanged.
+
+diff --git a/src/onsyuri/ONScripter_command.cpp b/src/onsyuri/ONScripter_command.cpp
+--- a/src/onsyuri/ONScripter_command.cpp
++++ b/src/onsyuri/ONScripter_command.cpp
+@@
+ #include "ONScripter.h"
++#include "twinquill_ons_exit.h"
+@@
+ int ONScripter::endCommand()
+ {
+     quit();
+     stopSMPEG();
++#if defined(ANDROID)
++    twinquillOnsExit(0);
++#else
+     exit(0);
++#endif
+     return RET_CONTINUE; // dummy
+ }
+diff --git a/src/onsyuri/onscripter_main.cpp b/src/onsyuri/onscripter_main.cpp
+--- a/src/onsyuri/onscripter_main.cpp
++++ b/src/onsyuri/onscripter_main.cpp
+@@
+ #include "ONScripter.h"
++#include "twinquill_ons_exit.h"
+@@
+     // ----------------------------------------
+     // Run ONScripter
++#if defined(ANDROID)
++    if (ons.openScript()) return -1;
++    if (ons.init()) return -1;
++#else
+     if (ons.openScript()) exit(-1);
+     if (ons.init()) exit(-1);
++#endif
+ #if defined(WEB)
+     EM_ASM(
+         self.postMessage("onsinit");
+     );
+ #endif
++#if defined(ANDROID)
++    try {
++        ons.executeLabel();
++    }
++    catch (const TwinQuillOnsExit &request) {
++        return request.status();
++    }
++    return 0;
++#else
+     ons.executeLabel();
+     exit(0);
++#endif
+ }

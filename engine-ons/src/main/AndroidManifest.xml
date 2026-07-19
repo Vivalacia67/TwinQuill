@@ -11,7 +11,7 @@
             android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
             android:exported="false"
             android:hardwareAccelerated="true"
-            android:process=":ons"
+            android:process=":ons_runtime"
             android:screenOrientation="sensorLandscape"
             android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
     </application>
