@@ -11,6 +11,7 @@ import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
 import android.net.Uri;
+import android.os.ParcelFileDescriptor;
 import android.provider.DocumentsContract;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -22,6 +23,7 @@ import org.junit.runner.RunWith;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.io.FileInputStream;
 
 @RunWith(AndroidJUnit4.class)
 public final class NativeVfsInstrumentedTest {
@@ -86,6 +88,12 @@ public final class NativeVfsInstrumentedTest {
     }
 
     @Test
+    public void detachesSeekableDescriptorsForLegacyNativeReaders() throws Exception {
+        assertDetachedDescriptor("中文_日本語.txt", 10, "abcdef");
+        assertDetachedDescriptor("cloud.bin", 900_000, null);
+    }
+
+    @Test
     public void uses64BitOffsetsBeyondFourGigabytes() {
         long[] stat = NativeVfs.stat(treeUri, "large.bin");
         assertNotNull(stat);
@@ -121,5 +129,32 @@ public final class NativeVfsInstrumentedTest {
             NativeVfs.rename(treeUri, "中文_日本語.txt", "renamed.txt")
         );
         assertEquals(UNSUPPORTED, NativeVfs.delete(treeUri, "中文_日本語.txt"));
+    }
+
+    private void assertDetachedDescriptor(
+        String relativePath,
+        long offset,
+        String expectedText
+    ) throws Exception {
+        int descriptor = NativeVfs.openReadOnlyDescriptor(treeUri, relativePath);
+        assertTrue(descriptor >= 0);
+        try (FileInputStream input =
+            new ParcelFileDescriptor.AutoCloseInputStream(
+                ParcelFileDescriptor.adoptFd(descriptor)
+            )) {
+            input.getChannel().position(offset);
+            byte[] output = new byte[expectedText == null ? 8 : expectedText.length()];
+            assertEquals(output.length, input.read(output));
+            if (expectedText == null) {
+                for (int index = 0; index < output.length; index++) {
+                    assertEquals(
+                        FixtureDocumentsProvider.cloudByte((int) offset + index),
+                        output[index]
+                    );
+                }
+            } else {
+                assertEquals(expectedText, new String(output, StandardCharsets.UTF_8));
+            }
+        }
     }
 }

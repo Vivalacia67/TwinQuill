@@ -10,6 +10,9 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.ParcelFileDescriptor;
 import android.provider.DocumentsContract;
+import android.system.ErrnoException;
+import android.system.Os;
+import android.system.OsConstants;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -78,6 +81,25 @@ final class SafVfsBackend {
             long id = NEXT_HANDLE.getAndIncrement();
             OPEN_HANDLES.put(id, handle);
             return id;
+        } catch (SecurityException exception) {
+            return PERMISSION;
+        } catch (FileNotFoundException exception) {
+            return NOT_FOUND;
+        } catch (IllegalArgumentException exception) {
+            return INVALID;
+        } catch (IOException exception) {
+            return ERROR;
+        }
+    }
+
+    static int detachReadOnlyDescriptor(byte[] treeBytes, byte[] pathBytes) {
+        try {
+            Uri treeUri = parseTree(treeBytes);
+            Uri documentUri = resolve(treeUri, text(pathBytes), false);
+            if (documentUri == null) {
+                return NOT_FOUND;
+            }
+            return detachSeekableRead(documentUri);
         } catch (SecurityException exception) {
             return PERMISSION;
         } catch (FileNotFoundException exception) {
@@ -333,6 +355,58 @@ final class SafVfsBackend {
             FileInputStream cachedInput = new FileInputStream(cache);
             return new OpenHandle(null, cachedInput, cachedInput.getChannel(), cache);
         }
+    }
+
+    private static int detachSeekableRead(Uri uri) throws IOException {
+        ParcelFileDescriptor descriptor = resolver.openFileDescriptor(uri, "r");
+        if (descriptor == null) {
+            throw new FileNotFoundException(uri.toString());
+        }
+        try {
+            try {
+                Os.lseek(descriptor.getFileDescriptor(), 0, OsConstants.SEEK_CUR);
+                return descriptor.detachFd();
+            } catch (ErrnoException notSeekable) {
+                if (notSeekable.errno != OsConstants.ESPIPE) {
+                    throw new IOException("Unable to inspect provider descriptor", notSeekable);
+                }
+            }
+        } finally {
+            descriptor.close();
+        }
+
+        File cache = File.createTempFile("tq-vfs-fd-", ".cache", cacheDirectory);
+        boolean complete = false;
+        try (
+            InputStream source = resolver.openInputStream(uri);
+            FileOutputStream output = new FileOutputStream(cache)
+        ) {
+            if (source == null) {
+                throw new FileNotFoundException(uri.toString());
+            }
+            byte[] buffer = new byte[1024 * 1024];
+            int count;
+            while ((count = source.read(buffer)) >= 0) {
+                if (count > 0) {
+                    output.write(buffer, 0, count);
+                }
+            }
+            complete = true;
+        } finally {
+            if (!complete) {
+                cache.delete();
+            }
+        }
+
+        ParcelFileDescriptor cached = ParcelFileDescriptor.open(
+            cache,
+            ParcelFileDescriptor.MODE_READ_ONLY
+        );
+        if (!cache.delete()) {
+            cached.close();
+            throw new IOException("Unable to unlink VFS descriptor cache");
+        }
+        return cached.detachFd();
     }
 
     private static Uri parseTree(byte[] bytes) throws FileNotFoundException {
