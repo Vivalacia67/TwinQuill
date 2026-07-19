@@ -30,6 +30,12 @@ android {
         prefab = true
     }
 
+    lint {
+        // Freeze findings inherited from the pinned SDL2 2.26.3 Android glue.
+        // New findings outside these exact source locations still fail lint.
+        baseline = file("lint-baseline.xml")
+    }
+
     sourceSets {
         getByName("main") {
             // Compile SDL's Android glue from the pinned source snapshot. This
