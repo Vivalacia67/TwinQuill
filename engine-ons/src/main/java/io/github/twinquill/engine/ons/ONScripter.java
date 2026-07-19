@@ -37,6 +37,7 @@ public abstract class ONScripter extends SDLActivity {
     private String[] onsArguments = new String[0];
     private Uri safTreeUri;
     private String safRoot;
+    private OnsAudioFocusController audioFocusController;
 
     private native int nativeInitJavaCallbacks();
 
@@ -46,6 +47,7 @@ public abstract class ONScripter extends SDLActivity {
         if (safTreeUri != null) {
             NativeVfs.install(this);
         }
+        audioFocusController = new OnsAudioFocusController(this);
         super.onCreate(savedInstanceState);
         nativeInitJavaCallbacks();
         enterImmersiveMode();
@@ -54,7 +56,14 @@ public abstract class ONScripter extends SDLActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        audioFocusController.onResume();
         enterImmersiveMode();
+    }
+
+    @Override
+    protected void onPause() {
+        audioFocusController.onPause();
+        super.onPause();
     }
 
     @Override
@@ -238,4 +247,5 @@ public abstract class ONScripter extends SDLActivity {
                 | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
         );
     }
+
 }
