@@ -43,6 +43,9 @@ android {
             java.directories.add(
                 "../vendor/deps/ons/SDL2-2.26.3/android-project/app/src/main/java"
             )
+            assets.directories.add(
+                "../third_party/fonts/noto-sans-cjk-sc-2.004"
+            )
         }
     }
 }

@@ -46,12 +46,15 @@ public final class OnsEngineActivity extends Activity {
         Intent runtimeIntent;
         try {
             runtimeIntent = runtimeIntent(getIntent());
+            if (runtimeIntent != null) {
+                installFallbackFont(runtimeIntent);
+            }
         } catch (IllegalArgumentException exception) {
             Log.e(LOG_TAG, "Invalid ONS launch request", exception);
             finishWithResult(EngineResult.INVALID_REQUEST);
             return;
         } catch (RuntimeException | LinkageError exception) {
-            Log.e(LOG_TAG, "Unable to initialize the ONS VFS", exception);
+            Log.e(LOG_TAG, "Unable to prepare the ONS runtime", exception);
             finishWithResult(EngineResult.VFS_UNAVAILABLE);
             return;
         }
@@ -120,6 +123,16 @@ public final class OnsEngineActivity extends Activity {
         runtime.putExtra(EXTRA_SAVE_ROOT, source.getStringExtra(EXTRA_SAVE_ROOT));
         runtime.putExtra(EXTRA_FONT_PATH, source.getStringExtra(EXTRA_FONT_PATH));
         runtime.putExtra(EXTRA_ENCODING, source.getStringExtra(EXTRA_ENCODING));
+    }
+
+    private void installFallbackFont(Intent runtime) {
+        String requestedFont = runtime.getStringExtra(EXTRA_FONT_PATH);
+        if (requestedFont == null || requestedFont.isBlank()) {
+            runtime.putExtra(
+                EXTRA_FONT_PATH,
+                OnsFallbackFont.prepare(this).getAbsolutePath()
+            );
+        }
     }
 
     private static void copyTextArgument(Bundle source, Intent target, String key) {
