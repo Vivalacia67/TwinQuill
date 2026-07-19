@@ -89,6 +89,7 @@ twinquill_prepare_ons_patched_sources(
     "${CMAKE_CURRENT_BINARY_DIR}/patched/onscripter-yuri/src/onsyuri"
     TWINQUILL_ONS_COMMAND_SOURCE
     TWINQUILL_ONS_MAIN_SOURCE
+    TWINQUILL_ONS_SOUND_SOURCE
 )
 get_target_property(TWINQUILL_ONS_SOURCES onsyuri SOURCES)
 set(TWINQUILL_ONS_PATCHED_SOURCES)
@@ -100,6 +101,10 @@ foreach(SOURCE_PATH IN LISTS TWINQUILL_ONS_SOURCES)
     elseif(SOURCE_PATH MATCHES "onscripter_main\\.cpp$")
         list(APPEND TWINQUILL_ONS_PATCHED_SOURCES
             "${TWINQUILL_ONS_MAIN_SOURCE}"
+        )
+    elseif(SOURCE_PATH MATCHES "ONScripter_sound\\.cpp$")
+        list(APPEND TWINQUILL_ONS_PATCHED_SOURCES
+            "${TWINQUILL_ONS_SOUND_SOURCE}"
         )
     else()
         list(APPEND TWINQUILL_ONS_PATCHED_SOURCES "${SOURCE_PATH}")

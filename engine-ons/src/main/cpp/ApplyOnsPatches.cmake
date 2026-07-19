@@ -15,11 +15,13 @@ function(twinquill_prepare_ons_patched_sources
     OUTPUT_DIR
     OUT_COMMAND_SOURCE
     OUT_MAIN_SOURCE
+    OUT_SOUND_SOURCE
 )
     file(MAKE_DIRECTORY "${OUTPUT_DIR}")
 
     set(COMMAND_SOURCE "${OUTPUT_DIR}/ONScripter_command.cpp")
     set(MAIN_SOURCE "${OUTPUT_DIR}/onscripter_main.cpp")
+    set(SOUND_SOURCE "${OUTPUT_DIR}/ONScripter_sound.cpp")
     configure_file(
         "${UPSTREAM_DIR}/src/onsyuri/ONScripter_command.cpp"
         "${COMMAND_SOURCE}"
@@ -28,6 +30,11 @@ function(twinquill_prepare_ons_patched_sources
     configure_file(
         "${UPSTREAM_DIR}/src/onsyuri/onscripter_main.cpp"
         "${MAIN_SOURCE}"
+        COPYONLY
+    )
+    configure_file(
+        "${UPSTREAM_DIR}/src/onsyuri/ONScripter_sound.cpp"
+        "${SOUND_SOURCE}"
         COPYONLY
     )
 
@@ -47,6 +54,28 @@ function(twinquill_prepare_ons_patched_sources
     exit(0);
 #endif
     return RET_CONTINUE; // dummy]=]
+    )
+
+    twinquill_replace_exact(
+        "${MAIN_SOURCE}"
+        [=[    JavaPlayVideo = jniEnv->GetMethodID(JavaONScripterClass, "playVideo", "([B)V");]=]
+        [=[    JavaPlayVideo = jniEnv->GetMethodID(JavaONScripterClass, "playVideo", "([BZZ)V");]=]
+    )
+    twinquill_replace_exact(
+        "${MAIN_SOURCE}"
+        [=[void playVideoAndroid(const char *path)]=]
+        [=[void playVideoAndroid(const char *path, bool click_flag, bool loop_flag)]=]
+    )
+    twinquill_replace_exact(
+        "${MAIN_SOURCE}"
+        [=[    jniEnv->CallVoidMethod(JavaONScripter, JavaPlayVideo, jba);]=]
+        [=[    jniEnv->CallVoidMethod(
+        JavaONScripter,
+        JavaPlayVideo,
+        jba,
+        static_cast<jboolean>(click_flag),
+        static_cast<jboolean>(loop_flag)
+    );]=]
     )
 
     twinquill_replace_exact(
@@ -87,6 +116,35 @@ function(twinquill_prepare_ons_patched_sources
 }]=]
     )
 
+    twinquill_replace_exact(
+        "${SOUND_SOURCE}"
+        [=[extern "C" void playVideoAndroid(const char *path);]=]
+        [=[extern "C" void playVideoAndroid(
+    const char *path,
+    bool click_flag,
+    bool loop_flag
+);]=]
+    )
+    twinquill_replace_exact(
+        "${SOUND_SOURCE}"
+        [=[#elif defined(ANDROID)
+    playVideoAndroid(absolute_filename);
+#elif defined(WEB)]=]
+        [=[#elif defined(ANDROID)
+    playVideoAndroid(absolute_filename, click_flag, loop_flag);
+#elif defined(WEB)]=]
+    )
+    twinquill_replace_exact(
+        "${SOUND_SOURCE}"
+        [=[#elif defined(ANDROID)
+    playVideoAndroid(absolute_filename);
+#else]=]
+        [=[#elif defined(ANDROID)
+    playVideoAndroid(absolute_filename, click_flag, false);
+#else]=]
+    )
+
     set("${OUT_COMMAND_SOURCE}" "${COMMAND_SOURCE}" PARENT_SCOPE)
     set("${OUT_MAIN_SOURCE}" "${MAIN_SOURCE}" PARENT_SCOPE)
+    set("${OUT_SOUND_SOURCE}" "${SOUND_SOURCE}" PARENT_SCOPE)
 endfunction()

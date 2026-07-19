@@ -7,12 +7,14 @@ package io.github.twinquill.engine.ons;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.ParcelFileDescriptor;
 import android.provider.DocumentsContract;
 import android.util.Log;
 
 import org.libsdl.app.SDLActivity;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -35,7 +37,9 @@ public abstract class ONScripter extends SDLActivity {
     private String[] onsArguments = new String[0];
     private Uri safTreeUri;
     private String safRoot;
+    private File gameRootDirectory;
     private OnsAudioFocusController audioFocusController;
+    private OnsVideoPlayer videoPlayer;
 
     private native int nativeInitJavaCallbacks();
 
@@ -48,6 +52,7 @@ public abstract class ONScripter extends SDLActivity {
         OnsWindowController.prepare(this);
         audioFocusController = new OnsAudioFocusController(this);
         super.onCreate(savedInstanceState);
+        videoPlayer = new OnsVideoPlayer(this, mLayout, this::openVideoDescriptor);
         nativeInitJavaCallbacks();
         OnsWindowController.enterImmersiveMode(this);
     }
@@ -61,8 +66,15 @@ public abstract class ONScripter extends SDLActivity {
 
     @Override
     protected void onPause() {
+        videoPlayer.stop();
         audioFocusController.onPause();
         super.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        videoPlayer.stop();
+        super.onDestroy();
     }
 
     @Override
@@ -118,9 +130,9 @@ public abstract class ONScripter extends SDLActivity {
 
     /** Callback used by the upstream engine for platform video playback. */
     @SuppressWarnings("unused")
-    public void playVideo(byte[] pathBytes) {
+    public void playVideo(byte[] pathBytes, boolean skippable, boolean looping) {
         String path = new String(pathBytes, StandardCharsets.UTF_8);
-        Log.w(TAG, "External video playback is disabled in the M0 prototype: " + path);
+        videoPlayer.play(path, skippable, looping);
     }
 
     private String[] createArguments(Intent intent) {
@@ -132,9 +144,9 @@ public abstract class ONScripter extends SDLActivity {
         String gameRootUri = intent.getStringExtra(OnsEngineActivity.EXTRA_GAME_ROOT_URI);
         String gameRootArgument;
         if (gameRootUri == null) {
-            File gameRoot =
+            gameRootDirectory =
                 requireDirectory(intent.getStringExtra(OnsEngineActivity.EXTRA_GAME_ROOT));
-            gameRootArgument = gameRoot.getAbsolutePath();
+            gameRootArgument = gameRootDirectory.getAbsolutePath();
         } else {
             Uri parsedRoot = Uri.parse(gameRootUri);
             if (!"content".equals(parsedRoot.getScheme())
@@ -155,7 +167,6 @@ public abstract class ONScripter extends SDLActivity {
         arguments.add(gameRootArgument);
         arguments.add("--save-dir");
         arguments.add(saveRoot.getAbsolutePath());
-        arguments.add("--no-video");
 
         String fontPath = intent.getStringExtra(OnsEngineActivity.EXTRA_FONT_PATH);
         if (fontPath != null && !fontPath.isBlank()) {
@@ -178,6 +189,41 @@ public abstract class ONScripter extends SDLActivity {
         }
 
         return arguments.toArray(new String[0]);
+    }
+
+    private ParcelFileDescriptor openVideoDescriptor(String requestedPath)
+        throws IOException {
+        if (safTreeUri != null) {
+            String relativePath = OnsSafRoot.relativePath(safRoot, requestedPath);
+            if (relativePath == null || relativePath.isBlank()) {
+                throw new FileNotFoundException("ONS video path is outside the SAF root");
+            }
+            int descriptor =
+                NativeVfs.openReadOnlyDescriptor(safTreeUri, relativePath);
+            if (descriptor < 0) {
+                throw new FileNotFoundException(
+                    "ONS video is unavailable through SAF: " + relativePath
+                );
+            }
+            return ParcelFileDescriptor.adoptFd(descriptor);
+        }
+
+        if (gameRootDirectory == null) {
+            throw new FileNotFoundException("ONS game root is unavailable");
+        }
+        File candidate = new File(requestedPath);
+        if (!candidate.isAbsolute()) {
+            candidate = new File(gameRootDirectory, requestedPath);
+        }
+        File video = candidate.getCanonicalFile();
+        if (!video.toPath().startsWith(gameRootDirectory.toPath())
+            || !video.isFile()) {
+            throw new FileNotFoundException("ONS video path is outside the game root");
+        }
+        return ParcelFileDescriptor.open(
+            video,
+            ParcelFileDescriptor.MODE_READ_ONLY
+        );
     }
 
     private static File requireDirectory(String path) {
