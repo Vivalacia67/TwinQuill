@@ -5,12 +5,10 @@
 package io.github.twinquill.engine.ons;
 
 import android.content.Intent;
-import android.content.pm.ActivityInfo;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.DocumentsContract;
 import android.util.Log;
-import android.view.View;
 
 import org.libsdl.app.SDLActivity;
 
@@ -47,17 +45,18 @@ public abstract class ONScripter extends SDLActivity {
         if (safTreeUri != null) {
             NativeVfs.install(this);
         }
+        OnsWindowController.prepare(this);
         audioFocusController = new OnsAudioFocusController(this);
         super.onCreate(savedInstanceState);
         nativeInitJavaCallbacks();
-        enterImmersiveMode();
+        OnsWindowController.enterImmersiveMode(this);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         audioFocusController.onResume();
-        enterImmersiveMode();
+        OnsWindowController.enterImmersiveMode(this);
     }
 
     @Override
@@ -70,7 +69,7 @@ public abstract class ONScripter extends SDLActivity {
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus) {
-            enterImmersiveMode();
+            OnsWindowController.enterImmersiveMode(this);
         }
     }
 
@@ -234,18 +233,6 @@ public abstract class ONScripter extends SDLActivity {
         } catch (IOException exception) {
             throw new IllegalArgumentException("Invalid ONS save directory", exception);
         }
-    }
-
-    private void enterImmersiveMode() {
-        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
-        getWindow().getDecorView().setSystemUiVisibility(
-            View.SYSTEM_UI_FLAG_FULLSCREEN
-                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-        );
     }
 
 }
