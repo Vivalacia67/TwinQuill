@@ -63,13 +63,48 @@ public final class EngineProcessProtocolInstrumentedTest {
     }
 
     @Test
-    public void returnsExplicitM1BoundaryFromSeparateEngineProcesses()
+    public void runsOnsFromSafWhileKrkrRetainsItsM1Boundary()
         throws Exception {
         int mainPid = android.os.Process.myPid();
 
-        Intent ons = requestIntent(OnsEngineActivity.class, EngineType.ONS, "ons-test");
-        assertBoundaryResult(ons);
+        Bundle grant = context.getContentResolver().call(
+            Uri.parse("content://" + LauncherGrantBrokerProvider.AUTHORITY),
+            LauncherGrantBrokerProvider.METHOD_GRANT,
+            null,
+            null
+        );
+        assertNotNull(grant);
+        Uri fixtureRoot = grant.getParcelable("uri", Uri.class);
+        assertNotNull(fixtureRoot);
+        File systemFont = new File("/system/fonts/Roboto-Regular.ttf");
+        assertTrue(systemFont.isFile());
+        Bundle onsArguments = new Bundle();
+        onsArguments.putString(
+            OnsEngineActivity.EXTRA_FONT_PATH,
+            systemFont.getAbsolutePath()
+        );
+        onsArguments.putString(OnsEngineActivity.EXTRA_ENCODING, "utf8");
+
+        Intent ons = requestIntent(
+            OnsEngineActivity.class,
+            EngineType.ONS,
+            "ons-saf-test",
+            fixtureRoot,
+            onsArguments
+        );
+        Intent onsResult = launchAndAwait(ons);
+        assertEquals(Activity.RESULT_OK, host.engineResultCode());
+        assertEquals(
+            EngineResult.NORMAL_EXIT.code(),
+            onsResult.getIntExtra(EngineContract.EXTRA_RESULT, -1)
+        );
         int onsPid = requireProcessPid(context.getPackageName() + ":ons");
+        assertTrue(
+            waitForProcessToDisappear(
+                context.getPackageName() + ":ons_runtime",
+                10_000
+            )
+        );
 
         Intent krkr = requestIntent(KrkrEngineActivity.class, EngineType.KRKR, "krkr-test");
         assertBoundaryResult(krkr);
@@ -85,6 +120,7 @@ public final class EngineProcessProtocolInstrumentedTest {
         Intent mismatch =
             requestIntent(OnsEngineActivity.class, EngineType.KRKR, "mismatch-test");
         Intent data = launchAndAwait(mismatch);
+        assertEquals(Activity.RESULT_CANCELED, host.engineResultCode());
         assertEquals(
             EngineResult.INVALID_REQUEST.code(),
             data.getIntExtra(EngineContract.EXTRA_RESULT, -1)
@@ -160,13 +196,29 @@ public final class EngineProcessProtocolInstrumentedTest {
         EngineType engine,
         String gameId
     ) {
+        return requestIntent(
+            activity,
+            engine,
+            gameId,
+            Uri.parse("content://io.github.twinquill.fixture/tree/root"),
+            Bundle.EMPTY
+        );
+    }
+
+    private Intent requestIntent(
+        Class<? extends Activity> activity,
+        EngineType engine,
+        String gameId,
+        Uri root,
+        Bundle arguments
+    ) {
         File saveDirectory = new File(context.getFilesDir(), "saves/" + gameId);
         EngineLaunchRequest request = new EngineLaunchRequest(
             gameId,
-            Uri.parse("content://io.github.twinquill.fixture/tree/root"),
+            root,
             saveDirectory.getAbsolutePath(),
             engine,
-            Bundle.EMPTY
+            arguments
         );
         return new Intent(context, activity)
             .putExtra(EngineContract.EXTRA_LAUNCH_REQUEST, request);
@@ -174,6 +226,7 @@ public final class EngineProcessProtocolInstrumentedTest {
 
     private void assertBoundaryResult(Intent intent) throws Exception {
         Intent data = launchAndAwait(intent);
+        assertEquals(Activity.RESULT_CANCELED, host.engineResultCode());
         assertEquals(
             EngineResult.VFS_UNAVAILABLE.code(),
             data.getIntExtra(EngineContract.EXTRA_RESULT, -1)
@@ -183,7 +236,6 @@ public final class EngineProcessProtocolInstrumentedTest {
     private Intent launchAndAwait(Intent intent) throws Exception {
         instrumentation.runOnMainSync(() -> host.launchEngine(intent));
         assertTrue(host.awaitEngineResult(15, TimeUnit.SECONDS));
-        assertEquals(Activity.RESULT_CANCELED, host.engineResultCode());
         Intent data = host.engineResultData();
         assertNotNull(data);
         return data;
