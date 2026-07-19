@@ -1,0 +1,76 @@
+/*
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright (C) 2026 TwinQuill contributors
+ */
+package io.github.twinquill.launcher;
+
+import android.content.ContentProvider;
+import android.content.ContentValues;
+import android.content.Intent;
+import android.database.Cursor;
+import android.net.Uri;
+import android.os.Bundle;
+
+/** Test-only provider that issues a persistable grant from the fixture APK UID. */
+public final class LauncherGrantBrokerProvider extends ContentProvider {
+    static final String AUTHORITY = "io.github.twinquill.test.grants";
+    static final String METHOD_GRANT = "grant";
+
+    @Override
+    public boolean onCreate() {
+        return true;
+    }
+
+    @Override
+    public Bundle call(String method, String argument, Bundle extras) {
+        if (!METHOD_GRANT.equals(method)) {
+            throw new IllegalArgumentException("Unknown fixture method");
+        }
+        int flags =
+            Intent.FLAG_GRANT_READ_URI_PERMISSION
+                | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION;
+        Uri treeUri = LauncherFixtureDocumentsProvider.treeUri();
+        getContext().grantUriPermission("io.github.twinquill", treeUri, flags);
+        Bundle result = new Bundle();
+        result.putParcelable("uri", treeUri);
+        result.putInt("flags", flags);
+        return result;
+    }
+
+    @Override
+    public Cursor query(
+        Uri uri,
+        String[] projection,
+        String selection,
+        String[] selectionArgs,
+        String sortOrder
+    ) {
+        return null;
+    }
+
+    @Override
+    public String getType(Uri uri) {
+        return null;
+    }
+
+    @Override
+    public Uri insert(Uri uri, ContentValues values) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public int delete(Uri uri, String selection, String[] selectionArgs) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public int update(
+        Uri uri,
+        ContentValues values,
+        String selection,
+        String[] selectionArgs
+    ) {
+        throw new UnsupportedOperationException();
+    }
+}

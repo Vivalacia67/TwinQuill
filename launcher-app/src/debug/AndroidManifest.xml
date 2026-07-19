@@ -14,5 +14,12 @@
             android:name="io.github.twinquill.engine.krkr.KrkrEngineActivity"
             android:exported="true"
             tools:replace="android:exported" />
+        <activity
+            android:name="io.github.twinquill.launcher.EngineProtocolTestHostActivity"
+            android:exported="false" />
+        <activity
+            android:name="io.github.twinquill.launcher.EngineCrashTestActivity"
+            android:exported="false"
+            android:process=":krkr" />
     </application>
 </manifest>

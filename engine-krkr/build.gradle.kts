@@ -30,3 +30,8 @@ android {
         prefab = true
     }
 }
+
+dependencies {
+    implementation(project(":engine-api"))
+    implementation(project(":native-vfs"))
+}
