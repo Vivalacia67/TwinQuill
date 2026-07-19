@@ -24,6 +24,7 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
     static final String ONS_UTF8_ROOT_ID = "ons-utf8";
     static final String ONS_GBK_ROOT_ID = "ons-gbk";
     static final String ONS_SJIS_ROOT_ID = "ons-sjis";
+    static final String ONS_SAVE_ROOT_ID = "ons-save";
 
     private static final byte[] UTF8_SCRIPT = script(
         "UTF-8 中文測試",
@@ -37,6 +38,24 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         "Shift-JIS 日本語テスト",
         Charset.forName("Shift_JIS")
     );
+    private static final byte[] SAVE_SCRIPT = (
+        "*define\n"
+            + "game\n"
+            + "*start\n"
+            + "savefileexist %0,1\n"
+            + "if %0=1 goto *restore\n"
+            + "mov %1,123\n"
+            + "savegame 1\n"
+            + "savefileexist %2,2\n"
+            + "if %2=0 end\n"
+            + "if %1=123 savegame 3\n"
+            + "end\n"
+            + "*restore\n"
+            + "savegame 2\n"
+            + "mov %1,999\n"
+            + "loadgame 1\n"
+            + "end\n"
+    ).getBytes(StandardCharsets.UTF_8);
     private static final String[] DOCUMENT_PROJECTION = {
         DocumentsContract.Document.COLUMN_DOCUMENT_ID,
         DocumentsContract.Document.COLUMN_DISPLAY_NAME,
@@ -220,7 +239,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         return ROOT_ID.equals(documentId)
             || ONS_UTF8_ROOT_ID.equals(documentId)
             || ONS_GBK_ROOT_ID.equals(documentId)
-            || ONS_SJIS_ROOT_ID.equals(documentId);
+            || ONS_SJIS_ROOT_ID.equals(documentId)
+            || ONS_SAVE_ROOT_ID.equals(documentId);
     }
 
     private static String scriptId(String rootId) {
@@ -238,7 +258,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             ROOT_ID,
             ONS_UTF8_ROOT_ID,
             ONS_GBK_ROOT_ID,
-            ONS_SJIS_ROOT_ID
+            ONS_SJIS_ROOT_ID,
+            ONS_SAVE_ROOT_ID
         }) {
             if (scriptId(rootId).equals(documentId)) {
                 return rootId;
@@ -258,6 +279,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
                 return GBK_SCRIPT;
             case ONS_SJIS_ROOT_ID:
                 return SJIS_SCRIPT;
+            case ONS_SAVE_ROOT_ID:
+                return SAVE_SCRIPT;
             case ROOT_ID:
             case ONS_UTF8_ROOT_ID:
                 return UTF8_SCRIPT;

@@ -4,7 +4,9 @@
  */
 package io.github.twinquill.launcher;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -34,6 +36,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import java.io.File;
+import java.nio.file.Files;
 import java.util.concurrent.TimeUnit;
 
 @RunWith(AndroidJUnit4.class)
@@ -110,6 +113,73 @@ public final class EngineProcessProtocolInstrumentedTest {
         assertNotEquals(mainPid, onsPid);
         assertNotEquals(mainPid, krkrPid);
         assertNotEquals(onsPid, krkrPid);
+    }
+
+    @Test
+    public void restoresOnsSaveFromPrivateGameDirectory() throws Exception {
+        String gameId = "ons-save-" + android.os.SystemClock.elapsedRealtime();
+        Uri gameRoot = grantFixture(
+            LauncherFixtureDocumentsProvider.ONS_SAVE_ROOT_ID
+        );
+        File saveDirectory = new File(context.getFilesDir(), "saves/" + gameId);
+
+        assertNormalOnsExit(
+            requestIntent(
+                OnsEngineActivity.class,
+                EngineType.ONS,
+                gameId,
+                gameRoot,
+                Bundle.EMPTY
+            )
+        );
+
+        File saveFile = new File(saveDirectory, "save1.dat");
+        File restoreControl = new File(saveDirectory, "save2.dat");
+        File restoredProof = new File(saveDirectory, "save3.dat");
+        assertTrue(saveFile.isFile());
+        assertTrue(saveFile.length() > 0L);
+        assertFalse(restoreControl.exists());
+        assertFalse(restoredProof.exists());
+        assertEquals(
+            saveDirectory.getCanonicalFile(),
+            saveFile.getCanonicalFile().getParentFile()
+        );
+        assertEquals(
+            new File(context.getFilesDir(), "saves").getCanonicalFile(),
+            saveDirectory.getCanonicalFile().getParentFile()
+        );
+        byte[] firstSave = Files.readAllBytes(saveFile.toPath());
+
+        assertNormalOnsExit(
+            requestIntent(
+                OnsEngineActivity.class,
+                EngineType.ONS,
+                gameId,
+                gameRoot,
+                Bundle.EMPTY
+            )
+        );
+
+        assertArrayEquals(firstSave, Files.readAllBytes(saveFile.toPath()));
+        assertTrue(restoreControl.isFile());
+        assertTrue(restoreControl.length() > 0L);
+        assertTrue(restoredProof.isFile());
+        assertTrue(restoredProof.length() > 0L);
+    }
+
+    private void assertNormalOnsExit(Intent request) throws Exception {
+        Intent result = launchAndAwait(request);
+        assertEquals(Activity.RESULT_OK, host.engineResultCode());
+        assertEquals(
+            EngineResult.NORMAL_EXIT.code(),
+            result.getIntExtra(EngineContract.EXTRA_RESULT, -1)
+        );
+        assertTrue(
+            waitForProcessToDisappear(
+                context.getPackageName() + ":ons_runtime",
+                10_000
+            )
+        );
     }
 
     private Uri grantFixture(String rootId) {
