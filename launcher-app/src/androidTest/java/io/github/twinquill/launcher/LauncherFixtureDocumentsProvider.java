@@ -29,6 +29,7 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
     static final String ONS_SAVE_ROOT_ID = "ons-save";
     static final String ONS_NSA_ROOT_ID = "ons-nsa";
     static final String ONS_SAR_ROOT_ID = "ons-sar";
+    static final String ONS_LUA_ROOT_ID = "ons-lua";
 
     private static final byte[] UTF8_SCRIPT = script(
         "UTF-8 中文測試",
@@ -62,6 +63,20 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
     ).getBytes(StandardCharsets.UTF_8);
     private static final byte[] NSA_SCRIPT = archiveScript("nsa");
     private static final byte[] SAR_SCRIPT = archiveScript("sar");
+    private static final byte[] LUA_SCRIPT = (
+        "*define\n"
+            + "luasub luaproof\n"
+            + "game\n"
+            + "*start\n"
+            + "luaproof\n"
+            + "if %10=321 savegame 5\n"
+            + "end\n"
+    ).getBytes(StandardCharsets.UTF_8);
+    private static final byte[] LUA_SYSTEM_SCRIPT = (
+        "function NSCOM_luaproof()\n"
+            + "  NSSetIntValue(10, 321)\n"
+            + "end\n"
+    ).getBytes(StandardCharsets.UTF_8);
     private static final byte[] BITMAP = bitmap();
     private static final byte[] NSA_ARCHIVE = archive(BITMAP, true);
     private static final byte[] SAR_ARCHIVE = archive(BITMAP, false);
@@ -150,6 +165,9 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         if (isArchiveRoot(parentDocumentId)) {
             addDocument(result, archiveId(parentDocumentId));
         }
+        if (ONS_LUA_ROOT_ID.equals(parentDocumentId)) {
+            addDocument(result, luaId(parentDocumentId));
+        }
         return result;
     }
 
@@ -172,6 +190,10 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
                     || (
                         isArchiveRoot(parentDocumentId)
                             && archiveId(parentDocumentId).equals(documentId)
+                    )
+                    || (
+                        ONS_LUA_ROOT_ID.equals(parentDocumentId)
+                            && luaId(parentDocumentId).equals(documentId)
                     )
             );
     }
@@ -263,7 +285,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
     private static void requireKnown(String documentId) throws FileNotFoundException {
         if (!isKnownRoot(documentId)
             && rootForScript(documentId) == null
-            && rootForArchive(documentId) == null) {
+            && rootForArchive(documentId) == null
+            && rootForLua(documentId) == null) {
             throw new FileNotFoundException(documentId);
         }
     }
@@ -275,7 +298,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             || ONS_SJIS_ROOT_ID.equals(documentId)
             || ONS_SAVE_ROOT_ID.equals(documentId)
             || ONS_NSA_ROOT_ID.equals(documentId)
-            || ONS_SAR_ROOT_ID.equals(documentId);
+            || ONS_SAR_ROOT_ID.equals(documentId)
+            || ONS_LUA_ROOT_ID.equals(documentId);
     }
 
     private static String scriptId(String rootId) {
@@ -284,6 +308,10 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
 
     private static String archiveId(String rootId) {
         return rootId + "-archive";
+    }
+
+    private static String luaId(String rootId) {
+        return rootId + "-system-lua";
     }
 
     private static boolean isArchiveRoot(String rootId) {
@@ -304,13 +332,20 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             ONS_SJIS_ROOT_ID,
             ONS_SAVE_ROOT_ID,
             ONS_NSA_ROOT_ID,
-            ONS_SAR_ROOT_ID
+            ONS_SAR_ROOT_ID,
+            ONS_LUA_ROOT_ID
         }) {
             if (scriptId(rootId).equals(documentId)) {
                 return rootId;
             }
         }
         return null;
+    }
+
+    private static String rootForLua(String documentId) {
+        return luaId(ONS_LUA_ROOT_ID).equals(documentId)
+            ? ONS_LUA_ROOT_ID
+            : null;
     }
 
     private static String rootForArchive(String documentId) {
@@ -334,6 +369,9 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         if (ONS_SAR_ROOT_ID.equals(archiveRoot)) {
             return "arc.sar";
         }
+        if (rootForLua(documentId) != null) {
+            return "system.lua";
+        }
         if (rootForScript(documentId) != null) {
             return "0.txt";
         }
@@ -348,6 +386,9 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         }
         if (ONS_SAR_ROOT_ID.equals(archiveRoot)) {
             return SAR_ARCHIVE;
+        }
+        if (rootForLua(documentId) != null) {
+            return LUA_SYSTEM_SCRIPT;
         }
         return scriptBytes(documentId);
     }
@@ -369,6 +410,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
                 return NSA_SCRIPT;
             case ONS_SAR_ROOT_ID:
                 return SAR_SCRIPT;
+            case ONS_LUA_ROOT_ID:
+                return LUA_SCRIPT;
             case ROOT_ID:
             case ONS_UTF8_ROOT_ID:
                 return UTF8_SCRIPT;

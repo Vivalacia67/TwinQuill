@@ -197,6 +197,28 @@ public final class EngineProcessProtocolInstrumentedTest {
         }
     }
 
+    @Test
+    public void executesOnsLuaFromSaf() throws Exception {
+        String gameId =
+            "ons-lua-" + android.os.SystemClock.elapsedRealtime();
+        assertNormalOnsExit(
+            requestIntent(
+                OnsEngineActivity.class,
+                EngineType.ONS,
+                gameId,
+                grantFixture(LauncherFixtureDocumentsProvider.ONS_LUA_ROOT_ID),
+                Bundle.EMPTY
+            )
+        );
+
+        File proofSave = new File(
+            context.getFilesDir(),
+            "saves/" + gameId + "/save5.dat"
+        );
+        assertTrue(proofSave.isFile());
+        assertTrue(proofSave.length() > 0L);
+    }
+
     private void resetArchiveOpenCount(String rootId) {
         Bundle result = context.getContentResolver().call(
             Uri.parse("content://" + LauncherGrantBrokerProvider.AUTHORITY),
