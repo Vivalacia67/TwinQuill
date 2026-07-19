@@ -30,7 +30,9 @@ public final class LauncherGrantBrokerProvider extends ContentProvider {
             Intent.FLAG_GRANT_READ_URI_PERMISSION
                 | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
                 | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION;
-        Uri treeUri = LauncherFixtureDocumentsProvider.treeUri();
+        Uri treeUri = argument == null
+            ? LauncherFixtureDocumentsProvider.treeUri()
+            : LauncherFixtureDocumentsProvider.treeUri(argument);
         getContext().grantUriPermission("io.github.twinquill", treeUri, flags);
         Bundle result = new Bundle();
         result.putParcelable("uri", treeUri);

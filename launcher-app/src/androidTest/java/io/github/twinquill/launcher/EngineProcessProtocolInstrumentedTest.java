@@ -63,48 +63,45 @@ public final class EngineProcessProtocolInstrumentedTest {
     }
 
     @Test
-    public void runsOnsFromSafWhileKrkrRetainsItsM1Boundary()
+    public void runsEncodedOnsSafGamesWithBundledFont()
         throws Exception {
         int mainPid = android.os.Process.myPid();
+        String[][] fixtures = {
+            {LauncherFixtureDocumentsProvider.ONS_UTF8_ROOT_ID, "utf8"},
+            {LauncherFixtureDocumentsProvider.ONS_GBK_ROOT_ID, "gbk"},
+            {LauncherFixtureDocumentsProvider.ONS_SJIS_ROOT_ID, "sjis"}
+        };
+        for (String[] fixture : fixtures) {
+            Bundle onsArguments = new Bundle();
+            onsArguments.putString(OnsEngineActivity.EXTRA_ENCODING, fixture[1]);
+            Intent ons = requestIntent(
+                OnsEngineActivity.class,
+                EngineType.ONS,
+                "ons-" + fixture[1] + "-test",
+                grantFixture(fixture[0]),
+                onsArguments
+            );
+            Intent onsResult = launchAndAwait(ons);
+            assertEquals(Activity.RESULT_OK, host.engineResultCode());
+            assertEquals(
+                EngineResult.NORMAL_EXIT.code(),
+                onsResult.getIntExtra(EngineContract.EXTRA_RESULT, -1)
+            );
+            assertTrue(
+                waitForProcessToDisappear(
+                    context.getPackageName() + ":ons_runtime",
+                    10_000
+                )
+            );
+        }
 
-        Bundle grant = context.getContentResolver().call(
-            Uri.parse("content://" + LauncherGrantBrokerProvider.AUTHORITY),
-            LauncherGrantBrokerProvider.METHOD_GRANT,
-            null,
-            null
+        File fallbackFont = new File(
+            context.getFilesDir(),
+            "engine-assets/ons/NotoSansCJKsc-Regular-2.004.otf"
         );
-        assertNotNull(grant);
-        Uri fixtureRoot = grant.getParcelable("uri", Uri.class);
-        assertNotNull(fixtureRoot);
-        File systemFont = new File("/system/fonts/Roboto-Regular.ttf");
-        assertTrue(systemFont.isFile());
-        Bundle onsArguments = new Bundle();
-        onsArguments.putString(
-            OnsEngineActivity.EXTRA_FONT_PATH,
-            systemFont.getAbsolutePath()
-        );
-        onsArguments.putString(OnsEngineActivity.EXTRA_ENCODING, "utf8");
-
-        Intent ons = requestIntent(
-            OnsEngineActivity.class,
-            EngineType.ONS,
-            "ons-saf-test",
-            fixtureRoot,
-            onsArguments
-        );
-        Intent onsResult = launchAndAwait(ons);
-        assertEquals(Activity.RESULT_OK, host.engineResultCode());
-        assertEquals(
-            EngineResult.NORMAL_EXIT.code(),
-            onsResult.getIntExtra(EngineContract.EXTRA_RESULT, -1)
-        );
+        assertTrue(fallbackFont.isFile());
+        assertEquals(16_437_364L, fallbackFont.length());
         int onsPid = requireProcessPid(context.getPackageName() + ":ons");
-        assertTrue(
-            waitForProcessToDisappear(
-                context.getPackageName() + ":ons_runtime",
-                10_000
-            )
-        );
 
         Intent krkr = requestIntent(KrkrEngineActivity.class, EngineType.KRKR, "krkr-test");
         assertBoundaryResult(krkr);
@@ -113,6 +110,19 @@ public final class EngineProcessProtocolInstrumentedTest {
         assertNotEquals(mainPid, onsPid);
         assertNotEquals(mainPid, krkrPid);
         assertNotEquals(onsPid, krkrPid);
+    }
+
+    private Uri grantFixture(String rootId) {
+        Bundle grant = context.getContentResolver().call(
+            Uri.parse("content://" + LauncherGrantBrokerProvider.AUTHORITY),
+            LauncherGrantBrokerProvider.METHOD_GRANT,
+            rootId,
+            null
+        );
+        assertNotNull(grant);
+        Uri fixtureRoot = grant.getParcelable("uri", Uri.class);
+        assertNotNull(fixtureRoot);
+        return fixtureRoot;
     }
 
     @Test

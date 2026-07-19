@@ -14,16 +14,29 @@ import android.provider.DocumentsProvider;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
 /** SAF fixture that lives only in the launcher instrumentation APK. */
 public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
     static final String AUTHORITY = "io.github.twinquill.test.documents";
     static final String ROOT_ID = "root";
+    static final String ONS_UTF8_ROOT_ID = "ons-utf8";
+    static final String ONS_GBK_ROOT_ID = "ons-gbk";
+    static final String ONS_SJIS_ROOT_ID = "ons-sjis";
 
-    private static final String SCRIPT_ID = "ons-script";
-    private static final byte[] SCRIPT = "*define\ngame\n*start\nend\n"
-        .getBytes(StandardCharsets.UTF_8);
+    private static final byte[] UTF8_SCRIPT = script(
+        "UTF-8 中文測試",
+        StandardCharsets.UTF_8
+    );
+    private static final byte[] GBK_SCRIPT = script(
+        "GBK 简体中文测试",
+        Charset.forName("GBK")
+    );
+    private static final byte[] SJIS_SCRIPT = script(
+        "Shift-JIS 日本語テスト",
+        Charset.forName("Shift_JIS")
+    );
     private static final String[] DOCUMENT_PROJECTION = {
         DocumentsContract.Document.COLUMN_DOCUMENT_ID,
         DocumentsContract.Document.COLUMN_DISPLAY_NAME,
@@ -47,6 +60,13 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
 
     static Uri treeUri() {
         return DocumentsContract.buildTreeDocumentUri(AUTHORITY, ROOT_ID);
+    }
+
+    static Uri treeUri(String rootId) {
+        if (!isKnownRoot(rootId)) {
+            throw new IllegalArgumentException("Unknown fixture root");
+        }
+        return DocumentsContract.buildTreeDocumentUri(AUTHORITY, rootId);
     }
 
     @Override
@@ -92,25 +112,26 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         String[] projection,
         String sortOrder
     ) throws FileNotFoundException {
-        if (!ROOT_ID.equals(parentDocumentId)) {
+        if (!isKnownRoot(parentDocumentId)) {
             throw new FileNotFoundException(parentDocumentId);
         }
         MatrixCursor result = documentCursor(projection);
-        addDocument(result, SCRIPT_ID);
+        addDocument(result, scriptId(parentDocumentId));
         return result;
     }
 
     @Override
     public String getDocumentType(String documentId) throws FileNotFoundException {
         requireKnown(documentId);
-        return ROOT_ID.equals(documentId)
+        return isKnownRoot(documentId)
             ? DocumentsContract.Document.MIME_TYPE_DIR
             : "text/plain";
     }
 
     @Override
     public boolean isChildDocument(String parentDocumentId, String documentId) {
-        return ROOT_ID.equals(parentDocumentId) && SCRIPT_ID.equals(documentId);
+        return isKnownRoot(parentDocumentId)
+            && scriptId(parentDocumentId).equals(documentId);
     }
 
     @Override
@@ -119,9 +140,7 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         String mode,
         CancellationSignal signal
     ) throws FileNotFoundException {
-        if (!SCRIPT_ID.equals(documentId)) {
-            throw new FileNotFoundException(documentId);
-        }
+        byte[] contents = scriptBytes(documentId);
         if (!"r".equals(mode)) {
             throw new UnsupportedOperationException("Fixture provider is read-only");
         }
@@ -132,7 +151,7 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
                     ParcelFileDescriptor.AutoCloseOutputStream output =
                         new ParcelFileDescriptor.AutoCloseOutputStream(pipe[1])
                 ) {
-                    output.write(SCRIPT);
+                    output.write(contents);
                 } catch (IOException ignored) {
                     // Closing a reader early is a valid cancellation path.
                 }
@@ -153,6 +172,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
     private static void addDocument(MatrixCursor cursor, String documentId)
         throws FileNotFoundException {
         requireKnown(documentId);
+        boolean root = isKnownRoot(documentId);
+        byte[] contents = root ? null : scriptBytes(documentId);
         MatrixCursor.RowBuilder row = cursor.newRow();
         for (String column : cursor.getColumnNames()) {
             switch (column) {
@@ -160,17 +181,21 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
                     row.add(documentId);
                     break;
                 case DocumentsContract.Document.COLUMN_DISPLAY_NAME:
-                    row.add(ROOT_ID.equals(documentId) ? "持久化测试" : "0.txt");
+                    row.add(
+                        root
+                            ? rootDisplayName(documentId)
+                            : "0.txt"
+                    );
                     break;
                 case DocumentsContract.Document.COLUMN_MIME_TYPE:
                     row.add(
-                        ROOT_ID.equals(documentId)
+                        root
                             ? DocumentsContract.Document.MIME_TYPE_DIR
                             : "text/plain"
                     );
                     break;
                 case DocumentsContract.Document.COLUMN_SIZE:
-                    row.add(ROOT_ID.equals(documentId) ? 0L : SCRIPT.length);
+                    row.add(root ? 0L : contents.length);
                     break;
                 case DocumentsContract.Document.COLUMN_LAST_MODIFIED:
                     row.add(0L);
@@ -186,8 +211,68 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
     }
 
     private static void requireKnown(String documentId) throws FileNotFoundException {
-        if (!ROOT_ID.equals(documentId) && !SCRIPT_ID.equals(documentId)) {
+        if (!isKnownRoot(documentId) && rootForScript(documentId) == null) {
             throw new FileNotFoundException(documentId);
         }
+    }
+
+    private static boolean isKnownRoot(String documentId) {
+        return ROOT_ID.equals(documentId)
+            || ONS_UTF8_ROOT_ID.equals(documentId)
+            || ONS_GBK_ROOT_ID.equals(documentId)
+            || ONS_SJIS_ROOT_ID.equals(documentId);
+    }
+
+    private static String scriptId(String rootId) {
+        return rootId + "-script";
+    }
+
+    private static String rootDisplayName(String rootId) {
+        return ROOT_ID.equals(rootId)
+            ? "持久化测试"
+            : "TwinQuill ONS 测试";
+    }
+
+    private static String rootForScript(String documentId) {
+        for (String rootId : new String[] {
+            ROOT_ID,
+            ONS_UTF8_ROOT_ID,
+            ONS_GBK_ROOT_ID,
+            ONS_SJIS_ROOT_ID
+        }) {
+            if (scriptId(rootId).equals(documentId)) {
+                return rootId;
+            }
+        }
+        return null;
+    }
+
+    private static byte[] scriptBytes(String documentId)
+        throws FileNotFoundException {
+        String rootId = rootForScript(documentId);
+        if (rootId == null) {
+            throw new FileNotFoundException(documentId);
+        }
+        switch (rootId) {
+            case ONS_GBK_ROOT_ID:
+                return GBK_SCRIPT;
+            case ONS_SJIS_ROOT_ID:
+                return SJIS_SCRIPT;
+            case ROOT_ID:
+            case ONS_UTF8_ROOT_ID:
+                return UTF8_SCRIPT;
+            default:
+                throw new FileNotFoundException(documentId);
+        }
+    }
+
+    private static byte[] script(String caption, Charset encoding) {
+        return (
+            "*define\n"
+                + "game\n"
+                + "*start\n"
+                + "caption \"" + caption + "\"\n"
+                + "end\n"
+        ).getBytes(encoding);
     }
 }
