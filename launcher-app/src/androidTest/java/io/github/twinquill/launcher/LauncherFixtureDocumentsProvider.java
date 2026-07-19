@@ -4,6 +4,7 @@
  */
 package io.github.twinquill.launcher;
 
+import android.content.Context;
 import android.database.Cursor;
 import android.database.MatrixCursor;
 import android.net.Uri;
@@ -31,6 +32,7 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
     static final String ONS_SAR_ROOT_ID = "ons-sar";
     static final String ONS_LUA_ROOT_ID = "ons-lua";
     static final String ONS_AUDIO_ROOT_ID = "ons-audio";
+    static final String ONS_VIDEO_ROOT_ID = "ons-video";
 
     private static final byte[] UTF8_SCRIPT = script(
         "UTF-8 中文測試",
@@ -90,6 +92,16 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             + "savegame 6\n"
             + "end\n"
     ).getBytes(StandardCharsets.UTF_8);
+    private static final byte[] VIDEO_SCRIPT = (
+        "*define\n"
+            + "game\n"
+            + "*start\n"
+            + "fileexist %0,\"clip.mp4\"\n"
+            + "if %0=0 end\n"
+            + "movie \"clip.mp4\"\n"
+            + "savegame 7\n"
+            + "end\n"
+    ).getBytes(StandardCharsets.UTF_8);
     private static final byte[] AUDIO_TONE = toneWave();
     private static final byte[] BITMAP = bitmap();
     private static final byte[] NSA_ARCHIVE = archive(BITMAP, true);
@@ -97,6 +109,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
     private static final AtomicInteger NSA_ARCHIVE_OPENS = new AtomicInteger();
     private static final AtomicInteger SAR_ARCHIVE_OPENS = new AtomicInteger();
     private static final AtomicInteger AUDIO_OPENS = new AtomicInteger();
+    private static final AtomicInteger VIDEO_OPENS = new AtomicInteger();
+    private static volatile Context fixtureContext;
     private static final String[] DOCUMENT_PROJECTION = {
         DocumentsContract.Document.COLUMN_DOCUMENT_ID,
         DocumentsContract.Document.COLUMN_DISPLAY_NAME,
@@ -115,6 +129,11 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
 
     @Override
     public boolean onCreate() {
+        Context context = getContext();
+        if (context == null) {
+            return false;
+        }
+        fixtureContext = context.getApplicationContext();
         return true;
     }
 
@@ -186,6 +205,9 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         if (ONS_AUDIO_ROOT_ID.equals(parentDocumentId)) {
             addDocument(result, audioId(parentDocumentId));
         }
+        if (ONS_VIDEO_ROOT_ID.equals(parentDocumentId)) {
+            addDocument(result, videoId(parentDocumentId));
+        }
         return result;
     }
 
@@ -195,9 +217,7 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         if (isKnownRoot(documentId)) {
             return DocumentsContract.Document.MIME_TYPE_DIR;
         }
-        return rootForArchive(documentId) == null
-            ? "text/plain"
-            : "application/octet-stream";
+        return documentMimeType(documentId);
     }
 
     @Override
@@ -216,6 +236,10 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
                     || (
                         ONS_AUDIO_ROOT_ID.equals(parentDocumentId)
                             && audioId(parentDocumentId).equals(documentId)
+                    )
+                    || (
+                        ONS_VIDEO_ROOT_ID.equals(parentDocumentId)
+                            && videoId(parentDocumentId).equals(documentId)
                     )
             );
     }
@@ -236,6 +260,9 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         }
         if (rootForAudio(documentId) != null) {
             AUDIO_OPENS.incrementAndGet();
+        }
+        if (rootForVideo(documentId) != null) {
+            VIDEO_OPENS.incrementAndGet();
         }
         try {
             ParcelFileDescriptor[] pipe = ParcelFileDescriptor.createPipe();
@@ -284,11 +311,7 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
                     row.add(
                         root
                             ? DocumentsContract.Document.MIME_TYPE_DIR
-                            : (
-                                rootForArchive(documentId) == null
-                                    ? "text/plain"
-                                    : "application/octet-stream"
-                            )
+                            : documentMimeType(documentId)
                     );
                     break;
                 case DocumentsContract.Document.COLUMN_SIZE:
@@ -312,7 +335,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             && rootForScript(documentId) == null
             && rootForArchive(documentId) == null
             && rootForLua(documentId) == null
-            && rootForAudio(documentId) == null) {
+            && rootForAudio(documentId) == null
+            && rootForVideo(documentId) == null) {
             throw new FileNotFoundException(documentId);
         }
     }
@@ -326,7 +350,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             || ONS_NSA_ROOT_ID.equals(documentId)
             || ONS_SAR_ROOT_ID.equals(documentId)
             || ONS_LUA_ROOT_ID.equals(documentId)
-            || ONS_AUDIO_ROOT_ID.equals(documentId);
+            || ONS_AUDIO_ROOT_ID.equals(documentId)
+            || ONS_VIDEO_ROOT_ID.equals(documentId);
     }
 
     private static String scriptId(String rootId) {
@@ -343,6 +368,10 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
 
     private static String audioId(String rootId) {
         return rootId + "-tone";
+    }
+
+    private static String videoId(String rootId) {
+        return rootId + "-clip";
     }
 
     private static boolean isArchiveRoot(String rootId) {
@@ -365,7 +394,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             ONS_NSA_ROOT_ID,
             ONS_SAR_ROOT_ID,
             ONS_LUA_ROOT_ID,
-            ONS_AUDIO_ROOT_ID
+            ONS_AUDIO_ROOT_ID,
+            ONS_VIDEO_ROOT_ID
         }) {
             if (scriptId(rootId).equals(documentId)) {
                 return rootId;
@@ -383,6 +413,12 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
     private static String rootForAudio(String documentId) {
         return audioId(ONS_AUDIO_ROOT_ID).equals(documentId)
             ? ONS_AUDIO_ROOT_ID
+            : null;
+    }
+
+    private static String rootForVideo(String documentId) {
+        return videoId(ONS_VIDEO_ROOT_ID).equals(documentId)
+            ? ONS_VIDEO_ROOT_ID
             : null;
     }
 
@@ -413,6 +449,9 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         if (rootForAudio(documentId) != null) {
             return "tone.wav";
         }
+        if (rootForVideo(documentId) != null) {
+            return "clip.mp4";
+        }
         if (rootForScript(documentId) != null) {
             return "0.txt";
         }
@@ -433,6 +472,20 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         }
         if (rootForAudio(documentId) != null) {
             return AUDIO_TONE;
+        }
+        if (rootForVideo(documentId) != null) {
+            try {
+                Context context = fixtureContext;
+                if (context == null) {
+                    throw new IOException("Fixture provider is not initialized");
+                }
+                return LauncherVideoFixture.bytes(context);
+            } catch (IOException exception) {
+                FileNotFoundException failure =
+                    new FileNotFoundException(exception.getMessage());
+                failure.initCause(exception);
+                throw failure;
+            }
         }
         return scriptBytes(documentId);
     }
@@ -458,6 +511,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
                 return LUA_SCRIPT;
             case ONS_AUDIO_ROOT_ID:
                 return AUDIO_SCRIPT;
+            case ONS_VIDEO_ROOT_ID:
+                return VIDEO_SCRIPT;
             case ROOT_ID:
             case ONS_UTF8_ROOT_ID:
                 return UTF8_SCRIPT;
@@ -490,6 +545,27 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
 
     static int audioOpenCount() {
         return AUDIO_OPENS.get();
+    }
+
+    static void resetVideoOpenCount() {
+        VIDEO_OPENS.set(0);
+    }
+
+    static int videoOpenCount() {
+        return VIDEO_OPENS.get();
+    }
+
+    private static String documentMimeType(String documentId) {
+        if (rootForArchive(documentId) != null) {
+            return "application/octet-stream";
+        }
+        if (rootForAudio(documentId) != null) {
+            return "audio/wav";
+        }
+        if (rootForVideo(documentId) != null) {
+            return "video/mp4";
+        }
+        return "text/plain";
     }
 
     private static AtomicInteger archiveOpenCounter(String rootId) {

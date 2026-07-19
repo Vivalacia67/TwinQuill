@@ -243,6 +243,33 @@ public final class EngineProcessProtocolInstrumentedTest {
         assertTrue(audioOpenCount() > 0);
     }
 
+    @Test
+    public void playsOnsPlatformVideoFromSaf() throws Exception {
+        resetVideoOpenCount();
+        String gameId =
+            "ons-video-" + android.os.SystemClock.elapsedRealtime();
+        long started = android.os.SystemClock.elapsedRealtime();
+        assertNormalOnsExit(
+            requestIntent(
+                OnsEngineActivity.class,
+                EngineType.ONS,
+                gameId,
+                grantFixture(LauncherFixtureDocumentsProvider.ONS_VIDEO_ROOT_ID),
+                Bundle.EMPTY
+            )
+        );
+        long elapsed = android.os.SystemClock.elapsedRealtime() - started;
+
+        File proofSave = new File(
+            context.getFilesDir(),
+            "saves/" + gameId + "/save7.dat"
+        );
+        assertTrue(proofSave.isFile());
+        assertTrue(proofSave.length() > 0L);
+        assertTrue(videoOpenCount() > 0);
+        assertTrue("ONS video returned before its final frame", elapsed >= 1_500L);
+    }
+
     private void resetAudioOpenCount() {
         Bundle result = context.getContentResolver().call(
             Uri.parse("content://" + LauncherGrantBrokerProvider.AUTHORITY),
@@ -257,6 +284,27 @@ public final class EngineProcessProtocolInstrumentedTest {
         Bundle result = context.getContentResolver().call(
             Uri.parse("content://" + LauncherGrantBrokerProvider.AUTHORITY),
             LauncherGrantBrokerProvider.METHOD_AUDIO_OPEN_COUNT,
+            null,
+            null
+        );
+        assertNotNull(result);
+        return result.getInt("count", 0);
+    }
+
+    private void resetVideoOpenCount() {
+        Bundle result = context.getContentResolver().call(
+            Uri.parse("content://" + LauncherGrantBrokerProvider.AUTHORITY),
+            LauncherGrantBrokerProvider.METHOD_RESET_VIDEO_OPEN_COUNT,
+            null,
+            null
+        );
+        assertNotNull(result);
+    }
+
+    private int videoOpenCount() {
+        Bundle result = context.getContentResolver().call(
+            Uri.parse("content://" + LauncherGrantBrokerProvider.AUTHORITY),
+            LauncherGrantBrokerProvider.METHOD_VIDEO_OPEN_COUNT,
             null,
             null
         );
