@@ -27,6 +27,8 @@ public final class OnsEngineActivity extends Activity {
         "io.github.twinquill.extra.ONS_GAME_ID";
     public static final String EXTRA_GAME_ROOT =
         "io.github.twinquill.extra.ONS_GAME_ROOT";
+    public static final String EXTRA_GAME_ROOT_URI =
+        "io.github.twinquill.extra.ONS_GAME_ROOT_URI";
     public static final String EXTRA_SAVE_ROOT =
         "io.github.twinquill.extra.ONS_SAVE_ROOT";
     public static final String EXTRA_FONT_PATH =
@@ -84,8 +86,14 @@ public final class OnsEngineActivity extends Activity {
         NativeVfs.install(this);
         Uri root = request.gameRootUri();
         if ("content".equals(root.getScheme())) {
-            Log.i(LOG_TAG, "ONS SAF runtime integration is scheduled for M2");
-            return null;
+            runtime.putExtra(EXTRA_GAME_ID, request.gameId());
+            runtime.putExtra(EXTRA_GAME_ROOT, OnsSafRoot.create(request.gameId()));
+            runtime.putExtra(EXTRA_GAME_ROOT_URI, root.toString());
+            runtime.putExtra(EXTRA_SAVE_ROOT, request.saveDirectoryPath());
+            Bundle arguments = request.arguments();
+            copyTextArgument(arguments, runtime, EXTRA_FONT_PATH);
+            copyTextArgument(arguments, runtime, EXTRA_ENCODING);
+            return runtime;
         }
         if (!"file".equals(root.getScheme()) || root.getPath() == null) {
             throw new IllegalArgumentException("Unsupported ONS game root URI");

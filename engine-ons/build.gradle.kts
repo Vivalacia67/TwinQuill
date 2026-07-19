@@ -50,4 +50,5 @@ android {
 dependencies {
     implementation(project(":engine-api"))
     implementation(project(":native-vfs"))
+    testImplementation("junit:junit:4.13.2")
 }

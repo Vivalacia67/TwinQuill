@@ -6,7 +6,9 @@ package io.github.twinquill.engine.ons;
 
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.DocumentsContract;
 import android.util.Log;
 import android.view.View;
 
@@ -18,6 +20,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+
+import io.github.twinquill.nativevfs.NativeVfs;
 
 /**
  * JNI bridge required by ONScripterYuri's source-level Android entry points.
@@ -31,12 +35,17 @@ public abstract class ONScripter extends SDLActivity {
     private static final String TAG = "TwinQuill/ONS";
 
     private String[] onsArguments = new String[0];
+    private Uri safTreeUri;
+    private String safRoot;
 
     private native int nativeInitJavaCallbacks();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         onsArguments = createArguments(getIntent());
+        if (safTreeUri != null) {
+            NativeVfs.install(this);
+        }
         super.onCreate(savedInstanceState);
         nativeInitJavaCallbacks();
         enterImmersiveMode();
@@ -77,9 +86,20 @@ public abstract class ONScripter extends SDLActivity {
     /** Native fallback for paths that regular POSIX I/O could not open. */
     @SuppressWarnings("unused")
     public int getFD(byte[] pathBytes, int mode) {
-        // SAF descriptors are supplied by native-vfs in M1. Returning -1 makes
-        // the current M0 contract explicitly regular-filesystem-only.
-        return -1;
+        if (mode != 0 || safTreeUri == null) {
+            return -1;
+        }
+        String requestedPath = new String(pathBytes, StandardCharsets.UTF_8);
+        String relativePath = OnsSafRoot.relativePath(safRoot, requestedPath);
+        if (relativePath == null || relativePath.isBlank()) {
+            return -1;
+        }
+        int descriptor = NativeVfs.openReadOnlyDescriptor(safTreeUri, relativePath);
+        if (descriptor < 0) {
+            Log.d(TAG, "SAF read unavailable (" + descriptor + "): " + relativePath);
+            return -1;
+        }
+        return descriptor;
     }
 
     /** Native fallback for directories that regular POSIX I/O could not make. */
@@ -100,8 +120,23 @@ public abstract class ONScripter extends SDLActivity {
             throw new IllegalArgumentException("ONS launch intent is required");
         }
 
-        File gameRoot = requireDirectory(intent.getStringExtra(OnsEngineActivity.EXTRA_GAME_ROOT));
         String gameId = requireSafeGameId(intent.getStringExtra(OnsEngineActivity.EXTRA_GAME_ID));
+        String gameRootUri = intent.getStringExtra(OnsEngineActivity.EXTRA_GAME_ROOT_URI);
+        String gameRootArgument;
+        if (gameRootUri == null) {
+            File gameRoot =
+                requireDirectory(intent.getStringExtra(OnsEngineActivity.EXTRA_GAME_ROOT));
+            gameRootArgument = gameRoot.getAbsolutePath();
+        } else {
+            Uri parsedRoot = Uri.parse(gameRootUri);
+            if (!"content".equals(parsedRoot.getScheme())
+                || !DocumentsContract.isTreeUri(parsedRoot)) {
+                throw new IllegalArgumentException("ONS game root is not a SAF tree");
+            }
+            safTreeUri = parsedRoot;
+            safRoot = OnsSafRoot.create(gameId);
+            gameRootArgument = safRoot;
+        }
         File saveRoot = requirePrivateSaveDirectory(
             intent.getStringExtra(OnsEngineActivity.EXTRA_SAVE_ROOT),
             gameId
@@ -109,7 +144,7 @@ public abstract class ONScripter extends SDLActivity {
 
         List<String> arguments = new ArrayList<>();
         arguments.add("--root");
-        arguments.add(gameRoot.getAbsolutePath());
+        arguments.add(gameRootArgument);
         arguments.add("--save-dir");
         arguments.add(saveRoot.getAbsolutePath());
         arguments.add("--no-video");
