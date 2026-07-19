@@ -15,6 +15,9 @@ import android.os.Bundle;
 public final class LauncherGrantBrokerProvider extends ContentProvider {
     static final String AUTHORITY = "io.github.twinquill.test.grants";
     static final String METHOD_GRANT = "grant";
+    static final String METHOD_RESET_ARCHIVE_OPEN_COUNT =
+        "reset-archive-open-count";
+    static final String METHOD_ARCHIVE_OPEN_COUNT = "archive-open-count";
 
     @Override
     public boolean onCreate() {
@@ -23,6 +26,18 @@ public final class LauncherGrantBrokerProvider extends ContentProvider {
 
     @Override
     public Bundle call(String method, String argument, Bundle extras) {
+        if (METHOD_RESET_ARCHIVE_OPEN_COUNT.equals(method)) {
+            LauncherFixtureDocumentsProvider.resetArchiveOpenCount(argument);
+            return Bundle.EMPTY;
+        }
+        if (METHOD_ARCHIVE_OPEN_COUNT.equals(method)) {
+            Bundle result = new Bundle();
+            result.putInt(
+                "count",
+                LauncherFixtureDocumentsProvider.archiveOpenCount(argument)
+            );
+            return result;
+        }
         if (!METHOD_GRANT.equals(method)) {
             throw new IllegalArgumentException("Unknown fixture method");
         }

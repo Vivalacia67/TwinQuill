@@ -167,6 +167,57 @@ public final class EngineProcessProtocolInstrumentedTest {
         assertTrue(restoredProof.length() > 0L);
     }
 
+    @Test
+    public void readsOnsNsaAndSarArchivesFromSaf() throws Exception {
+        String[][] fixtures = {
+            {LauncherFixtureDocumentsProvider.ONS_NSA_ROOT_ID, "nsa"},
+            {LauncherFixtureDocumentsProvider.ONS_SAR_ROOT_ID, "sar"}
+        };
+        for (String[] fixture : fixtures) {
+            resetArchiveOpenCount(fixture[0]);
+            String gameId =
+                "ons-" + fixture[1] + "-" + android.os.SystemClock.elapsedRealtime();
+            assertNormalOnsExit(
+                requestIntent(
+                    OnsEngineActivity.class,
+                    EngineType.ONS,
+                    gameId,
+                    grantFixture(fixture[0]),
+                    Bundle.EMPTY
+                )
+            );
+
+            File proofSave = new File(
+                context.getFilesDir(),
+                "saves/" + gameId + "/save4.dat"
+            );
+            assertTrue(proofSave.isFile());
+            assertTrue(proofSave.length() > 0L);
+            assertTrue(archiveOpenCount(fixture[0]) > 0);
+        }
+    }
+
+    private void resetArchiveOpenCount(String rootId) {
+        Bundle result = context.getContentResolver().call(
+            Uri.parse("content://" + LauncherGrantBrokerProvider.AUTHORITY),
+            LauncherGrantBrokerProvider.METHOD_RESET_ARCHIVE_OPEN_COUNT,
+            rootId,
+            null
+        );
+        assertNotNull(result);
+    }
+
+    private int archiveOpenCount(String rootId) {
+        Bundle result = context.getContentResolver().call(
+            Uri.parse("content://" + LauncherGrantBrokerProvider.AUTHORITY),
+            LauncherGrantBrokerProvider.METHOD_ARCHIVE_OPEN_COUNT,
+            rootId,
+            null
+        );
+        assertNotNull(result);
+        return result.getInt("count", 0);
+    }
+
     private void assertNormalOnsExit(Intent request) throws Exception {
         Intent result = launchAndAwait(request);
         assertEquals(Activity.RESULT_OK, host.engineResultCode());
