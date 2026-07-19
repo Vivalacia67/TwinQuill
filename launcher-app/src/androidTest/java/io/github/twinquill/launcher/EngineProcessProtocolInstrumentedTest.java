@@ -219,6 +219,51 @@ public final class EngineProcessProtocolInstrumentedTest {
         assertTrue(proofSave.length() > 0L);
     }
 
+    @Test
+    public void playsOnsPcmAudioFromSaf() throws Exception {
+        resetAudioOpenCount();
+        String gameId =
+            "ons-audio-" + android.os.SystemClock.elapsedRealtime();
+        assertNormalOnsExit(
+            requestIntent(
+                OnsEngineActivity.class,
+                EngineType.ONS,
+                gameId,
+                grantFixture(LauncherFixtureDocumentsProvider.ONS_AUDIO_ROOT_ID),
+                Bundle.EMPTY
+            )
+        );
+
+        File proofSave = new File(
+            context.getFilesDir(),
+            "saves/" + gameId + "/save6.dat"
+        );
+        assertTrue(proofSave.isFile());
+        assertTrue(proofSave.length() > 0L);
+        assertTrue(audioOpenCount() > 0);
+    }
+
+    private void resetAudioOpenCount() {
+        Bundle result = context.getContentResolver().call(
+            Uri.parse("content://" + LauncherGrantBrokerProvider.AUTHORITY),
+            LauncherGrantBrokerProvider.METHOD_RESET_AUDIO_OPEN_COUNT,
+            null,
+            null
+        );
+        assertNotNull(result);
+    }
+
+    private int audioOpenCount() {
+        Bundle result = context.getContentResolver().call(
+            Uri.parse("content://" + LauncherGrantBrokerProvider.AUTHORITY),
+            LauncherGrantBrokerProvider.METHOD_AUDIO_OPEN_COUNT,
+            null,
+            null
+        );
+        assertNotNull(result);
+        return result.getInt("count", 0);
+    }
+
     private void resetArchiveOpenCount(String rootId) {
         Bundle result = context.getContentResolver().call(
             Uri.parse("content://" + LauncherGrantBrokerProvider.AUTHORITY),

@@ -30,6 +30,7 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
     static final String ONS_NSA_ROOT_ID = "ons-nsa";
     static final String ONS_SAR_ROOT_ID = "ons-sar";
     static final String ONS_LUA_ROOT_ID = "ons-lua";
+    static final String ONS_AUDIO_ROOT_ID = "ons-audio";
 
     private static final byte[] UTF8_SCRIPT = script(
         "UTF-8 中文測試",
@@ -77,11 +78,25 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             + "  NSSetIntValue(10, 321)\n"
             + "end\n"
     ).getBytes(StandardCharsets.UTF_8);
+    private static final byte[] AUDIO_SCRIPT = (
+        "*define\n"
+            + "game\n"
+            + "*start\n"
+            + "fileexist %0,\"tone.wav\"\n"
+            + "if %0=0 end\n"
+            + "dwave 0,\"tone.wav\"\n"
+            + "delay 250\n"
+            + "dwavestop 0\n"
+            + "savegame 6\n"
+            + "end\n"
+    ).getBytes(StandardCharsets.UTF_8);
+    private static final byte[] AUDIO_TONE = toneWave();
     private static final byte[] BITMAP = bitmap();
     private static final byte[] NSA_ARCHIVE = archive(BITMAP, true);
     private static final byte[] SAR_ARCHIVE = archive(BITMAP, false);
     private static final AtomicInteger NSA_ARCHIVE_OPENS = new AtomicInteger();
     private static final AtomicInteger SAR_ARCHIVE_OPENS = new AtomicInteger();
+    private static final AtomicInteger AUDIO_OPENS = new AtomicInteger();
     private static final String[] DOCUMENT_PROJECTION = {
         DocumentsContract.Document.COLUMN_DOCUMENT_ID,
         DocumentsContract.Document.COLUMN_DISPLAY_NAME,
@@ -168,6 +183,9 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         if (ONS_LUA_ROOT_ID.equals(parentDocumentId)) {
             addDocument(result, luaId(parentDocumentId));
         }
+        if (ONS_AUDIO_ROOT_ID.equals(parentDocumentId)) {
+            addDocument(result, audioId(parentDocumentId));
+        }
         return result;
     }
 
@@ -195,6 +213,10 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
                         ONS_LUA_ROOT_ID.equals(parentDocumentId)
                             && luaId(parentDocumentId).equals(documentId)
                     )
+                    || (
+                        ONS_AUDIO_ROOT_ID.equals(parentDocumentId)
+                            && audioId(parentDocumentId).equals(documentId)
+                    )
             );
     }
 
@@ -211,6 +233,9 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         String archiveRoot = rootForArchive(documentId);
         if (archiveRoot != null) {
             archiveOpenCounter(archiveRoot).incrementAndGet();
+        }
+        if (rootForAudio(documentId) != null) {
+            AUDIO_OPENS.incrementAndGet();
         }
         try {
             ParcelFileDescriptor[] pipe = ParcelFileDescriptor.createPipe();
@@ -286,7 +311,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         if (!isKnownRoot(documentId)
             && rootForScript(documentId) == null
             && rootForArchive(documentId) == null
-            && rootForLua(documentId) == null) {
+            && rootForLua(documentId) == null
+            && rootForAudio(documentId) == null) {
             throw new FileNotFoundException(documentId);
         }
     }
@@ -299,7 +325,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             || ONS_SAVE_ROOT_ID.equals(documentId)
             || ONS_NSA_ROOT_ID.equals(documentId)
             || ONS_SAR_ROOT_ID.equals(documentId)
-            || ONS_LUA_ROOT_ID.equals(documentId);
+            || ONS_LUA_ROOT_ID.equals(documentId)
+            || ONS_AUDIO_ROOT_ID.equals(documentId);
     }
 
     private static String scriptId(String rootId) {
@@ -312,6 +339,10 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
 
     private static String luaId(String rootId) {
         return rootId + "-system-lua";
+    }
+
+    private static String audioId(String rootId) {
+        return rootId + "-tone";
     }
 
     private static boolean isArchiveRoot(String rootId) {
@@ -333,7 +364,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             ONS_SAVE_ROOT_ID,
             ONS_NSA_ROOT_ID,
             ONS_SAR_ROOT_ID,
-            ONS_LUA_ROOT_ID
+            ONS_LUA_ROOT_ID,
+            ONS_AUDIO_ROOT_ID
         }) {
             if (scriptId(rootId).equals(documentId)) {
                 return rootId;
@@ -345,6 +377,12 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
     private static String rootForLua(String documentId) {
         return luaId(ONS_LUA_ROOT_ID).equals(documentId)
             ? ONS_LUA_ROOT_ID
+            : null;
+    }
+
+    private static String rootForAudio(String documentId) {
+        return audioId(ONS_AUDIO_ROOT_ID).equals(documentId)
+            ? ONS_AUDIO_ROOT_ID
             : null;
     }
 
@@ -372,6 +410,9 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         if (rootForLua(documentId) != null) {
             return "system.lua";
         }
+        if (rootForAudio(documentId) != null) {
+            return "tone.wav";
+        }
         if (rootForScript(documentId) != null) {
             return "0.txt";
         }
@@ -389,6 +430,9 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         }
         if (rootForLua(documentId) != null) {
             return LUA_SYSTEM_SCRIPT;
+        }
+        if (rootForAudio(documentId) != null) {
+            return AUDIO_TONE;
         }
         return scriptBytes(documentId);
     }
@@ -412,6 +456,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
                 return SAR_SCRIPT;
             case ONS_LUA_ROOT_ID:
                 return LUA_SCRIPT;
+            case ONS_AUDIO_ROOT_ID:
+                return AUDIO_SCRIPT;
             case ROOT_ID:
             case ONS_UTF8_ROOT_ID:
                 return UTF8_SCRIPT;
@@ -436,6 +482,14 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
 
     static int archiveOpenCount(String rootId) {
         return archiveOpenCounter(rootId).get();
+    }
+
+    static void resetAudioOpenCount() {
+        AUDIO_OPENS.set(0);
+    }
+
+    static int audioOpenCount() {
+        return AUDIO_OPENS.get();
     }
 
     private static AtomicInteger archiveOpenCounter(String rootId) {
@@ -507,6 +561,36 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         output.write(0xff);
         output.write(0);
         return output.toByteArray();
+    }
+
+    private static byte[] toneWave() {
+        int sampleRate = 8_000;
+        int sampleCount = sampleRate / 5;
+        ByteArrayOutputStream output =
+            new ByteArrayOutputStream(44 + sampleCount);
+        writeAscii(output, "RIFF");
+        writeLittleEndianInt(output, 36 + sampleCount);
+        writeAscii(output, "WAVE");
+        writeAscii(output, "fmt ");
+        writeLittleEndianInt(output, 16);
+        writeLittleEndianShort(output, 1);
+        writeLittleEndianShort(output, 1);
+        writeLittleEndianInt(output, sampleRate);
+        writeLittleEndianInt(output, sampleRate);
+        writeLittleEndianShort(output, 1);
+        writeLittleEndianShort(output, 8);
+        writeAscii(output, "data");
+        writeLittleEndianInt(output, sampleCount);
+        for (int sample = 0; sample < sampleCount; sample++) {
+            double phase = 2.0 * Math.PI * 440.0 * sample / sampleRate;
+            output.write((int) Math.round(128.0 + 48.0 * Math.sin(phase)));
+        }
+        return output.toByteArray();
+    }
+
+    private static void writeAscii(ByteArrayOutputStream output, String value) {
+        byte[] bytes = value.getBytes(StandardCharsets.US_ASCII);
+        output.write(bytes, 0, bytes.length);
     }
 
     private static void writeBigEndianShort(

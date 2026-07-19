@@ -18,6 +18,8 @@ public final class LauncherGrantBrokerProvider extends ContentProvider {
     static final String METHOD_RESET_ARCHIVE_OPEN_COUNT =
         "reset-archive-open-count";
     static final String METHOD_ARCHIVE_OPEN_COUNT = "archive-open-count";
+    static final String METHOD_RESET_AUDIO_OPEN_COUNT = "reset-audio-open-count";
+    static final String METHOD_AUDIO_OPEN_COUNT = "audio-open-count";
 
     @Override
     public boolean onCreate() {
@@ -35,6 +37,18 @@ public final class LauncherGrantBrokerProvider extends ContentProvider {
             result.putInt(
                 "count",
                 LauncherFixtureDocumentsProvider.archiveOpenCount(argument)
+            );
+            return result;
+        }
+        if (METHOD_RESET_AUDIO_OPEN_COUNT.equals(method)) {
+            LauncherFixtureDocumentsProvider.resetAudioOpenCount();
+            return Bundle.EMPTY;
+        }
+        if (METHOD_AUDIO_OPEN_COUNT.equals(method)) {
+            Bundle result = new Bundle();
+            result.putInt(
+                "count",
+                LauncherFixtureDocumentsProvider.audioOpenCount()
             );
             return result;
         }
