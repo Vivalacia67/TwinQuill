@@ -29,6 +29,7 @@ import java.io.FileInputStream;
 public final class NativeVfsInstrumentedTest {
     private static final int INVALID = -5;
     private static final int PERMISSION = -2;
+    private static final int NOT_FOUND = -3;
     private static final int UNSUPPORTED = -4;
 
     private Uri treeUri;
@@ -91,6 +92,38 @@ public final class NativeVfsInstrumentedTest {
     public void detachesSeekableDescriptorsForLegacyNativeReaders() throws Exception {
         assertDetachedDescriptor("中文_日本語.txt", 10, "abcdef");
         assertDetachedDescriptor("cloud.bin", 900_000, null);
+    }
+
+    @Test
+    public void resolvesReadPathsLikeCaseInsensitiveGameFilesystems() throws Exception {
+        assertDetachedDescriptor("BG/B27A.PNG", 0, "case-image");
+
+        long[] stat = NativeVfs.stat(treeUri, "BG/B27A.PNG");
+        assertNotNull(stat);
+        assertArrayEquals(new long[] {0, 1, 0, 10, 0, 0}, stat);
+
+        String[] names = NativeVfs.list(treeUri, "BG");
+        assertNotNull(names);
+        assertArrayEquals(new String[] {"b27a.png"}, names);
+    }
+
+    @Test
+    public void prefersExactCaseAndRejectsAmbiguousFoldedReads() throws Exception {
+        assertDetachedDescriptor("choice.png", 0, "lower");
+        assertDetachedDescriptor("CHOICE.PNG", 0, "upper");
+        assertEquals(
+            NOT_FOUND,
+            NativeVfs.openReadOnlyDescriptor(treeUri, "Choice.png")
+        );
+    }
+
+    @Test
+    public void keepsMutationResolutionCaseSensitive() {
+        assertEquals(
+            NOT_FOUND,
+            NativeVfs.rename(treeUri, "Choice.png", "renamed.png")
+        );
+        assertEquals(NOT_FOUND, NativeVfs.mkdir(treeUri, "BG/new-directory"));
     }
 
     @Test

@@ -29,6 +29,10 @@ public final class FixtureDocumentsProvider extends DocumentsProvider {
     private static final String CLOUD_ID = "cloud";
     private static final String LARGE_ID = "large";
     private static final String REVOKED_ID = "revoked";
+    private static final String CASE_DIRECTORY_ID = "case-directory";
+    private static final String CASE_IMAGE_ID = "case-image";
+    private static final String AMBIGUOUS_LOWER_ID = "ambiguous-lower";
+    private static final String AMBIGUOUS_UPPER_ID = "ambiguous-upper";
 
     private static final String[] DEFAULT_DOCUMENT_PROJECTION = {
         DocumentsContract.Document.COLUMN_DOCUMENT_ID,
@@ -48,6 +52,9 @@ public final class FixtureDocumentsProvider extends DocumentsProvider {
 
     private File unicodeFile;
     private File largeFile;
+    private File caseImageFile;
+    private File ambiguousLowerFile;
+    private File ambiguousUpperFile;
 
     @Override
     public boolean onCreate() {
@@ -57,10 +64,16 @@ public final class FixtureDocumentsProvider extends DocumentsProvider {
         }
         unicodeFile = new File(directory, "unicode.txt");
         largeFile = new File(directory, "large.bin");
+        caseImageFile = new File(directory, "case-image.txt");
+        ambiguousLowerFile = new File(directory, "ambiguous-lower.txt");
+        ambiguousUpperFile = new File(directory, "ambiguous-upper.txt");
         try {
             try (FileOutputStream output = new FileOutputStream(unicodeFile)) {
                 output.write("0123456789abcdef".getBytes(StandardCharsets.UTF_8));
             }
+            writeText(caseImageFile, "case-image");
+            writeText(ambiguousLowerFile, "lower");
+            writeText(ambiguousUpperFile, "upper");
             try (RandomAccessFile output = new RandomAccessFile(largeFile, "rw")) {
                 output.setLength(LARGE_SIZE);
                 output.seek(LARGE_SIZE - 1);
@@ -117,6 +130,11 @@ public final class FixtureDocumentsProvider extends DocumentsProvider {
         String[] projection,
         String sortOrder
     ) throws FileNotFoundException {
+        if (CASE_DIRECTORY_ID.equals(parentDocumentId)) {
+            MatrixCursor result = documentCursor(projection);
+            addDocument(result, CASE_IMAGE_ID);
+            return result;
+        }
         if (!ROOT_ID.equals(parentDocumentId)) {
             throw new FileNotFoundException(parentDocumentId);
         }
@@ -125,22 +143,27 @@ public final class FixtureDocumentsProvider extends DocumentsProvider {
         addDocument(result, CLOUD_ID);
         addDocument(result, LARGE_ID);
         addDocument(result, REVOKED_ID);
+        addDocument(result, CASE_DIRECTORY_ID);
+        addDocument(result, AMBIGUOUS_LOWER_ID);
+        addDocument(result, AMBIGUOUS_UPPER_ID);
         return result;
     }
 
     @Override
     public String getDocumentType(String documentId) throws FileNotFoundException {
         requireKnown(documentId);
-        return ROOT_ID.equals(documentId)
+        return ROOT_ID.equals(documentId) || CASE_DIRECTORY_ID.equals(documentId)
             ? DocumentsContract.Document.MIME_TYPE_DIR
             : "application/octet-stream";
     }
 
     @Override
     public boolean isChildDocument(String parentDocumentId, String documentId) {
-        return ROOT_ID.equals(parentDocumentId)
-            && !ROOT_ID.equals(documentId)
-            && isKnown(documentId);
+        if (ROOT_ID.equals(parentDocumentId)) {
+            return !ROOT_ID.equals(documentId) && isKnown(documentId);
+        }
+        return CASE_DIRECTORY_ID.equals(parentDocumentId)
+            && CASE_IMAGE_ID.equals(documentId);
     }
 
     @Override
@@ -160,6 +183,15 @@ public final class FixtureDocumentsProvider extends DocumentsProvider {
                 unicodeFile,
                 ParcelFileDescriptor.MODE_READ_ONLY
             );
+        }
+        if (CASE_IMAGE_ID.equals(documentId)) {
+            return readOnly(caseImageFile);
+        }
+        if (AMBIGUOUS_LOWER_ID.equals(documentId)) {
+            return readOnly(ambiguousLowerFile);
+        }
+        if (AMBIGUOUS_UPPER_ID.equals(documentId)) {
+            return readOnly(ambiguousUpperFile);
         }
         if (LARGE_ID.equals(documentId)) {
             return ParcelFileDescriptor.open(
@@ -204,6 +236,17 @@ public final class FixtureDocumentsProvider extends DocumentsProvider {
 
     static byte cloudByte(int offset) {
         return (byte) ((offset * 31 + 7) & 0xff);
+    }
+
+    private static void writeText(File file, String text) throws IOException {
+        try (FileOutputStream output = new FileOutputStream(file)) {
+            output.write(text.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    private static ParcelFileDescriptor readOnly(File file)
+        throws FileNotFoundException {
+        return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY);
     }
 
     private MatrixCursor documentCursor(String[] projection) {
@@ -255,6 +298,14 @@ public final class FixtureDocumentsProvider extends DocumentsProvider {
                 return "large.bin";
             case REVOKED_ID:
                 return "revoked.bin";
+            case CASE_DIRECTORY_ID:
+                return "bg";
+            case CASE_IMAGE_ID:
+                return "b27a.png";
+            case AMBIGUOUS_LOWER_ID:
+                return "choice.png";
+            case AMBIGUOUS_UPPER_ID:
+                return "CHOICE.PNG";
             default:
                 throw new IllegalArgumentException(documentId);
         }
@@ -263,6 +314,7 @@ public final class FixtureDocumentsProvider extends DocumentsProvider {
     private long size(String documentId) {
         switch (documentId) {
             case ROOT_ID:
+            case CASE_DIRECTORY_ID:
                 return 0L;
             case UNICODE_ID:
                 return unicodeFile.length();
@@ -272,6 +324,12 @@ public final class FixtureDocumentsProvider extends DocumentsProvider {
                 return largeFile.length();
             case REVOKED_ID:
                 return 1L;
+            case CASE_IMAGE_ID:
+                return caseImageFile.length();
+            case AMBIGUOUS_LOWER_ID:
+                return ambiguousLowerFile.length();
+            case AMBIGUOUS_UPPER_ID:
+                return ambiguousUpperFile.length();
             default:
                 throw new IllegalArgumentException(documentId);
         }
@@ -288,6 +346,10 @@ public final class FixtureDocumentsProvider extends DocumentsProvider {
             || UNICODE_ID.equals(documentId)
             || CLOUD_ID.equals(documentId)
             || LARGE_ID.equals(documentId)
-            || REVOKED_ID.equals(documentId);
+            || REVOKED_ID.equals(documentId)
+            || CASE_DIRECTORY_ID.equals(documentId)
+            || CASE_IMAGE_ID.equals(documentId)
+            || AMBIGUOUS_LOWER_ID.equals(documentId)
+            || AMBIGUOUS_UPPER_ID.equals(documentId);
     }
 }

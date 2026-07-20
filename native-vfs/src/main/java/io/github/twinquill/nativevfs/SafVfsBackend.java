@@ -73,7 +73,7 @@ final class SafVfsBackend {
         }
         try {
             Uri treeUri = parseTree(treeBytes);
-            Uri documentUri = resolve(treeUri, text(pathBytes), false);
+            Uri documentUri = resolve(treeUri, text(pathBytes), false, true);
             if (documentUri == null) {
                 return NOT_FOUND;
             }
@@ -95,7 +95,7 @@ final class SafVfsBackend {
     static int detachReadOnlyDescriptor(byte[] treeBytes, byte[] pathBytes) {
         try {
             Uri treeUri = parseTree(treeBytes);
-            Uri documentUri = resolve(treeUri, text(pathBytes), false);
+            Uri documentUri = resolve(treeUri, text(pathBytes), false, true);
             if (documentUri == null) {
                 return NOT_FOUND;
             }
@@ -174,7 +174,7 @@ final class SafVfsBackend {
         long[] failure = {ERROR, 0, 0, 0, 0, 0};
         try {
             Uri treeUri = parseTree(treeBytes);
-            Uri documentUri = resolve(treeUri, text(pathBytes), true);
+            Uri documentUri = resolve(treeUri, text(pathBytes), true, true);
             if (documentUri == null) {
                 failure[0] = NOT_FOUND;
                 return failure;
@@ -215,7 +215,7 @@ final class SafVfsBackend {
     static byte[][] list(byte[] treeBytes, byte[] pathBytes) {
         try {
             Uri treeUri = parseTree(treeBytes);
-            Uri directory = resolve(treeUri, text(pathBytes), true);
+            Uri directory = resolve(treeUri, text(pathBytes), true, true);
             if (directory == null) {
                 return null;
             }
@@ -255,7 +255,7 @@ final class SafVfsBackend {
         try {
             PathParts parts = splitParent(text(pathBytes));
             Uri treeUri = parseTree(treeBytes);
-            Uri parent = resolve(treeUri, parts.parent, true);
+            Uri parent = resolve(treeUri, parts.parent, true, false);
             if (parent == null) {
                 return NOT_FOUND;
             }
@@ -282,7 +282,7 @@ final class SafVfsBackend {
             String newName = text(newNameBytes);
             validateName(newName);
             Uri treeUri = parseTree(treeBytes);
-            Uri document = resolve(treeUri, text(pathBytes), false);
+            Uri document = resolve(treeUri, text(pathBytes), false, false);
             if (document == null) {
                 return NOT_FOUND;
             }
@@ -302,7 +302,7 @@ final class SafVfsBackend {
     static int delete(byte[] treeBytes, byte[] pathBytes) {
         try {
             Uri treeUri = parseTree(treeBytes);
-            Uri document = resolve(treeUri, text(pathBytes), false);
+            Uri document = resolve(treeUri, text(pathBytes), false, false);
             if (document == null) {
                 return NOT_FOUND;
             }
@@ -421,7 +421,12 @@ final class SafVfsBackend {
         return uri;
     }
 
-    private static Uri resolve(Uri treeUri, String relativePath, boolean allowRoot)
+    private static Uri resolve(
+        Uri treeUri,
+        String relativePath,
+        boolean allowRoot,
+        boolean caseInsensitiveFallback
+    )
         throws FileNotFoundException {
         List<String> segments = pathSegments(relativePath);
         Uri current = DocumentsContract.buildDocumentUriUsingTree(
@@ -439,7 +444,9 @@ final class SafVfsBackend {
                 treeUri,
                 DocumentsContract.getDocumentId(current)
             );
-            Uri found = null;
+            Uri exact = null;
+            Uri folded = null;
+            boolean foldedAmbiguous = false;
             try (Cursor cursor = resolver.query(
                 children,
                 CHILD_PROJECTION,
@@ -451,15 +458,32 @@ final class SafVfsBackend {
                     throw new FileNotFoundException(segment);
                 }
                 while (cursor.moveToNext()) {
-                    if (segment.equals(cursor.getString(1))) {
-                        found = DocumentsContract.buildDocumentUriUsingTree(
+                    String displayName = cursor.getString(1);
+                    if (segment.equals(displayName)) {
+                        exact = DocumentsContract.buildDocumentUriUsingTree(
                             treeUri,
                             cursor.getString(0)
                         );
                         break;
                     }
+                    if (caseInsensitiveFallback
+                        && displayName != null
+                        && segment.equalsIgnoreCase(displayName)) {
+                        Uri candidate = DocumentsContract.buildDocumentUriUsingTree(
+                            treeUri,
+                            cursor.getString(0)
+                        );
+                        if (folded == null) {
+                            folded = candidate;
+                        } else {
+                            foldedAmbiguous = true;
+                        }
+                    }
                 }
             }
+            Uri found = exact != null
+                ? exact
+                : (foldedAmbiguous ? null : folded);
             if (found == null) {
                 return null;
             }
