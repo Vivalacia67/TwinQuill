@@ -12,7 +12,10 @@
 #include <fstream>
 #include <limits>
 #include <string>
+#include <unordered_set>
 #include <vector>
+
+#include "zlib.h"
 
 namespace twinquill::krkr {
 namespace {
@@ -22,7 +25,14 @@ constexpr std::array<std::uint8_t, 11> kXp3Mark = {
 };
 constexpr std::uint64_t kMaxIndexSize = 16 * 1024 * 1024;
 constexpr std::uint64_t kMaxStartupSize = 8 * 1024 * 1024;
+constexpr std::uint64_t kMaxCompressedIndexSize = 64 * 1024 * 1024;
+constexpr std::uint64_t kMaxCompressedStartupSize = 64 * 1024 * 1024;
+constexpr std::size_t kXp3IndexBaseHeaderSize = 9;
+constexpr std::size_t kMaxXp3IndexBlocks = 64;
 constexpr std::uint32_t kProtectedFile = 1U << 31U;
+constexpr std::uint32_t kXp3MethodMask = 0x07U;
+constexpr std::uint32_t kXp3Continuation = 0x80U;
+constexpr std::uint32_t kXp3IndexSupportedFlags = kXp3Continuation | kXp3MethodMask;
 
 std::uint16_t read_u16(const std::uint8_t* data) {
     return static_cast<std::uint16_t>(data[0]) |
@@ -48,6 +58,14 @@ bool add_fits(std::uint64_t left, std::uint64_t right, std::uint64_t limit) {
     return left <= limit && right <= limit - left;
 }
 
+bool fits_size_t(std::uint64_t value) {
+    return value <= static_cast<std::uint64_t>(std::numeric_limits<std::size_t>::max());
+}
+
+bool fits_zlib_uint(std::size_t value) {
+    return value <= static_cast<std::size_t>(std::numeric_limits<uInt>::max());
+}
+
 bool read_at(
     std::ifstream* input,
     std::uint64_t file_size,
@@ -55,13 +73,71 @@ bool read_at(
     void* output,
     std::size_t size) {
     if (!add_fits(offset, size, file_size) ||
-        offset > static_cast<std::uint64_t>(std::numeric_limits<std::streamoff>::max())) {
+        offset > static_cast<std::uint64_t>(std::numeric_limits<std::streamoff>::max()) ||
+        size > static_cast<std::size_t>(std::numeric_limits<std::streamsize>::max())) {
         return false;
     }
     input->clear();
     input->seekg(static_cast<std::streamoff>(offset), std::ios::beg);
     input->read(static_cast<char*>(output), static_cast<std::streamsize>(size));
     return input->good() || input->gcount() == static_cast<std::streamsize>(size);
+}
+
+bool bounded_size(std::uint64_t value, std::uint64_t maximum, std::size_t* output) {
+    if (value > maximum || !fits_size_t(value)) {
+        return false;
+    }
+    *output = static_cast<std::size_t>(value);
+    return true;
+}
+
+bool read_payload(
+    std::ifstream* input,
+    std::uint64_t file_size,
+    std::uint64_t offset,
+    std::uint64_t size,
+    std::uint64_t maximum,
+    std::vector<std::uint8_t>* output) {
+    std::size_t checked_size = 0;
+    if (!bounded_size(size, maximum, &checked_size)) {
+        return false;
+    }
+    output->assign(checked_size, 0);
+    return checked_size == 0 || read_at(input, file_size, offset, output->data(), checked_size);
+}
+
+bool inflate_exact(
+    const std::vector<std::uint8_t>& compressed,
+    std::uint64_t expected_size,
+    std::uint64_t maximum_size,
+    std::vector<std::uint8_t>* output) {
+    std::size_t checked_size = 0;
+    if (!bounded_size(expected_size, maximum_size, &checked_size) ||
+        !fits_zlib_uint(compressed.size()) ||
+        !fits_zlib_uint(checked_size)) {
+        return false;
+    }
+
+    output->assign(checked_size, 0);
+    std::array<Bytef, 1> empty_output{};
+    z_stream stream{};
+    stream.next_in = const_cast<Bytef*>(compressed.empty() ? nullptr : compressed.data());
+    stream.avail_in = static_cast<uInt>(compressed.size());
+    stream.next_out = checked_size == 0 ? empty_output.data() : output->data();
+    stream.avail_out = checked_size == 0 ? static_cast<uInt>(empty_output.size()) :
+        static_cast<uInt>(checked_size);
+
+    if (inflateInit(&stream) != Z_OK) {
+        return false;
+    }
+    const int result = inflate(&stream, Z_FINISH);
+    const int end_result = inflateEnd(&stream);
+    if (result != Z_STREAM_END || end_result != Z_OK) {
+        return false;
+    }
+    return stream.total_in == static_cast<uLong>(compressed.size()) &&
+        stream.total_out == static_cast<uLong>(checked_size) &&
+        (checked_size == 0 || stream.avail_out == 0);
 }
 
 struct Chunk {
@@ -109,6 +185,56 @@ bool startup_name(const std::uint8_t* utf16, std::uint16_t length) {
     return true;
 }
 
+int append_segment(
+    const std::uint8_t* data,
+    std::ifstream* input,
+    std::uint64_t file_size,
+    std::uint64_t original_size,
+    std::string* source) {
+    const std::uint32_t flags = read_u32(data);
+    if ((flags & ~kXp3MethodMask) != 0) {
+        return 33;
+    }
+    const std::uint32_t method = flags & kXp3MethodMask;
+    const std::uint64_t offset = read_u64(data + 4);
+    const std::uint64_t unpacked_size = read_u64(data + 12);
+    const std::uint64_t archived_size = read_u64(data + 20);
+    if (!add_fits(source->size(), unpacked_size, original_size) ||
+        unpacked_size > kMaxStartupSize ||
+        archived_size > kMaxCompressedStartupSize ||
+        !fits_size_t(unpacked_size)) {
+        return 34;
+    }
+
+    const std::size_t old_size = source->size();
+    const std::size_t checked_unpacked_size = static_cast<std::size_t>(unpacked_size);
+    if (method == 0) {
+        if (unpacked_size != archived_size) {
+            return 33;
+        }
+        source->resize(old_size + checked_unpacked_size);
+        if (checked_unpacked_size != 0 &&
+            !read_at(input, file_size, offset, source->data() + old_size, checked_unpacked_size)) {
+            return 34;
+        }
+        return 0;
+    }
+    if (method != 1) {
+        return 33;
+    }
+
+    std::vector<std::uint8_t> compressed;
+    if (!read_payload(input, file_size, offset, archived_size, kMaxCompressedStartupSize, &compressed)) {
+        return 34;
+    }
+    std::vector<std::uint8_t> unpacked;
+    if (!inflate_exact(compressed, unpacked_size, kMaxStartupSize, &unpacked)) {
+        return 34;
+    }
+    source->append(reinterpret_cast<const char*>(unpacked.data()), unpacked.size());
+    return source->size() == old_size + checked_unpacked_size ? 0 : 34;
+}
+
 int read_file_chunk(
     const Chunk& file,
     std::ifstream* input,
@@ -136,14 +262,18 @@ int read_file_chunk(
         return 34;
     }
 
+    const std::uint32_t info_flags = read_u32(info->data);
     const std::uint16_t name_length = read_u16(info->data + 20);
     const std::uint64_t name_bytes = static_cast<std::uint64_t>(name_length) * 2;
     if (!add_fits(22, name_bytes, info->size) ||
         !startup_name(info->data + 22, name_length)) {
         return 31;
     }
-    if ((read_u32(info->data) & kProtectedFile) != 0) {
+    if ((info_flags & kProtectedFile) != 0) {
         return 35;
+    }
+    if ((info_flags & ~kProtectedFile) != 0) {
+        return 33;
     }
 
     const std::uint64_t original_size = read_u64(info->data + 4);
@@ -153,23 +283,14 @@ int read_file_chunk(
     source->clear();
     source->reserve(static_cast<std::size_t>(original_size));
     for (std::size_t segment = 0; segment < segments->size; segment += 28) {
-        const std::uint8_t* data = segments->data + segment;
-        const std::uint32_t flags = read_u32(data);
-        const std::uint64_t offset = read_u64(data + 4);
-        const std::uint64_t unpacked_size = read_u64(data + 12);
-        const std::uint64_t archived_size = read_u64(data + 20);
-        if ((flags & 0x07U) != 0 || unpacked_size != archived_size) {
-            return 33;
-        }
-        if (!add_fits(source->size(), unpacked_size, original_size) ||
-            unpacked_size > std::numeric_limits<std::size_t>::max()) {
-            return 34;
-        }
-        const std::size_t old_size = source->size();
-        source->resize(old_size + static_cast<std::size_t>(unpacked_size));
-        if (!read_at(input, file_size, offset, source->data() + old_size,
-                     static_cast<std::size_t>(unpacked_size))) {
-            return 34;
+        const int result = append_segment(
+            segments->data + segment,
+            input,
+            file_size,
+            original_size,
+            source);
+        if (result != 0) {
+            return result;
         }
     }
     return source->size() == original_size ? 0 : 34;
@@ -197,9 +318,63 @@ int read_index(
     return 31;
 }
 
+int read_index_payload(
+    std::ifstream* input,
+    std::uint64_t file_size,
+    std::uint64_t index_offset,
+    std::uint8_t* flags,
+    std::vector<std::uint8_t>* index,
+    std::uint64_t* next_offset_position) {
+    std::array<std::uint8_t, 17> header{};
+    if (!read_at(input, file_size, index_offset, header.data(), 9)) {
+        return 34;
+    }
+    *flags = header[0];
+    if ((*flags & ~kXp3IndexSupportedFlags) != 0) {
+        return 33;
+    }
+    const std::uint32_t method = *flags & kXp3MethodMask;
+    if (method == 0) {
+        const std::uint64_t raw_size = read_u64(header.data() + 1);
+        if (!add_fits(index_offset, 9, file_size) ||
+            !add_fits(index_offset + 9, raw_size, file_size) ||
+            !read_payload(input, file_size, index_offset + 9, raw_size, kMaxIndexSize, index)) {
+            return 34;
+        }
+        *next_offset_position = index_offset + 9 + raw_size;
+        return 0;
+    }
+    if (method != 1) {
+        return 33;
+    }
+
+    if (!read_at(input, file_size, index_offset + 9, header.data() + 9, 8)) {
+        return 34;
+    }
+    const std::uint64_t compressed_size = read_u64(header.data() + 1);
+    const std::uint64_t uncompressed_size = read_u64(header.data() + 9);
+    if (!add_fits(index_offset, 17, file_size) ||
+        !add_fits(index_offset + 17, compressed_size, file_size)) {
+        return 34;
+    }
+    std::vector<std::uint8_t> compressed;
+    if (!read_payload(
+            input,
+            file_size,
+            index_offset + 17,
+            compressed_size,
+            kMaxCompressedIndexSize,
+            &compressed) ||
+        !inflate_exact(compressed, uncompressed_size, kMaxIndexSize, index)) {
+        return 34;
+    }
+    *next_offset_position = index_offset + 17 + compressed_size;
+    return 0;
+}
+
 }  // namespace
 
-int read_raw_xp3_startup(const char* archive_path, std::string* source) {
+int read_xp3_startup(const char* archive_path, std::string* source) {
     if (archive_path == nullptr || source == nullptr) {
         return 30;
     }
@@ -219,36 +394,46 @@ int read_raw_xp3_startup(const char* archive_path, std::string* source) {
     }
 
     std::uint64_t index_offset = read_u64(header.data() + kXp3Mark.size());
+    std::unordered_set<std::uint64_t> visited_index_offsets;
+    std::size_t index_blocks_read = 0;
     for (;;) {
-        std::array<std::uint8_t, 9> index_header{};
-        if (!read_at(&input, file_size, index_offset, index_header.data(), index_header.size())) {
+        if (index_blocks_read >= kMaxXp3IndexBlocks ||
+            !visited_index_offsets.insert(index_offset).second ||
+            !add_fits(index_offset, kXp3IndexBaseHeaderSize, file_size)) {
             return 34;
         }
-        const std::uint8_t flags = index_header[0];
-        if ((flags & 0x07U) != 0) {
-            return 33;
-        }
-        const std::uint64_t index_size = read_u64(index_header.data() + 1);
-        if (index_size > kMaxIndexSize || !add_fits(index_offset, 9 + index_size, file_size)) {
-            return 34;
-        }
-        std::vector<std::uint8_t> index(static_cast<std::size_t>(index_size));
-        if (!read_at(&input, file_size, index_offset + 9, index.data(), index.size())) {
-            return 34;
+        ++index_blocks_read;
+
+        std::uint8_t flags = 0;
+        std::vector<std::uint8_t> index;
+        std::uint64_t next_offset_position = 0;
+        const int payload_result = read_index_payload(
+            &input,
+            file_size,
+            index_offset,
+            &flags,
+            &index,
+            &next_offset_position);
+        if (payload_result != 0) {
+            return payload_result;
         }
         const int result = read_index(index, &input, file_size, source);
         if (result != 31) {
             return result;
         }
-        if ((flags & 0x80U) == 0) {
+        if ((flags & kXp3Continuation) == 0) {
             return 31;
         }
-        const std::uint64_t next_offset_position = index_offset + 9 + index_size;
         std::array<std::uint8_t, 8> next_offset{};
         if (!read_at(&input, file_size, next_offset_position, next_offset.data(), next_offset.size())) {
             return 34;
         }
-        index_offset = read_u64(next_offset.data());
+        const std::uint64_t next_index_offset = read_u64(next_offset.data());
+        if (!add_fits(next_index_offset, kXp3IndexBaseHeaderSize, file_size) ||
+            visited_index_offsets.find(next_index_offset) != visited_index_offsets.end()) {
+            return 34;
+        }
+        index_offset = next_index_offset;
     }
 }
 

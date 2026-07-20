@@ -8,8 +8,7 @@
 
 namespace twinquill::krkr {
 
-// Reads an unprotected, raw XP3 root startup.tjs into memory.
-// Compressed indices and segments are deliberately deferred beyond M0.
-int read_raw_xp3_startup(const char* archive_path, std::string* source);
+// Reads an unprotected XP3 root startup.tjs into memory.
+int read_xp3_startup(const char* archive_path, std::string* source);
 
 }  // namespace twinquill::krkr

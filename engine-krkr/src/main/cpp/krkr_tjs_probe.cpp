@@ -135,7 +135,7 @@ extern "C" __attribute__((visibility("default")))
 int twinquill_engine_krkr_run_xp3_startup(const char* archive_path) {
     try {
         std::string source;
-        const int read_result = twinquill::krkr::read_raw_xp3_startup(archive_path, &source);
+        const int read_result = twinquill::krkr::read_xp3_startup(archive_path, &source);
         if (read_result != 0) {
             return read_result;
         }
