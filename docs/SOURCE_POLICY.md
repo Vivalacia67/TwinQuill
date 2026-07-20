@@ -25,6 +25,14 @@ Git submodules are not treated as implicitly trusted content. Each gitlink is
 listed separately and must receive its own source snapshot, checksum, and
 license audit before an engine build may depend on it.
 
+## Font assets
+
+Bundled fallback fonts are third-party assets and require the same audit trail
+as source snapshots: a compatible license, canonical source URL, exact version
+or release identifier, SHA-256 checksum, destination path, and license file
+record in `third_party/sources.toml` or a sibling source manifest. Unreviewed
+binary font files must not be added to the repository.
+
 ## Local patches
 
 TwinQuill changes to imported code are maintained as reviewable patches under

@@ -40,6 +40,9 @@ tree = "374bee686e5c02ea57c04439216f768e5d3fd739"
 archive_sha256 = "8fa348146ac27ab02d7421b1f231c2b248691467de62f23c0dc1377c2b9aeaf5"
 license = "GPL-2.0-or-later"
 license_files = ["LICENSE", "src/onsyuri/COPYING"]
+patches = [
+    "vendor/patches/onscripter-yuri/0001-android-return-from-sdl-main.patch",
+]
 
 [[gitlinks]]
 parent = "krkrz"
@@ -209,3 +212,14 @@ url = "https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz"
 archive_sha256 = "ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269"
 license = "bzip2-1.0.6"
 license_files = ["LICENSE"]
+
+[[sources]]
+id = "noto-sans-cjk-sc-2.004"
+source_type = "font-asset"
+destination = "third_party/fonts/noto-sans-cjk-sc-2.004"
+url = "https://raw.githubusercontent.com/notofonts/noto-cjk/Sans2.004/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf"
+version = "Sans2.004"
+asset_file = "NotoSansCJKsc-Regular.otf"
+asset_sha256 = "2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b"
+license = "OFL-1.1"
+license_files = ["OFL.txt"]

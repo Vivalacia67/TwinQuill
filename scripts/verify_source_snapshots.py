@@ -8,6 +8,7 @@ import hashlib
 import sys
 import tomllib
 from pathlib import Path, PurePosixPath
+from typing import Any
 
 
 MANIFEST_PATH = Path("third_party/source_files.sha256")
@@ -22,9 +23,9 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def source_destinations(root: Path) -> dict[str, Path]:
+def source_destinations(root: Path) -> dict[str, tuple[Path, dict[str, Any]]]:
     configuration = tomllib.loads((root / SOURCES_PATH).read_text(encoding="utf-8"))
-    destinations: dict[str, Path] = {}
+    destinations: dict[str, tuple[Path, dict[str, Any]]] = {}
     for source in configuration.get("sources", []):
         source_id = source["id"]
         destination = (root / source["destination"]).resolve()
@@ -32,15 +33,56 @@ def source_destinations(root: Path) -> dict[str, Path]:
             raise ValueError(f"duplicate source id: {source_id}")
         if not destination.is_relative_to(root):
             raise ValueError(f"source destination escapes repository: {destination}")
-        destinations[source_id] = destination
+        destinations[source_id] = (destination, source)
     return destinations
+
+
+def snapshot_file(destination: Path, relative: str, label: str) -> Path:
+    path = PurePosixPath(relative)
+    if path.is_absolute() or ".." in path.parts:
+        raise ValueError(f"unsafe {label}: {relative}")
+    return destination.joinpath(*path.parts)
+
+
+def validate_source_files(
+    source_id: str,
+    destination: Path,
+    source: dict[str, Any],
+) -> None:
+    license_files = source.get("license_files")
+    if not isinstance(license_files, list) or not license_files:
+        raise ValueError(f"missing license files for source: {source_id}")
+    for relative in license_files:
+        if not isinstance(relative, str):
+            raise ValueError(f"invalid license file for source: {source_id}")
+        license_path = snapshot_file(destination, relative, "license path")
+        if not license_path.is_file():
+            raise FileNotFoundError(f"missing license file: {license_path}")
+
+    if source.get("source_type") != "font-asset":
+        return
+
+    for field in ("url", "version", "asset_file", "asset_sha256", "license"):
+        if not isinstance(source.get(field), str) or not source[field]:
+            raise ValueError(f"missing {field} for font asset: {source_id}")
+    expected_sha256 = source["asset_sha256"]
+    if len(expected_sha256) != 64 or any(
+        character not in "0123456789abcdef" for character in expected_sha256
+    ):
+        raise ValueError(f"invalid asset SHA-256 for font asset: {source_id}")
+    asset_path = snapshot_file(destination, source["asset_file"], "font asset path")
+    if not asset_path.is_file():
+        raise FileNotFoundError(f"missing font asset: {asset_path}")
+    if sha256(asset_path) != expected_sha256:
+        raise ValueError(f"font asset checksum mismatch: {source_id}")
 
 
 def collect(root: Path) -> dict[str, str]:
     entries: dict[str, str] = {}
-    for source_id, destination in source_destinations(root).items():
+    for source_id, (destination, source) in source_destinations(root).items():
         if not destination.is_dir():
             raise FileNotFoundError(f"missing source snapshot: {destination}")
+        validate_source_files(source_id, destination, source)
         for candidate in destination.rglob("*"):
             if candidate.is_symlink():
                 raise ValueError(f"symbolic links are not allowed in snapshots: {candidate}")

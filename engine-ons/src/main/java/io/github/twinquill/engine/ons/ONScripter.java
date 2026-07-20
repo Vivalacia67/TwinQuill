@@ -5,19 +5,23 @@
 package io.github.twinquill.engine.ons;
 
 import android.content.Intent;
-import android.content.pm.ActivityInfo;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.ParcelFileDescriptor;
+import android.provider.DocumentsContract;
 import android.util.Log;
-import android.view.View;
 
 import org.libsdl.app.SDLActivity;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+
+import io.github.twinquill.nativevfs.NativeVfs;
 
 /**
  * JNI bridge required by ONScripterYuri's source-level Android entry points.
@@ -31,28 +35,53 @@ public abstract class ONScripter extends SDLActivity {
     private static final String TAG = "TwinQuill/ONS";
 
     private String[] onsArguments = new String[0];
+    private Uri safTreeUri;
+    private String safRoot;
+    private File gameRootDirectory;
+    private OnsAudioFocusController audioFocusController;
+    private OnsVideoPlayer videoPlayer;
 
     private native int nativeInitJavaCallbacks();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         onsArguments = createArguments(getIntent());
+        if (safTreeUri != null) {
+            NativeVfs.install(this);
+        }
+        OnsWindowController.prepare(this);
+        audioFocusController = new OnsAudioFocusController(this);
         super.onCreate(savedInstanceState);
+        videoPlayer = new OnsVideoPlayer(this, mLayout, this::openVideoDescriptor);
         nativeInitJavaCallbacks();
-        enterImmersiveMode();
+        OnsWindowController.enterImmersiveMode(this);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        enterImmersiveMode();
+        audioFocusController.onResume();
+        OnsWindowController.enterImmersiveMode(this);
+    }
+
+    @Override
+    protected void onPause() {
+        videoPlayer.stop();
+        audioFocusController.onPause();
+        super.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        videoPlayer.stop();
+        super.onDestroy();
     }
 
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus) {
-            enterImmersiveMode();
+            OnsWindowController.enterImmersiveMode(this);
         }
     }
 
@@ -77,9 +106,20 @@ public abstract class ONScripter extends SDLActivity {
     /** Native fallback for paths that regular POSIX I/O could not open. */
     @SuppressWarnings("unused")
     public int getFD(byte[] pathBytes, int mode) {
-        // SAF descriptors are supplied by native-vfs in M1. Returning -1 makes
-        // the current M0 contract explicitly regular-filesystem-only.
-        return -1;
+        if (mode != 0 || safTreeUri == null) {
+            return -1;
+        }
+        String requestedPath = new String(pathBytes, StandardCharsets.UTF_8);
+        String relativePath = OnsSafRoot.relativePath(safRoot, requestedPath);
+        if (relativePath == null || relativePath.isBlank()) {
+            return -1;
+        }
+        int descriptor = NativeVfs.openReadOnlyDescriptor(safTreeUri, relativePath);
+        if (descriptor < 0) {
+            Log.d(TAG, "SAF read unavailable (" + descriptor + "): " + relativePath);
+            return -1;
+        }
+        return descriptor;
     }
 
     /** Native fallback for directories that regular POSIX I/O could not make. */
@@ -90,9 +130,9 @@ public abstract class ONScripter extends SDLActivity {
 
     /** Callback used by the upstream engine for platform video playback. */
     @SuppressWarnings("unused")
-    public void playVideo(byte[] pathBytes) {
+    public void playVideo(byte[] pathBytes, boolean skippable, boolean looping) {
         String path = new String(pathBytes, StandardCharsets.UTF_8);
-        Log.w(TAG, "External video playback is disabled in the M0 prototype: " + path);
+        videoPlayer.play(path, skippable, looping);
     }
 
     private String[] createArguments(Intent intent) {
@@ -100,8 +140,23 @@ public abstract class ONScripter extends SDLActivity {
             throw new IllegalArgumentException("ONS launch intent is required");
         }
 
-        File gameRoot = requireDirectory(intent.getStringExtra(OnsEngineActivity.EXTRA_GAME_ROOT));
         String gameId = requireSafeGameId(intent.getStringExtra(OnsEngineActivity.EXTRA_GAME_ID));
+        String gameRootUri = intent.getStringExtra(OnsEngineActivity.EXTRA_GAME_ROOT_URI);
+        String gameRootArgument;
+        if (gameRootUri == null) {
+            gameRootDirectory =
+                requireDirectory(intent.getStringExtra(OnsEngineActivity.EXTRA_GAME_ROOT));
+            gameRootArgument = gameRootDirectory.getAbsolutePath();
+        } else {
+            Uri parsedRoot = Uri.parse(gameRootUri);
+            if (!"content".equals(parsedRoot.getScheme())
+                || !DocumentsContract.isTreeUri(parsedRoot)) {
+                throw new IllegalArgumentException("ONS game root is not a SAF tree");
+            }
+            safTreeUri = parsedRoot;
+            safRoot = OnsSafRoot.create(gameId);
+            gameRootArgument = safRoot;
+        }
         File saveRoot = requirePrivateSaveDirectory(
             intent.getStringExtra(OnsEngineActivity.EXTRA_SAVE_ROOT),
             gameId
@@ -109,10 +164,9 @@ public abstract class ONScripter extends SDLActivity {
 
         List<String> arguments = new ArrayList<>();
         arguments.add("--root");
-        arguments.add(gameRoot.getAbsolutePath());
+        arguments.add(gameRootArgument);
         arguments.add("--save-dir");
         arguments.add(saveRoot.getAbsolutePath());
-        arguments.add("--no-video");
 
         String fontPath = intent.getStringExtra(OnsEngineActivity.EXTRA_FONT_PATH);
         if (fontPath != null && !fontPath.isBlank()) {
@@ -135,6 +189,41 @@ public abstract class ONScripter extends SDLActivity {
         }
 
         return arguments.toArray(new String[0]);
+    }
+
+    private ParcelFileDescriptor openVideoDescriptor(String requestedPath)
+        throws IOException {
+        if (safTreeUri != null) {
+            String relativePath = OnsSafRoot.relativePath(safRoot, requestedPath);
+            if (relativePath == null || relativePath.isBlank()) {
+                throw new FileNotFoundException("ONS video path is outside the SAF root");
+            }
+            int descriptor =
+                NativeVfs.openReadOnlyDescriptor(safTreeUri, relativePath);
+            if (descriptor < 0) {
+                throw new FileNotFoundException(
+                    "ONS video is unavailable through SAF: " + relativePath
+                );
+            }
+            return ParcelFileDescriptor.adoptFd(descriptor);
+        }
+
+        if (gameRootDirectory == null) {
+            throw new FileNotFoundException("ONS game root is unavailable");
+        }
+        File candidate = new File(requestedPath);
+        if (!candidate.isAbsolute()) {
+            candidate = new File(gameRootDirectory, requestedPath);
+        }
+        File video = candidate.getCanonicalFile();
+        if (!video.toPath().startsWith(gameRootDirectory.toPath())
+            || !video.isFile()) {
+            throw new FileNotFoundException("ONS video path is outside the game root");
+        }
+        return ParcelFileDescriptor.open(
+            video,
+            ParcelFileDescriptor.MODE_READ_ONLY
+        );
     }
 
     private static File requireDirectory(String path) {
@@ -192,15 +281,4 @@ public abstract class ONScripter extends SDLActivity {
         }
     }
 
-    private void enterImmersiveMode() {
-        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
-        getWindow().getDecorView().setSystemUiVisibility(
-            View.SYSTEM_UI_FLAG_FULLSCREEN
-                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-        );
-    }
 }

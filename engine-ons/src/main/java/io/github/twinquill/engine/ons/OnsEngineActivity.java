@@ -27,6 +27,8 @@ public final class OnsEngineActivity extends Activity {
         "io.github.twinquill.extra.ONS_GAME_ID";
     public static final String EXTRA_GAME_ROOT =
         "io.github.twinquill.extra.ONS_GAME_ROOT";
+    public static final String EXTRA_GAME_ROOT_URI =
+        "io.github.twinquill.extra.ONS_GAME_ROOT_URI";
     public static final String EXTRA_SAVE_ROOT =
         "io.github.twinquill.extra.ONS_SAVE_ROOT";
     public static final String EXTRA_FONT_PATH =
@@ -44,12 +46,15 @@ public final class OnsEngineActivity extends Activity {
         Intent runtimeIntent;
         try {
             runtimeIntent = runtimeIntent(getIntent());
+            if (runtimeIntent != null) {
+                installFallbackFont(runtimeIntent);
+            }
         } catch (IllegalArgumentException exception) {
             Log.e(LOG_TAG, "Invalid ONS launch request", exception);
             finishWithResult(EngineResult.INVALID_REQUEST);
             return;
         } catch (RuntimeException | LinkageError exception) {
-            Log.e(LOG_TAG, "Unable to initialize the ONS VFS", exception);
+            Log.e(LOG_TAG, "Unable to prepare the ONS runtime", exception);
             finishWithResult(EngineResult.VFS_UNAVAILABLE);
             return;
         }
@@ -84,8 +89,14 @@ public final class OnsEngineActivity extends Activity {
         NativeVfs.install(this);
         Uri root = request.gameRootUri();
         if ("content".equals(root.getScheme())) {
-            Log.i(LOG_TAG, "ONS SAF runtime integration is scheduled for M2");
-            return null;
+            runtime.putExtra(EXTRA_GAME_ID, request.gameId());
+            runtime.putExtra(EXTRA_GAME_ROOT, OnsSafRoot.create(request.gameId()));
+            runtime.putExtra(EXTRA_GAME_ROOT_URI, root.toString());
+            runtime.putExtra(EXTRA_SAVE_ROOT, request.saveDirectoryPath());
+            Bundle arguments = request.arguments();
+            copyTextArgument(arguments, runtime, EXTRA_FONT_PATH);
+            copyTextArgument(arguments, runtime, EXTRA_ENCODING);
+            return runtime;
         }
         if (!"file".equals(root.getScheme()) || root.getPath() == null) {
             throw new IllegalArgumentException("Unsupported ONS game root URI");
@@ -112,6 +123,16 @@ public final class OnsEngineActivity extends Activity {
         runtime.putExtra(EXTRA_SAVE_ROOT, source.getStringExtra(EXTRA_SAVE_ROOT));
         runtime.putExtra(EXTRA_FONT_PATH, source.getStringExtra(EXTRA_FONT_PATH));
         runtime.putExtra(EXTRA_ENCODING, source.getStringExtra(EXTRA_ENCODING));
+    }
+
+    private void installFallbackFont(Intent runtime) {
+        String requestedFont = runtime.getStringExtra(EXTRA_FONT_PATH);
+        if (requestedFont == null || requestedFont.isBlank()) {
+            runtime.putExtra(
+                EXTRA_FONT_PATH,
+                OnsFallbackFont.prepare(this).getAbsolutePath()
+            );
+        }
     }
 
     private static void copyTextArgument(Bundle source, Intent target, String key) {

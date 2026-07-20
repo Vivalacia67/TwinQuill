@@ -10,6 +10,9 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.ParcelFileDescriptor;
 import android.provider.DocumentsContract;
+import android.system.ErrnoException;
+import android.system.Os;
+import android.system.OsConstants;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -70,7 +73,7 @@ final class SafVfsBackend {
         }
         try {
             Uri treeUri = parseTree(treeBytes);
-            Uri documentUri = resolve(treeUri, text(pathBytes), false);
+            Uri documentUri = resolve(treeUri, text(pathBytes), false, true);
             if (documentUri == null) {
                 return NOT_FOUND;
             }
@@ -78,6 +81,25 @@ final class SafVfsBackend {
             long id = NEXT_HANDLE.getAndIncrement();
             OPEN_HANDLES.put(id, handle);
             return id;
+        } catch (SecurityException exception) {
+            return PERMISSION;
+        } catch (FileNotFoundException exception) {
+            return NOT_FOUND;
+        } catch (IllegalArgumentException exception) {
+            return INVALID;
+        } catch (IOException exception) {
+            return ERROR;
+        }
+    }
+
+    static int detachReadOnlyDescriptor(byte[] treeBytes, byte[] pathBytes) {
+        try {
+            Uri treeUri = parseTree(treeBytes);
+            Uri documentUri = resolve(treeUri, text(pathBytes), false, true);
+            if (documentUri == null) {
+                return NOT_FOUND;
+            }
+            return detachSeekableRead(documentUri);
         } catch (SecurityException exception) {
             return PERMISSION;
         } catch (FileNotFoundException exception) {
@@ -152,7 +174,7 @@ final class SafVfsBackend {
         long[] failure = {ERROR, 0, 0, 0, 0, 0};
         try {
             Uri treeUri = parseTree(treeBytes);
-            Uri documentUri = resolve(treeUri, text(pathBytes), true);
+            Uri documentUri = resolve(treeUri, text(pathBytes), true, true);
             if (documentUri == null) {
                 failure[0] = NOT_FOUND;
                 return failure;
@@ -193,7 +215,7 @@ final class SafVfsBackend {
     static byte[][] list(byte[] treeBytes, byte[] pathBytes) {
         try {
             Uri treeUri = parseTree(treeBytes);
-            Uri directory = resolve(treeUri, text(pathBytes), true);
+            Uri directory = resolve(treeUri, text(pathBytes), true, true);
             if (directory == null) {
                 return null;
             }
@@ -233,7 +255,7 @@ final class SafVfsBackend {
         try {
             PathParts parts = splitParent(text(pathBytes));
             Uri treeUri = parseTree(treeBytes);
-            Uri parent = resolve(treeUri, parts.parent, true);
+            Uri parent = resolve(treeUri, parts.parent, true, false);
             if (parent == null) {
                 return NOT_FOUND;
             }
@@ -260,7 +282,7 @@ final class SafVfsBackend {
             String newName = text(newNameBytes);
             validateName(newName);
             Uri treeUri = parseTree(treeBytes);
-            Uri document = resolve(treeUri, text(pathBytes), false);
+            Uri document = resolve(treeUri, text(pathBytes), false, false);
             if (document == null) {
                 return NOT_FOUND;
             }
@@ -280,7 +302,7 @@ final class SafVfsBackend {
     static int delete(byte[] treeBytes, byte[] pathBytes) {
         try {
             Uri treeUri = parseTree(treeBytes);
-            Uri document = resolve(treeUri, text(pathBytes), false);
+            Uri document = resolve(treeUri, text(pathBytes), false, false);
             if (document == null) {
                 return NOT_FOUND;
             }
@@ -335,6 +357,58 @@ final class SafVfsBackend {
         }
     }
 
+    private static int detachSeekableRead(Uri uri) throws IOException {
+        ParcelFileDescriptor descriptor = resolver.openFileDescriptor(uri, "r");
+        if (descriptor == null) {
+            throw new FileNotFoundException(uri.toString());
+        }
+        try {
+            try {
+                Os.lseek(descriptor.getFileDescriptor(), 0, OsConstants.SEEK_CUR);
+                return descriptor.detachFd();
+            } catch (ErrnoException notSeekable) {
+                if (notSeekable.errno != OsConstants.ESPIPE) {
+                    throw new IOException("Unable to inspect provider descriptor", notSeekable);
+                }
+            }
+        } finally {
+            descriptor.close();
+        }
+
+        File cache = File.createTempFile("tq-vfs-fd-", ".cache", cacheDirectory);
+        boolean complete = false;
+        try (
+            InputStream source = resolver.openInputStream(uri);
+            FileOutputStream output = new FileOutputStream(cache)
+        ) {
+            if (source == null) {
+                throw new FileNotFoundException(uri.toString());
+            }
+            byte[] buffer = new byte[1024 * 1024];
+            int count;
+            while ((count = source.read(buffer)) >= 0) {
+                if (count > 0) {
+                    output.write(buffer, 0, count);
+                }
+            }
+            complete = true;
+        } finally {
+            if (!complete) {
+                cache.delete();
+            }
+        }
+
+        ParcelFileDescriptor cached = ParcelFileDescriptor.open(
+            cache,
+            ParcelFileDescriptor.MODE_READ_ONLY
+        );
+        if (!cache.delete()) {
+            cached.close();
+            throw new IOException("Unable to unlink VFS descriptor cache");
+        }
+        return cached.detachFd();
+    }
+
     private static Uri parseTree(byte[] bytes) throws FileNotFoundException {
         if (resolver == null) {
             throw new IllegalStateException("VFS was not installed");
@@ -347,7 +421,12 @@ final class SafVfsBackend {
         return uri;
     }
 
-    private static Uri resolve(Uri treeUri, String relativePath, boolean allowRoot)
+    private static Uri resolve(
+        Uri treeUri,
+        String relativePath,
+        boolean allowRoot,
+        boolean caseInsensitiveFallback
+    )
         throws FileNotFoundException {
         List<String> segments = pathSegments(relativePath);
         Uri current = DocumentsContract.buildDocumentUriUsingTree(
@@ -365,7 +444,9 @@ final class SafVfsBackend {
                 treeUri,
                 DocumentsContract.getDocumentId(current)
             );
-            Uri found = null;
+            Uri exact = null;
+            Uri folded = null;
+            boolean foldedAmbiguous = false;
             try (Cursor cursor = resolver.query(
                 children,
                 CHILD_PROJECTION,
@@ -377,15 +458,32 @@ final class SafVfsBackend {
                     throw new FileNotFoundException(segment);
                 }
                 while (cursor.moveToNext()) {
-                    if (segment.equals(cursor.getString(1))) {
-                        found = DocumentsContract.buildDocumentUriUsingTree(
+                    String displayName = cursor.getString(1);
+                    if (segment.equals(displayName)) {
+                        exact = DocumentsContract.buildDocumentUriUsingTree(
                             treeUri,
                             cursor.getString(0)
                         );
                         break;
                     }
+                    if (caseInsensitiveFallback
+                        && displayName != null
+                        && segment.equalsIgnoreCase(displayName)) {
+                        Uri candidate = DocumentsContract.buildDocumentUriUsingTree(
+                            treeUri,
+                            cursor.getString(0)
+                        );
+                        if (folded == null) {
+                            folded = candidate;
+                        } else {
+                            foldedAmbiguous = true;
+                        }
+                    }
                 }
             }
+            Uri found = exact != null
+                ? exact
+                : (foldedAmbiguous ? null : folded);
             if (found == null) {
                 return null;
             }

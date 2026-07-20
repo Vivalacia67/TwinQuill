@@ -83,6 +83,41 @@ set(CMAKE_SYSTEM_NAME Android)
 include_directories("${BZ2_DIR}" "${LUA_SRC_DIR}")
 add_subdirectory("${ONSYURI_DIR}" "${CMAKE_BINARY_DIR}/onscripter-yuri")
 
+include("${CMAKE_CURRENT_LIST_DIR}/ApplyOnsPatches.cmake")
+twinquill_prepare_ons_patched_sources(
+    "${ONSYURI_DIR}"
+    "${CMAKE_CURRENT_BINARY_DIR}/patched/onscripter-yuri/src/onsyuri"
+    TWINQUILL_ONS_COMMAND_SOURCE
+    TWINQUILL_ONS_MAIN_SOURCE
+    TWINQUILL_ONS_SOUND_SOURCE
+)
+get_target_property(TWINQUILL_ONS_SOURCES onsyuri SOURCES)
+set(TWINQUILL_ONS_PATCHED_SOURCES)
+foreach(SOURCE_PATH IN LISTS TWINQUILL_ONS_SOURCES)
+    if(SOURCE_PATH MATCHES "ONScripter_command\\.cpp$")
+        list(APPEND TWINQUILL_ONS_PATCHED_SOURCES
+            "${TWINQUILL_ONS_COMMAND_SOURCE}"
+        )
+    elseif(SOURCE_PATH MATCHES "onscripter_main\\.cpp$")
+        list(APPEND TWINQUILL_ONS_PATCHED_SOURCES
+            "${TWINQUILL_ONS_MAIN_SOURCE}"
+        )
+    elseif(SOURCE_PATH MATCHES "ONScripter_sound\\.cpp$")
+        list(APPEND TWINQUILL_ONS_PATCHED_SOURCES
+            "${TWINQUILL_ONS_SOUND_SOURCE}"
+        )
+    else()
+        list(APPEND TWINQUILL_ONS_PATCHED_SOURCES "${SOURCE_PATH}")
+    endif()
+endforeach()
+set_property(TARGET onsyuri PROPERTY SOURCES
+    "${TWINQUILL_ONS_PATCHED_SOURCES}"
+)
+target_include_directories(onsyuri PRIVATE
+    "${CMAKE_CURRENT_LIST_DIR}"
+    "${ONSYURI_DIR}/src/onsyuri"
+)
+
 # ONScripterYuri's JNI entry points use a configurable package prefix but its
 # upstream Android package is embedded in the pinned snapshot's CMake file.
 # Replace only that build definition; the vendor source remains byte-for-byte

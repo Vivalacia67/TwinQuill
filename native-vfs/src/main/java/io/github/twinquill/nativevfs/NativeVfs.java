@@ -32,6 +32,17 @@ public final class NativeVfs {
         return nativeOpen(bytes(treeUri.toString()), bytes(relativePath), OPEN_READ);
     }
 
+    /**
+     * Opens a seekable read-only OS descriptor for native code that still uses
+     * {@code fdopen}. The caller owns the returned descriptor and must close it.
+     */
+    public static int openReadOnlyDescriptor(Uri treeUri, String relativePath) {
+        return SafVfsBackend.detachReadOnlyDescriptor(
+            bytes(treeUri.toString()),
+            bytes(relativePath)
+        );
+    }
+
     public static int read(long handle, byte[] output, int offset, int size) {
         if (offset < 0 || size < 0 || offset > output.length - size) {
             return -5;

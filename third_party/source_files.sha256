@@ -1261,6 +1261,8 @@ ef4d513c147e6c167bb51c031fe52358250fcd64a1eea36ef115e33fcea8408d  lua-5.4.4/src/
 aa40b399f811f5cbf6c2fb792d8bb932db6488541201525cda075371e100b332  lua-5.4.4/src/lvm.h
 fba61ceeeb257a3fe5f63310f21e14fc26c4be647583dcf8e74cbc7fb7e43e8a  lua-5.4.4/src/lzio.c
 9673f62eac2d0fe3010f9d23148be7b8113319fdf4c4490015cd9feae2ecaad4  lua-5.4.4/src/lzio.h
+2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b  noto-sans-cjk-sc-2.004/NotoSansCJKsc-Regular.otf
+6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2  noto-sans-cjk-sc-2.004/OFL.txt
 8e57940bb27a316c9b4aeb1d4d66855ec09c833f5d49d2e02e956c6d1d425d45  oniguruma-cf93dc/.gitignore
 172a2a72c080d3067969599308c91385af86fdeb2419f8ad687883ca5a8ff912  oniguruma-cf93dc/AUTHORS
 8dee7679b71c0f10ff685e3346fe26bd476e32249a777a99d4b9c9dc5084cf1c  oniguruma-cf93dc/Android.mk

@@ -16,6 +16,7 @@
             tools:replace="android:exported" />
         <activity
             android:name="io.github.twinquill.launcher.EngineProtocolTestHostActivity"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
             android:exported="false" />
         <activity
             android:name="io.github.twinquill.launcher.EngineCrashTestActivity"

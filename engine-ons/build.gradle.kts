@@ -30,12 +30,21 @@ android {
         prefab = true
     }
 
+    lint {
+        // Freeze findings inherited from the pinned SDL2 2.26.3 Android glue.
+        // New findings outside these exact source locations still fail lint.
+        baseline = file("lint-baseline.xml")
+    }
+
     sourceSets {
         getByName("main") {
             // Compile SDL's Android glue from the pinned source snapshot. This
             // is source input, not a prebuilt Android or native dependency.
             java.directories.add(
                 "../vendor/deps/ons/SDL2-2.26.3/android-project/app/src/main/java"
+            )
+            assets.directories.add(
+                "../third_party/fonts/noto-sans-cjk-sc-2.004"
             )
         }
     }
@@ -44,4 +53,5 @@ android {
 dependencies {
     implementation(project(":engine-api"))
     implementation(project(":native-vfs"))
+    testImplementation("junit:junit:4.13.2")
 }
