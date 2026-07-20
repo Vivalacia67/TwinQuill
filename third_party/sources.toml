@@ -30,6 +30,16 @@ tree = "8f269e21d4d1191ff25356b463551780bc0fdbac"
 archive_sha256 = "e9b8cc8de41f86eef6bafa2f9840369dc218dc7bc976c7362e2c52a86561e74c"
 license = "BSD-2-Clause"
 license_files = ["COPYING"]
+[[sources]]
+id = "zlib-16fe0d"
+source_type = "git-archive"
+destination = "vendor/deps/krkr/zlib"
+url = "https://github.com/krkrz/zlib.git"
+commit = "16fe0db79aa40a1ecae686cef84481b83013bb8c"
+tree = "f11cd72812d6f451674acbc35376454687417138"
+archive_sha256 = "de0ba745e2482e37c4b5b18611d66de771e4f714cc5a62c82098f2ef0b28041c"
+license = "Zlib"
+license_files = ["README", "zlib.h"]
 
 [[sources]]
 id = "onscripter-yuri"
@@ -84,7 +94,9 @@ parent = "krkrz"
 path = "external/zlib"
 url = "https://github.com/krkrz/zlib.git"
 commit = "16fe0db79aa40a1ecae686cef84481b83013bb8c"
-status = "not-yet-imported"
+status = "imported"
+source_id = "zlib-16fe0d"
+destination = "vendor/deps/krkr/zlib"
 
 [[gitlinks]]
 parent = "onscripter-yuri"

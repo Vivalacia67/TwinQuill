@@ -5,10 +5,31 @@ set(TWINQUILL_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../../..")
 set(KRKR2_CORE "${TWINQUILL_ROOT}/vendor/kirikiroid2/src/core")
 set(TJS2_DIR "${KRKR2_CORE}/tjs2")
 set(ONIG_DIR "${TWINQUILL_ROOT}/vendor/deps/krkr/oniguruma")
+set(ZLIB_DIR "${TWINQUILL_ROOT}/vendor/deps/krkr/zlib")
 
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build Krkr dependencies statically" FORCE)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 add_subdirectory("${ONIG_DIR}" "${CMAKE_BINARY_DIR}/third_party/oniguruma")
+
+add_library(twinquill_krkr_zlib STATIC
+    "${ZLIB_DIR}/adler32.c"
+    "${ZLIB_DIR}/compress.c"
+    "${ZLIB_DIR}/crc32.c"
+    "${ZLIB_DIR}/deflate.c"
+    "${ZLIB_DIR}/infback.c"
+    "${ZLIB_DIR}/inffast.c"
+    "${ZLIB_DIR}/inflate.c"
+    "${ZLIB_DIR}/inftrees.c"
+    "${ZLIB_DIR}/trees.c"
+    "${ZLIB_DIR}/uncompr.c"
+    "${ZLIB_DIR}/zutil.c"
+)
+set_target_properties(twinquill_krkr_zlib PROPERTIES
+    C_VISIBILITY_PRESET hidden
+    POSITION_INDEPENDENT_CODE ON
+)
+target_compile_options(twinquill_krkr_zlib PRIVATE -fvisibility=hidden)
+target_include_directories(twinquill_krkr_zlib PUBLIC "${ZLIB_DIR}")
 
 # Apply the small, recorded libc++ compatibility patch to a generated copy.
 # The source snapshot itself remains identical to the pinned upstream tree.
@@ -57,6 +78,7 @@ target_compile_features(twinquill_engine_krkr PRIVATE cxx_std_17)
 target_compile_options(twinquill_engine_krkr PRIVATE -fvisibility=hidden)
 target_link_libraries(twinquill_engine_krkr PRIVATE
     twinquill_krkr_tjs2
+    twinquill_krkr_zlib
     android
     log
 )
