@@ -4,10 +4,11 @@
  */
 #pragma once
 
-#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
+
+#include "tjs.h"
 
 namespace twinquill::krkr {
 
@@ -25,12 +26,9 @@ struct StorageSpec {
     static StorageSpec OwnedFileDescriptor(int descriptor);
 };
 
-class ReadOnlyStream {
+class ReadOnlyStream : public TJS::tTJSBinaryStream {
 public:
     virtual ~ReadOnlyStream() = default;
-
-    virtual std::uint64_t size() const = 0;
-    virtual bool read_at(std::uint64_t offset, void* output, std::size_t size) = 0;
 };
 
 int open_read_only_stream(

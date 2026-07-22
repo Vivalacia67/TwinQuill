@@ -6,6 +6,8 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <cstddef>
+#include <cstdint>
 #include <fcntl.h>
 #include <limits>
 #include <sys/stat.h>
@@ -26,6 +28,58 @@ bool fits_size_t(std::uint64_t value) {
 
 bool fits_off_t(std::uint64_t value) {
     return value <= static_cast<std::uint64_t>(std::numeric_limits<off_t>::max());
+}
+
+bool fits_tjs_int64(std::uint64_t value) {
+    return value <= static_cast<std::uint64_t>(std::numeric_limits<TJS::tjs_int64>::max());
+}
+
+bool compute_seek_position(
+    std::uint64_t current,
+    std::uint64_t size,
+    TJS::tjs_int64 offset,
+    TJS::tjs_int whence,
+    std::uint64_t* output) {
+    if (output == nullptr) {
+        return false;
+    }
+
+    std::uint64_t base = 0;
+    switch (whence) {
+        case TJS_BS_SEEK_SET:
+            base = 0;
+            break;
+        case TJS_BS_SEEK_CUR:
+            base = current;
+            break;
+        case TJS_BS_SEEK_END:
+            base = size;
+            break;
+        default:
+            return false;
+    }
+
+    std::uint64_t position = 0;
+    if (offset < 0) {
+        const std::uint64_t magnitude =
+            static_cast<std::uint64_t>(-(offset + 1)) + 1;
+        if (magnitude > base) {
+            return false;
+        }
+        position = base - magnitude;
+    } else {
+        const std::uint64_t magnitude = static_cast<std::uint64_t>(offset);
+        if (magnitude > std::numeric_limits<std::uint64_t>::max() - base) {
+            return false;
+        }
+        position = base + magnitude;
+    }
+
+    if (position > size || !fits_tjs_int64(position)) {
+        return false;
+    }
+    *output = position;
+    return true;
 }
 
 void close_ignoring_result(int descriptor) {
@@ -64,7 +118,7 @@ private:
 class FileDescriptorReadOnlyStream final : public ReadOnlyStream {
 public:
     FileDescriptorReadOnlyStream(int descriptor, std::uint64_t size)
-        : descriptor_(descriptor), size_(size) {
+        : descriptor_(descriptor), size_(size), cursor_(0) {
     }
 
     ~FileDescriptorReadOnlyStream() override {
@@ -74,51 +128,104 @@ public:
     FileDescriptorReadOnlyStream(const FileDescriptorReadOnlyStream&) = delete;
     FileDescriptorReadOnlyStream& operator=(const FileDescriptorReadOnlyStream&) = delete;
 
-    std::uint64_t size() const override {
-        return size_;
+    TJS::tjs_uint64 TJS_INTF_METHOD Seek(
+        TJS::tjs_int64 offset,
+        TJS::tjs_int whence) override {
+        std::uint64_t position = 0;
+        if (compute_seek_position(cursor_, size_, offset, whence, &position)) {
+            cursor_ = position;
+        }
+        return static_cast<TJS::tjs_uint64>(cursor_);
     }
 
-    bool read_at(std::uint64_t offset, void* output, std::size_t size) override {
-        if ((output == nullptr && size != 0) ||
-            !add_fits(offset, size, size_) ||
-            !fits_off_t(offset)) {
-            return false;
+    TJS::tjs_uint TJS_INTF_METHOD Read(void* buffer, TJS::tjs_uint read_size) override {
+        if ((buffer == nullptr && read_size != 0) || read_size == 0 || cursor_ >= size_) {
+            return 0;
         }
-        auto* cursor = static_cast<unsigned char*>(output);
-        std::uint64_t position = offset;
-        std::size_t remaining = size;
+
+        const std::uint64_t bytes_available = size_ - cursor_;
+        TJS::tjs_uint bytes_requested = read_size;
+        if (bytes_available < static_cast<std::uint64_t>(bytes_requested)) {
+            bytes_requested = static_cast<TJS::tjs_uint>(bytes_available);
+        }
+
+        auto* output = static_cast<unsigned char*>(buffer);
+        std::uint64_t position = cursor_;
+        TJS::tjs_uint bytes_read = 0;
+        TJS::tjs_uint remaining = bytes_requested;
         while (remaining > 0) {
             if (!fits_off_t(position)) {
-                return false;
+                break;
             }
             const std::size_t request = std::min(
-                remaining,
+                static_cast<std::size_t>(remaining),
                 static_cast<std::size_t>(std::numeric_limits<ssize_t>::max()));
             const ssize_t count = pread(
                 descriptor_,
-                cursor,
+                output,
                 request,
                 static_cast<off_t>(position));
             if (count < 0) {
                 if (errno == EINTR) {
                     continue;
                 }
-                return false;
+                break;
             }
-            if (count == 0 || static_cast<std::size_t>(count) > remaining) {
-                return false;
+            if (count == 0 || static_cast<std::size_t>(count) > request) {
+                break;
             }
-            cursor += count;
+            output += count;
             position += static_cast<std::uint64_t>(count);
-            remaining -= static_cast<std::size_t>(count);
+            bytes_read += static_cast<TJS::tjs_uint>(count);
+            remaining -= static_cast<TJS::tjs_uint>(count);
         }
-        return true;
+        cursor_ = position;
+        return bytes_read;
+    }
+
+    TJS::tjs_uint TJS_INTF_METHOD Write(
+        const void* /*buffer*/,
+        TJS::tjs_uint /*write_size*/) override {
+        return 0;
+    }
+
+    TJS::tjs_uint64 TJS_INTF_METHOD GetSize() override {
+        return static_cast<TJS::tjs_uint64>(size_);
     }
 
 private:
     int descriptor_;
     std::uint64_t size_;
+    std::uint64_t cursor_;
 };
+
+bool read_exact_at(
+    TJS::tTJSBinaryStream* input,
+    std::uint64_t offset,
+    void* output,
+    std::size_t size) {
+    if (input == nullptr || (output == nullptr && size != 0) || !fits_tjs_int64(offset)) {
+        return false;
+    }
+    if (input->Seek(static_cast<TJS::tjs_int64>(offset), TJS_BS_SEEK_SET) != offset) {
+        return false;
+    }
+
+    auto* cursor = static_cast<unsigned char*>(output);
+    std::size_t remaining = size;
+    while (remaining > 0) {
+        const std::size_t request = std::min(
+            remaining,
+            static_cast<std::size_t>(std::numeric_limits<TJS::tjs_uint>::max()));
+        const TJS::tjs_uint count = input->Read(cursor, static_cast<TJS::tjs_uint>(request));
+        if (count == 0 || static_cast<std::size_t>(count) > request) {
+            return false;
+        }
+        cursor += count;
+        remaining -= static_cast<std::size_t>(count);
+    }
+    return true;
+}
 
 int descriptor_size(int descriptor, bool require_regular_file, std::uint64_t* output) {
     if (descriptor < 0 || output == nullptr) {
@@ -222,12 +329,13 @@ int read_storage_file(
     if (open_result != 0) {
         return open_result;
     }
-    if (input->size() > maximum_size || !fits_size_t(input->size())) {
+    const std::uint64_t input_size = input->GetSize();
+    if (input_size > maximum_size || !fits_size_t(input_size)) {
         return -1;
     }
-    output->assign(static_cast<std::size_t>(input->size()), '\0');
+    output->assign(static_cast<std::size_t>(input_size), '\0');
     if (!output->empty() &&
-        !input->read_at(0, output->data(), output->size())) {
+        !read_exact_at(input.get(), 0, output->data(), output->size())) {
         return -1;
     }
     return 0;

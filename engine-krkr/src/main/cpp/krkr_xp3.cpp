@@ -66,16 +66,40 @@ bool fits_zlib_uint(std::size_t value) {
     return value <= static_cast<std::size_t>(std::numeric_limits<uInt>::max());
 }
 
-bool read_at(
+bool fits_tjs_int64(std::uint64_t value) {
+    return value <= static_cast<std::uint64_t>(std::numeric_limits<TJS::tjs_int64>::max());
+}
+
+bool read_exact_at(
     ReadOnlyStream* input,
     std::uint64_t file_size,
     std::uint64_t offset,
     void* output,
     std::size_t size) {
-    if (input == nullptr || !add_fits(offset, size, file_size)) {
+    if (input == nullptr ||
+        (output == nullptr && size != 0) ||
+        !add_fits(offset, size, file_size) ||
+        !fits_tjs_int64(offset)) {
         return false;
     }
-    return input->read_at(offset, output, size);
+    if (input->Seek(static_cast<TJS::tjs_int64>(offset), TJS_BS_SEEK_SET) != offset) {
+        return false;
+    }
+
+    auto* cursor = static_cast<unsigned char*>(output);
+    std::size_t remaining = size;
+    while (remaining > 0) {
+        const std::size_t request = std::min(
+            remaining,
+            static_cast<std::size_t>(std::numeric_limits<TJS::tjs_uint>::max()));
+        const TJS::tjs_uint count = input->Read(cursor, static_cast<TJS::tjs_uint>(request));
+        if (count == 0 || static_cast<std::size_t>(count) > request) {
+            return false;
+        }
+        cursor += count;
+        remaining -= static_cast<std::size_t>(count);
+    }
+    return true;
 }
 
 bool bounded_size(std::uint64_t value, std::uint64_t maximum, std::size_t* output) {
@@ -98,7 +122,7 @@ bool read_payload(
         return false;
     }
     output->assign(checked_size, 0);
-    return checked_size == 0 || read_at(input, file_size, offset, output->data(), checked_size);
+    return checked_size == 0 || read_exact_at(input, file_size, offset, output->data(), checked_size);
 }
 
 bool inflate_exact(
@@ -209,7 +233,7 @@ int append_segment(
         }
         source->resize(old_size + checked_unpacked_size);
         if (checked_unpacked_size != 0 &&
-            !read_at(input, file_size, offset, source->data() + old_size, checked_unpacked_size)) {
+            !read_exact_at(input, file_size, offset, source->data() + old_size, checked_unpacked_size)) {
             return 34;
         }
         return 0;
@@ -321,7 +345,7 @@ int read_index_payload(
     std::vector<std::uint8_t>* index,
     std::uint64_t* next_offset_position) {
     std::array<std::uint8_t, 17> header{};
-    if (!read_at(input, file_size, index_offset, header.data(), 9)) {
+    if (!read_exact_at(input, file_size, index_offset, header.data(), 9)) {
         return 34;
     }
     *flags = header[0];
@@ -343,7 +367,7 @@ int read_index_payload(
         return 33;
     }
 
-    if (!read_at(input, file_size, index_offset + 9, header.data() + 9, 8)) {
+    if (!read_exact_at(input, file_size, index_offset + 9, header.data() + 9, 8)) {
         return 34;
     }
     const std::uint64_t compressed_size = read_u64(header.data() + 1);
@@ -377,12 +401,12 @@ int read_xp3_startup(const StorageSpec& archive, std::string* source) {
     if (open_read_only_stream(archive, &input) != 0 || input == nullptr) {
         return 30;
     }
-    const std::uint64_t file_size = input->size();
+    const std::uint64_t file_size = input->GetSize();
     if (file_size < 19) {
         return 32;
     }
     std::array<std::uint8_t, 19> header{};
-    if (!read_at(input.get(), file_size, 0, header.data(), header.size()) ||
+    if (!read_exact_at(input.get(), file_size, 0, header.data(), header.size()) ||
         !std::equal(kXp3Mark.begin(), kXp3Mark.end(), header.begin())) {
         return 32;
     }
@@ -419,7 +443,7 @@ int read_xp3_startup(const StorageSpec& archive, std::string* source) {
             return 31;
         }
         std::array<std::uint8_t, 8> next_offset{};
-        if (!read_at(input.get(), file_size, next_offset_position, next_offset.data(), next_offset.size())) {
+        if (!read_exact_at(input.get(), file_size, next_offset_position, next_offset.data(), next_offset.size())) {
             return 34;
         }
         const std::uint64_t next_index_offset = read_u64(next_offset.data());
