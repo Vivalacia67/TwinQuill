@@ -71,6 +71,7 @@ target_link_libraries(twinquill_krkr_tjs2 PUBLIC onig)
 
 add_library(twinquill_engine_krkr SHARED
     krkr_jni.cpp
+    krkr_storage.cpp
     krkr_tjs_probe.cpp
     krkr_xp3.cpp
 )

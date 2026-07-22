@@ -9,8 +9,8 @@
 #include <cctype>
 #include <cstdint>
 #include <cstring>
-#include <fstream>
 #include <limits>
+#include <memory>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -67,20 +67,15 @@ bool fits_zlib_uint(std::size_t value) {
 }
 
 bool read_at(
-    std::ifstream* input,
+    ReadOnlyStream* input,
     std::uint64_t file_size,
     std::uint64_t offset,
     void* output,
     std::size_t size) {
-    if (!add_fits(offset, size, file_size) ||
-        offset > static_cast<std::uint64_t>(std::numeric_limits<std::streamoff>::max()) ||
-        size > static_cast<std::size_t>(std::numeric_limits<std::streamsize>::max())) {
+    if (input == nullptr || !add_fits(offset, size, file_size)) {
         return false;
     }
-    input->clear();
-    input->seekg(static_cast<std::streamoff>(offset), std::ios::beg);
-    input->read(static_cast<char*>(output), static_cast<std::streamsize>(size));
-    return input->good() || input->gcount() == static_cast<std::streamsize>(size);
+    return input->read_at(offset, output, size);
 }
 
 bool bounded_size(std::uint64_t value, std::uint64_t maximum, std::size_t* output) {
@@ -92,7 +87,7 @@ bool bounded_size(std::uint64_t value, std::uint64_t maximum, std::size_t* outpu
 }
 
 bool read_payload(
-    std::ifstream* input,
+    ReadOnlyStream* input,
     std::uint64_t file_size,
     std::uint64_t offset,
     std::uint64_t size,
@@ -187,7 +182,7 @@ bool startup_name(const std::uint8_t* utf16, std::uint16_t length) {
 
 int append_segment(
     const std::uint8_t* data,
-    std::ifstream* input,
+    ReadOnlyStream* input,
     std::uint64_t file_size,
     std::uint64_t original_size,
     std::string* source) {
@@ -237,7 +232,7 @@ int append_segment(
 
 int read_file_chunk(
     const Chunk& file,
-    std::ifstream* input,
+    ReadOnlyStream* input,
     std::uint64_t file_size,
     std::string* source) {
     const Chunk* info = nullptr;
@@ -298,7 +293,7 @@ int read_file_chunk(
 
 int read_index(
     const std::vector<std::uint8_t>& index,
-    std::ifstream* input,
+    ReadOnlyStream* input,
     std::uint64_t file_size,
     std::string* source) {
     std::size_t position = 0;
@@ -319,7 +314,7 @@ int read_index(
 }
 
 int read_index_payload(
-    std::ifstream* input,
+    ReadOnlyStream* input,
     std::uint64_t file_size,
     std::uint64_t index_offset,
     std::uint8_t* flags,
@@ -374,21 +369,20 @@ int read_index_payload(
 
 }  // namespace
 
-int read_xp3_startup(const char* archive_path, std::string* source) {
-    if (archive_path == nullptr || source == nullptr) {
+int read_xp3_startup(const StorageSpec& archive, std::string* source) {
+    if (source == nullptr) {
         return 30;
     }
-    std::ifstream input(archive_path, std::ios::binary | std::ios::ate);
-    if (!input) {
+    std::unique_ptr<ReadOnlyStream> input;
+    if (open_read_only_stream(archive, &input) != 0 || input == nullptr) {
         return 30;
     }
-    const std::streamoff end = input.tellg();
-    if (end < 19) {
+    const std::uint64_t file_size = input->size();
+    if (file_size < 19) {
         return 32;
     }
-    const std::uint64_t file_size = static_cast<std::uint64_t>(end);
     std::array<std::uint8_t, 19> header{};
-    if (!read_at(&input, file_size, 0, header.data(), header.size()) ||
+    if (!read_at(input.get(), file_size, 0, header.data(), header.size()) ||
         !std::equal(kXp3Mark.begin(), kXp3Mark.end(), header.begin())) {
         return 32;
     }
@@ -408,7 +402,7 @@ int read_xp3_startup(const char* archive_path, std::string* source) {
         std::vector<std::uint8_t> index;
         std::uint64_t next_offset_position = 0;
         const int payload_result = read_index_payload(
-            &input,
+            input.get(),
             file_size,
             index_offset,
             &flags,
@@ -417,7 +411,7 @@ int read_xp3_startup(const char* archive_path, std::string* source) {
         if (payload_result != 0) {
             return payload_result;
         }
-        const int result = read_index(index, &input, file_size, source);
+        const int result = read_index(index, input.get(), file_size, source);
         if (result != 31) {
             return result;
         }
@@ -425,7 +419,7 @@ int read_xp3_startup(const char* archive_path, std::string* source) {
             return 31;
         }
         std::array<std::uint8_t, 8> next_offset{};
-        if (!read_at(&input, file_size, next_offset_position, next_offset.data(), next_offset.size())) {
+        if (!read_at(input.get(), file_size, next_offset_position, next_offset.data(), next_offset.size())) {
             return 34;
         }
         const std::uint64_t next_index_offset = read_u64(next_offset.data());
@@ -435,6 +429,13 @@ int read_xp3_startup(const char* archive_path, std::string* source) {
         }
         index_offset = next_index_offset;
     }
+}
+
+int read_xp3_startup(const char* archive_path, std::string* source) {
+    if (archive_path == nullptr) {
+        return 30;
+    }
+    return read_xp3_startup(StorageSpec::LocalFile(archive_path), source);
 }
 
 }  // namespace twinquill::krkr

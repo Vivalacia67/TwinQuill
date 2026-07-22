@@ -6,11 +6,10 @@
 
 #include <chrono>
 #include <cstdint>
-#include <fstream>
-#include <iterator>
 #include <stdexcept>
 #include <string>
 
+#include "krkr_storage.h"
 #include "tjs.h"
 #include "tjsError.h"
 #include "krkr_xp3.h"
@@ -18,6 +17,7 @@
 namespace {
 
 constexpr char kLogTag[] = "TwinQuill/Krkr";
+constexpr std::uint64_t kMaxLooseStartupSize = 8 * 1024 * 1024;
 
 std::u16string ascii_to_tjs(const std::string& text) {
     std::u16string converted;
@@ -103,20 +103,14 @@ TJS::tjs_uint32 TVPGetRoughTickCount32() {
         duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count());
 }
 
-extern "C" __attribute__((visibility("default")))
-int twinquill_engine_krkr_run_loose_startup(const char* startup_path) {
-    if (startup_path == nullptr || startup_path[0] == '\0') {
-        return 10;
-    }
-
+int run_loose_startup(const twinquill::krkr::StorageSpec& startup) {
     try {
-        std::ifstream input(startup_path, std::ios::binary);
-        if (!input) {
+        std::string source;
+        const int read_result =
+            twinquill::krkr::read_storage_file(startup, kMaxLooseStartupSize, &source);
+        if (read_result != 0) {
             return 11;
         }
-        const std::string source(
-            (std::istreambuf_iterator<char>(input)),
-            std::istreambuf_iterator<char>());
         return run_tjs_source(source);
     } catch (const TJS::eTJS& exception) {
         AndroidConsoleOutput output;
@@ -131,11 +125,10 @@ int twinquill_engine_krkr_run_loose_startup(const char* startup_path) {
     }
 }
 
-extern "C" __attribute__((visibility("default")))
-int twinquill_engine_krkr_run_xp3_startup(const char* archive_path) {
+int run_xp3_startup(const twinquill::krkr::StorageSpec& archive) {
     try {
         std::string source;
-        const int read_result = twinquill::krkr::read_xp3_startup(archive_path, &source);
+        const int read_result = twinquill::krkr::read_xp3_startup(archive, &source);
         if (read_result != 0) {
             return read_result;
         }
@@ -151,4 +144,36 @@ int twinquill_engine_krkr_run_xp3_startup(const char* archive_path) {
         __android_log_print(ANDROID_LOG_ERROR, kLogTag, "Unknown XP3 probe failure");
         return 22;
     }
+}
+
+extern "C" __attribute__((visibility("default")))
+int twinquill_engine_krkr_run_loose_startup(const char* startup_path) {
+    if (startup_path == nullptr || startup_path[0] == '\0') {
+        return 10;
+    }
+    return run_loose_startup(twinquill::krkr::StorageSpec::LocalFile(startup_path));
+}
+
+extern "C" __attribute__((visibility("default")))
+int twinquill_engine_krkr_run_loose_startup_fd(int descriptor) {
+    if (descriptor < 0) {
+        return 10;
+    }
+    return run_loose_startup(twinquill::krkr::StorageSpec::OwnedFileDescriptor(descriptor));
+}
+
+extern "C" __attribute__((visibility("default")))
+int twinquill_engine_krkr_run_xp3_startup(const char* archive_path) {
+    if (archive_path == nullptr || archive_path[0] == '\0') {
+        return 30;
+    }
+    return run_xp3_startup(twinquill::krkr::StorageSpec::LocalFile(archive_path));
+}
+
+extern "C" __attribute__((visibility("default")))
+int twinquill_engine_krkr_run_xp3_startup_fd(int descriptor) {
+    if (descriptor < 0) {
+        return 30;
+    }
+    return run_xp3_startup(twinquill::krkr::StorageSpec::OwnedFileDescriptor(descriptor));
 }
