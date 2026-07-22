@@ -18,6 +18,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /** SAF fixture that lives only in the launcher instrumentation APK. */
@@ -33,7 +34,22 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
     static final String ONS_LUA_ROOT_ID = "ons-lua";
     static final String ONS_AUDIO_ROOT_ID = "ons-audio";
     static final String ONS_VIDEO_ROOT_ID = "ons-video";
+    static final String KRKR_LOOSE_ROOT_ID = "krkr-loose";
+    static final String KRKR_XP3_ROOT_ID = "krkr-xp3";
+    static final String KRKR_INVALID_XP3_ROOT_ID = "krkr-invalid-xp3";
+    static final String KRKR_LOOSE_WITH_INVALID_XP3_ROOT_ID =
+        "krkr-loose-with-invalid-xp3";
+    static final String KRKR_XP3_ORDER_ROOT_ID = "krkr-xp3-order";
+    static final String KRKR_AMBIGUOUS_STARTUP_ROOT_ID =
+        "krkr-ambiguous-startup";
+    static final String KRKR_EMPTY_ROOT_ID = "krkr-empty";
 
+    private static final byte[] KRKR_STARTUP_SOURCE = (
+        "global.twinQuillM0Result = 42;"
+    ).getBytes(StandardCharsets.US_ASCII);
+    private static final byte[] KRKR_INVALID_XP3 = (
+        "not an xp3 archive"
+    ).getBytes(StandardCharsets.US_ASCII);
     private static final byte[] UTF8_SCRIPT = script(
         "UTF-8 中文測試",
         StandardCharsets.UTF_8
@@ -195,6 +211,12 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             throw new FileNotFoundException(parentDocumentId);
         }
         MatrixCursor result = documentCursor(projection);
+        if (isKrkrRoot(parentDocumentId)) {
+            for (int index = 0; index < krkrDocuments(parentDocumentId).length; index++) {
+                addDocument(result, krkrId(parentDocumentId, index));
+            }
+            return result;
+        }
         addDocument(result, scriptId(parentDocumentId));
         if (isArchiveRoot(parentDocumentId)) {
             addDocument(result, archiveId(parentDocumentId));
@@ -240,6 +262,11 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
                     || (
                         ONS_VIDEO_ROOT_ID.equals(parentDocumentId)
                             && videoId(parentDocumentId).equals(documentId)
+                    )
+                    || (
+                        isKrkrRoot(parentDocumentId)
+                            && rootForKrkr(documentId) != null
+                            && documentId.startsWith(parentDocumentId + "-krkr-")
                     )
             );
     }
@@ -336,7 +363,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             && rootForArchive(documentId) == null
             && rootForLua(documentId) == null
             && rootForAudio(documentId) == null
-            && rootForVideo(documentId) == null) {
+            && rootForVideo(documentId) == null
+            && rootForKrkr(documentId) == null) {
             throw new FileNotFoundException(documentId);
         }
     }
@@ -351,7 +379,14 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             || ONS_SAR_ROOT_ID.equals(documentId)
             || ONS_LUA_ROOT_ID.equals(documentId)
             || ONS_AUDIO_ROOT_ID.equals(documentId)
-            || ONS_VIDEO_ROOT_ID.equals(documentId);
+            || ONS_VIDEO_ROOT_ID.equals(documentId)
+            || KRKR_LOOSE_ROOT_ID.equals(documentId)
+            || KRKR_XP3_ROOT_ID.equals(documentId)
+            || KRKR_INVALID_XP3_ROOT_ID.equals(documentId)
+            || KRKR_LOOSE_WITH_INVALID_XP3_ROOT_ID.equals(documentId)
+            || KRKR_XP3_ORDER_ROOT_ID.equals(documentId)
+            || KRKR_AMBIGUOUS_STARTUP_ROOT_ID.equals(documentId)
+            || KRKR_EMPTY_ROOT_ID.equals(documentId);
     }
 
     private static String scriptId(String rootId) {
@@ -374,11 +409,28 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         return rootId + "-clip";
     }
 
+    private static String krkrId(String rootId, int index) {
+        return rootId + "-krkr-" + index;
+    }
+
     private static boolean isArchiveRoot(String rootId) {
         return ONS_NSA_ROOT_ID.equals(rootId) || ONS_SAR_ROOT_ID.equals(rootId);
     }
 
+    private static boolean isKrkrRoot(String rootId) {
+        return KRKR_LOOSE_ROOT_ID.equals(rootId)
+            || KRKR_XP3_ROOT_ID.equals(rootId)
+            || KRKR_INVALID_XP3_ROOT_ID.equals(rootId)
+            || KRKR_LOOSE_WITH_INVALID_XP3_ROOT_ID.equals(rootId)
+            || KRKR_XP3_ORDER_ROOT_ID.equals(rootId)
+            || KRKR_AMBIGUOUS_STARTUP_ROOT_ID.equals(rootId)
+            || KRKR_EMPTY_ROOT_ID.equals(rootId);
+    }
+
     private static String rootDisplayName(String rootId) {
+        if (isKrkrRoot(rootId)) {
+            return "TwinQuill KRKR 测试";
+        }
         return ROOT_ID.equals(rootId)
             ? "持久化测试"
             : "TwinQuill ONS 测试";
@@ -422,6 +474,41 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             : null;
     }
 
+    private static String rootForKrkr(String documentId) {
+        for (String rootId : new String[] {
+            KRKR_LOOSE_ROOT_ID,
+            KRKR_XP3_ROOT_ID,
+            KRKR_INVALID_XP3_ROOT_ID,
+            KRKR_LOOSE_WITH_INVALID_XP3_ROOT_ID,
+            KRKR_XP3_ORDER_ROOT_ID,
+            KRKR_AMBIGUOUS_STARTUP_ROOT_ID,
+            KRKR_EMPTY_ROOT_ID
+        }) {
+            KrkrDocument[] documents = krkrDocuments(rootId);
+            for (int index = 0; index < documents.length; index++) {
+                if (krkrId(rootId, index).equals(documentId)) {
+                    return rootId;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static KrkrDocument krkrDocument(String documentId)
+        throws FileNotFoundException {
+        String rootId = rootForKrkr(documentId);
+        if (rootId == null) {
+            throw new FileNotFoundException(documentId);
+        }
+        KrkrDocument[] documents = krkrDocuments(rootId);
+        for (int index = 0; index < documents.length; index++) {
+            if (krkrId(rootId, index).equals(documentId)) {
+                return documents[index];
+            }
+        }
+        throw new FileNotFoundException(documentId);
+    }
+
     private static String rootForArchive(String documentId) {
         for (String rootId : new String[] {
             ONS_NSA_ROOT_ID,
@@ -451,6 +538,9 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         }
         if (rootForVideo(documentId) != null) {
             return "clip.mp4";
+        }
+        if (rootForKrkr(documentId) != null) {
+            return krkrDocument(documentId).name;
         }
         if (rootForScript(documentId) != null) {
             return "0.txt";
@@ -486,6 +576,9 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
                 failure.initCause(exception);
                 throw failure;
             }
+        }
+        if (rootForKrkr(documentId) != null) {
+            return krkrDocument(documentId).contents;
         }
         return scriptBytes(documentId);
     }
@@ -539,6 +632,7 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         return archiveOpenCounter(rootId).get();
     }
 
+
     static void resetAudioOpenCount() {
         AUDIO_OPENS.set(0);
     }
@@ -565,7 +659,73 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         if (rootForVideo(documentId) != null) {
             return "video/mp4";
         }
+        if (rootForKrkr(documentId) != null) {
+            try {
+                String name = krkrDocument(documentId).name;
+                return name.toLowerCase(Locale.ROOT).endsWith(".xp3")
+                    ? "application/octet-stream"
+                    : "text/plain";
+            } catch (FileNotFoundException exception) {
+                return "application/octet-stream";
+            }
+        }
         return "text/plain";
+    }
+
+    private static KrkrDocument[] krkrDocuments(String rootId) {
+        try {
+            switch (rootId) {
+                case KRKR_LOOSE_ROOT_ID:
+                    return new KrkrDocument[] {
+                        new KrkrDocument("startup.tjs", KRKR_STARTUP_SOURCE)
+                    };
+                case KRKR_XP3_ROOT_ID:
+                    return new KrkrDocument[] {
+                        new KrkrDocument(
+                            "data.xp3",
+                            KrkrXp3FixtureBuilder.compressedStartupArchive()
+                        )
+                    };
+                case KRKR_INVALID_XP3_ROOT_ID:
+                    return new KrkrDocument[] {
+                        new KrkrDocument("data.xp3", KRKR_INVALID_XP3)
+                    };
+                case KRKR_LOOSE_WITH_INVALID_XP3_ROOT_ID:
+                    return new KrkrDocument[] {
+                        new KrkrDocument("startup.tjs", KRKR_STARTUP_SOURCE),
+                        new KrkrDocument("data.xp3", KRKR_INVALID_XP3)
+                    };
+                case KRKR_XP3_ORDER_ROOT_ID:
+                    return new KrkrDocument[] {
+                        new KrkrDocument(
+                            "Alpha.XP3",
+                            KrkrXp3FixtureBuilder.compressedStartupArchive()
+                        ),
+                        new KrkrDocument("beta.xp3", KRKR_INVALID_XP3)
+                    };
+                case KRKR_AMBIGUOUS_STARTUP_ROOT_ID:
+                    return new KrkrDocument[] {
+                        new KrkrDocument("startup.tjs", KRKR_STARTUP_SOURCE),
+                        new KrkrDocument("STARTUP.TJS", KRKR_STARTUP_SOURCE)
+                    };
+                case KRKR_EMPTY_ROOT_ID:
+                    return new KrkrDocument[0];
+                default:
+                    throw new IllegalArgumentException("Unknown KRKR fixture root");
+            }
+        } catch (IOException exception) {
+            throw new IllegalStateException("Unable to build KRKR XP3 fixture", exception);
+        }
+    }
+
+    private static final class KrkrDocument {
+        final String name;
+        final byte[] contents;
+
+        KrkrDocument(String name, byte[] contents) {
+            this.name = name;
+            this.contents = contents;
+        }
     }
 
     private static AtomicInteger archiveOpenCounter(String rootId) {
