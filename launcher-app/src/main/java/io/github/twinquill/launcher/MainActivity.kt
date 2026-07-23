@@ -65,6 +65,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.twinquill.engine.api.EngineResult
 import io.github.twinquill.engine.api.EngineType
+import io.github.twinquill.engine.krkr.KrkrEngineActivity
 import io.github.twinquill.launcher.data.GameEntity
 import io.github.twinquill.launcher.data.GameRepository
 import kotlinx.coroutines.Dispatchers
@@ -121,7 +122,15 @@ private fun LauncherScreen(repository: GameRepository) {
                     io.github.twinquill.engine.api.EngineContract.EXTRA_RESULT,
                     if (result.resultCode == Activity.RESULT_OK) 0 else 13,
                 ) ?: if (result.resultCode == Activity.RESULT_OK) 0 else 13
-            message = "引擎返回：${EngineResult.fromCode(code).name}"
+            val engineResult = EngineResult.fromCode(code)
+            val krkrDiagnosticCode =
+                result.data
+                    ?.takeIf {
+                        engineResult == EngineResult.SCRIPT_ERROR &&
+                            it.hasExtra(KrkrEngineActivity.EXTRA_RESULT_CODE)
+                    }
+                    ?.getIntExtra(KrkrEngineActivity.EXTRA_RESULT_CODE, 0)
+            message = engineResultMessage(engineResult, krkrDiagnosticCode)
         }
     val treeLauncher =
         rememberLauncherForActivityResult(OpenGameTreeContract()) { grant ->
@@ -397,6 +406,28 @@ private fun engineLabel(engine: EngineType): String =
         EngineType.AUTO -> "自动"
         EngineType.ONS -> "ONS"
         EngineType.KRKR -> "Kirikiri"
+    }
+
+internal fun engineResultMessage(
+    result: EngineResult,
+    krkrDiagnosticCode: Int?,
+): String {
+    if (result != EngineResult.SCRIPT_ERROR || krkrDiagnosticCode == null) {
+        return "引擎返回：${result.name}"
+    }
+    return "引擎返回：${krkrDiagnosticMessage(krkrDiagnosticCode)}"
+}
+
+private fun krkrDiagnosticMessage(code: Int): String =
+    when (code) {
+        20 -> "TJS脚本错误（20）"
+        30 -> "无法打开XP3（30）"
+        31 -> "所有XP3均无startup.tjs（31）"
+        32 -> "无效XP3头（32）"
+        33 -> "不支持的XP3编码或flags（33）"
+        34 -> "XP3损坏或解压失败（34）"
+        35 -> "受保护XP3当前尚未支持（35）"
+        else -> "Krkr诊断码：$code"
     }
 
 private fun detectionLabel(game: GameEntity): String =
