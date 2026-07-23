@@ -45,6 +45,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         "krkr-no-startup-xp3";
     static final String KRKR_PROTECTED_XP3_ROOT_ID = "krkr-protected-xp3";
     static final String KRKR_CONTINUED_XP3_ROOT_ID = "krkr-continued-xp3";
+    static final String KRKR_MULTI_SEGMENT_XP3_ROOT_ID =
+        "krkr-multi-segment-xp3";
     static final String KRKR_TRAILING_INDEX_XP3_ROOT_ID =
         "krkr-trailing-index-xp3";
     static final String KRKR_AMBIGUOUS_STARTUP_ROOT_ID =
@@ -396,6 +398,7 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             || KRKR_NO_STARTUP_XP3_ROOT_ID.equals(documentId)
             || KRKR_PROTECTED_XP3_ROOT_ID.equals(documentId)
             || KRKR_CONTINUED_XP3_ROOT_ID.equals(documentId)
+            || KRKR_MULTI_SEGMENT_XP3_ROOT_ID.equals(documentId)
             || KRKR_TRAILING_INDEX_XP3_ROOT_ID.equals(documentId)
             || KRKR_AMBIGUOUS_STARTUP_ROOT_ID.equals(documentId)
             || KRKR_EMPTY_ROOT_ID.equals(documentId);
@@ -439,6 +442,7 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             || KRKR_NO_STARTUP_XP3_ROOT_ID.equals(rootId)
             || KRKR_PROTECTED_XP3_ROOT_ID.equals(rootId)
             || KRKR_CONTINUED_XP3_ROOT_ID.equals(rootId)
+            || KRKR_MULTI_SEGMENT_XP3_ROOT_ID.equals(rootId)
             || KRKR_TRAILING_INDEX_XP3_ROOT_ID.equals(rootId)
             || KRKR_AMBIGUOUS_STARTUP_ROOT_ID.equals(rootId)
             || KRKR_EMPTY_ROOT_ID.equals(rootId);
@@ -502,6 +506,7 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             KRKR_NO_STARTUP_XP3_ROOT_ID,
             KRKR_PROTECTED_XP3_ROOT_ID,
             KRKR_CONTINUED_XP3_ROOT_ID,
+            KRKR_MULTI_SEGMENT_XP3_ROOT_ID,
             KRKR_TRAILING_INDEX_XP3_ROOT_ID,
             KRKR_AMBIGUOUS_STARTUP_ROOT_ID,
             KRKR_EMPTY_ROOT_ID
@@ -755,6 +760,13 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
                         new KrkrDocument(
                             "data.xp3",
                             KrkrXp3FixtureBuilder.archiveWithContinuedCompressedIndex()
+                        )
+                    };
+                case KRKR_MULTI_SEGMENT_XP3_ROOT_ID:
+                    return new KrkrDocument[] {
+                        new KrkrDocument(
+                            "data.xp3",
+                            KrkrXp3FixtureBuilder.archiveWithRawAndCompressedStartupSegments()
                         )
                     };
                 case KRKR_TRAILING_INDEX_XP3_ROOT_ID:

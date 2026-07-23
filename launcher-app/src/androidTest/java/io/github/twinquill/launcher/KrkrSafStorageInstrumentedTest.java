@@ -79,6 +79,18 @@ public final class KrkrSafStorageInstrumentedTest {
         }
     }
 
+    @Test
+    public void runsMultiSegmentXp3StartupFromSafContentRoot()
+        throws Exception {
+        Fixture fixture = fixture(
+            LauncherFixtureDocumentsProvider.KRKR_MULTI_SEGMENT_XP3_ROOT_ID
+        );
+        try {
+            assertNormalKrkrExit(requestIntent(fixture));
+        } finally {
+            fixture.delete();
+        }
+    }
 
     @Test
     public void triesLaterXp3WhenEarlierSafArchiveHasNoStartup()

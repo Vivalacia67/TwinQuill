@@ -35,6 +35,9 @@ import java.util.concurrent.TimeUnit;
 
 @RunWith(AndroidJUnit4.class)
 public final class KrkrCompressedXp3InstrumentedTest {
+    private static final int UNSUPPORTED_XP3_DIAGNOSTIC = 33;
+    private static final int MALFORMED_XP3_DIAGNOSTIC = 34;
+
     private Instrumentation instrumentation;
     private Context context;
     private EngineProtocolTestHostActivity host;
@@ -55,69 +58,99 @@ public final class KrkrCompressedXp3InstrumentedTest {
 
     @Test
     public void runsKrkrStartupFromCompressedXp3() throws Exception {
-        Fixture fixture = createFixture(
+        assertNormalExit(
             "krkr-xp3-ok-",
             KrkrXp3FixtureBuilder.compressedStartupArchive()
         );
-        try {
-            Intent result = launchAndAwait(requestIntent(fixture));
-            assertEquals(Activity.RESULT_OK, host.engineResultCode());
-            assertEquals(
-                EngineResult.NORMAL_EXIT.code(),
-                result.getIntExtra(EngineContract.EXTRA_RESULT, -1)
-            );
-            assertEquals(
-                0,
-                result.getIntExtra(KrkrEngineActivity.EXTRA_RESULT_CODE, -1)
-            );
-        } finally {
-            fixture.delete();
-        }
+    }
+
+    @Test
+    public void runsKrkrStartupFromRawIndexWhenStartupIsNotFirstEntry()
+        throws Exception {
+        assertNormalExit(
+            "krkr-xp3-startup-second-entry-",
+            KrkrXp3FixtureBuilder.archiveWithStartupAsSecondEntry()
+        );
+    }
+
+    @Test
+    public void runsKrkrStartupAcrossRawAndCompressedSegments()
+        throws Exception {
+        assertNormalExit(
+            "krkr-xp3-raw-zlib-segments-",
+            KrkrXp3FixtureBuilder.archiveWithRawAndCompressedStartupSegments()
+        );
     }
 
     @Test
     public void runsKrkrStartupFromContinuedCompressedXp3Index() throws Exception {
-        Fixture fixture = createFixture(
+        assertNormalExit(
             "krkr-xp3-continued-index-ok-",
             KrkrXp3FixtureBuilder.archiveWithContinuedCompressedIndex()
         );
-        try {
-            Intent result = launchAndAwait(requestIntent(fixture));
-            assertEquals(Activity.RESULT_OK, host.engineResultCode());
-            assertEquals(
-                EngineResult.NORMAL_EXIT.code(),
-                result.getIntExtra(EngineContract.EXTRA_RESULT, -1)
-            );
-            assertEquals(
-                0,
-                result.getIntExtra(KrkrEngineActivity.EXTRA_RESULT_CODE, -1)
-            );
-        } finally {
-            fixture.delete();
-        }
+    }
+
+    @Test
+    public void runsKrkrStartupFromSecondContinuedXp3IndexBlock()
+        throws Exception {
+        assertNormalExit(
+            "krkr-xp3-second-continued-index-block-",
+            KrkrXp3FixtureBuilder.archiveWithStartupInSecondContinuedIndexBlock()
+        );
     }
 
     @Test
     public void rejectsKrkrXp3WithCorruptCompressedIndex() throws Exception {
-        assertScriptError34Result(
+        assertScriptErrorResult(
             "krkr-xp3-bad-index-",
-            KrkrXp3FixtureBuilder.archiveWithCorruptCompressedIndex()
+            KrkrXp3FixtureBuilder.archiveWithCorruptCompressedIndex(),
+            MALFORMED_XP3_DIAGNOSTIC
         );
     }
 
     @Test
     public void rejectsKrkrXp3WithCorruptCompressedSegment() throws Exception {
-        assertScriptError34Result(
+        assertScriptErrorResult(
             "krkr-xp3-bad-segment-",
-            KrkrXp3FixtureBuilder.archiveWithCorruptCompressedSegment()
+            KrkrXp3FixtureBuilder.archiveWithCorruptCompressedSegment(),
+            MALFORMED_XP3_DIAGNOSTIC
+        );
+    }
+
+    @Test
+    public void rejectsKrkrXp3WithSegmentOffsetBeyondArchive() throws Exception {
+        assertScriptErrorResult(
+            "krkr-xp3-segment-offset-beyond-archive-",
+            KrkrXp3FixtureBuilder.archiveWithSegmentOffsetBeyondArchive(),
+            MALFORMED_XP3_DIAGNOSTIC
+        );
+    }
+
+    @Test
+    public void rejectsKrkrXp3WithEntryOriginalSizeMismatch() throws Exception {
+        assertScriptErrorResult(
+            "krkr-xp3-entry-original-size-mismatch-",
+            KrkrXp3FixtureBuilder.archiveWithInfoOriginalSizeMismatch(),
+            MALFORMED_XP3_DIAGNOSTIC
+        );
+    }
+
+    @Test
+    public void rejectsKrkrXp3WithRawSegmentArchivedSizeMismatch()
+        throws Exception {
+        assertScriptErrorResult(
+            "krkr-xp3-raw-segment-size-mismatch-",
+            KrkrXp3FixtureBuilder.archiveWithRawSegmentSizeMismatch(),
+            UNSUPPORTED_XP3_DIAGNOSTIC
         );
     }
 
     @Test
     public void rejectsKrkrXp3WithSelfLoopingIndexContinuation() throws Exception {
-        assertScriptError34Result(
+        assertScriptErrorResult(
             "krkr-xp3-loop-index-",
-            KrkrXp3FixtureBuilder.archiveWithSelfLoopingIndexContinuation()
+            KrkrXp3FixtureBuilder.archiveWithSelfLoopingIndexContinuation(),
+            MALFORMED_XP3_DIAGNOSTIC
         );
     }
 
@@ -127,8 +160,30 @@ public final class KrkrCompressedXp3InstrumentedTest {
         return (EngineProtocolTestHostActivity) instrumentation.startActivitySync(intent);
     }
 
-    private void assertScriptError34Result(String gameIdPrefix, byte[] archive)
+    private void assertNormalExit(String gameIdPrefix, byte[] archive)
         throws Exception {
+        Fixture fixture = createFixture(gameIdPrefix, archive);
+        try {
+            Intent result = launchAndAwait(requestIntent(fixture));
+            assertEquals(Activity.RESULT_OK, host.engineResultCode());
+            assertEquals(
+                EngineResult.NORMAL_EXIT.code(),
+                result.getIntExtra(EngineContract.EXTRA_RESULT, -1)
+            );
+            assertEquals(
+                0,
+                result.getIntExtra(KrkrEngineActivity.EXTRA_RESULT_CODE, -1)
+            );
+        } finally {
+            fixture.delete();
+        }
+    }
+
+    private void assertScriptErrorResult(
+        String gameIdPrefix,
+        byte[] archive,
+        int diagnostic
+    ) throws Exception {
         Fixture fixture = createFixture(gameIdPrefix, archive);
         try {
             Intent result = launchAndAwait(requestIntent(fixture));
@@ -138,7 +193,7 @@ public final class KrkrCompressedXp3InstrumentedTest {
                 result.getIntExtra(EngineContract.EXTRA_RESULT, -1)
             );
             assertEquals(
-                34,
+                diagnostic,
                 result.getIntExtra(KrkrEngineActivity.EXTRA_RESULT_CODE, -1)
             );
         } finally {
