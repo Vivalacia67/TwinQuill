@@ -73,6 +73,7 @@ add_library(twinquill_engine_krkr SHARED
     krkr_jni.cpp
     krkr_storage.cpp
     krkr_tjs_probe.cpp
+    krkr_xp3_archive.cpp
     krkr_xp3.cpp
 )
 target_compile_features(twinquill_engine_krkr PRIVATE cxx_std_17)
