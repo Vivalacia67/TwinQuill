@@ -5,29 +5,42 @@
 package io.github.twinquill.launcher;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.zip.Adler32;
 import java.util.zip.Deflater;
 
-final class KrkrXp3FixtureBuilder {
+public final class KrkrXp3FixtureBuilder {
     private static final byte[] XP3_MARK = {
         0x58, 0x50, 0x33, 0x0d, 0x0a, 0x20, 0x0a, 0x1a, (byte) 0x8b, 0x67, 0x01
     };
     private static final byte INDEX_METHOD_ZLIB = 1;
     private static final int SEGMENT_METHOD_ZLIB = 1;
+    private static final long PROTECTED_FILE = 1L << 31;
     private static final String STARTUP_NAME = "startup.tjs";
+    private static final String NON_STARTUP_NAME = "readme.tjs";
     private static final byte[] STARTUP_SOURCE =
         "global.twinQuillM0Result = 42;".getBytes(StandardCharsets.US_ASCII);
 
     private KrkrXp3FixtureBuilder() {
     }
 
-    static byte[] compressedStartupArchive() throws IOException {
-        return archive(false, false);
+    public static byte[] compressedStartupArchive() throws IOException {
+        return archive(false, false, STARTUP_NAME, 0);
     }
 
-    static byte[] archiveWithContinuedCompressedIndex() throws IOException {
+    public static byte[] noStartupArchive() throws IOException {
+        return archive(false, false, NON_STARTUP_NAME, 0);
+    }
+
+    public static byte[] protectedStartupArchive() throws IOException {
+        return archive(false, false, STARTUP_NAME, PROTECTED_FILE);
+    }
+
+    public static byte[] archiveWithContinuedCompressedIndex() throws IOException {
         byte[] segment = deflate(STARTUP_SOURCE);
         long segmentOffset = XP3_MARK.length + 8L;
         byte[] emptyIndex = new byte[0];
@@ -35,7 +48,11 @@ final class KrkrXp3FixtureBuilder {
         byte[] firstIndexBlock = indexBlock(emptyIndex, true, 0);
         long secondIndexOffset = firstIndexOffset + firstIndexBlock.length;
         firstIndexBlock = indexBlock(emptyIndex, true, secondIndexOffset);
-        byte[] secondIndexBlock = indexBlock(index(segmentOffset, segment.length), false, 0);
+        byte[] secondIndexBlock = indexBlock(
+            index(segmentOffset, segment.length, STARTUP_NAME, 0),
+            false,
+            0
+        );
 
         ByteArrayOutputStream archive = new ByteArrayOutputStream();
         archive.write(XP3_MARK);
@@ -46,7 +63,7 @@ final class KrkrXp3FixtureBuilder {
         return archive.toByteArray();
     }
 
-    static byte[] archiveWithSelfLoopingIndexContinuation() throws IOException {
+    public static byte[] archiveWithSelfLoopingIndexContinuation() throws IOException {
         byte[] segment = deflate(STARTUP_SOURCE);
         long segmentOffset = XP3_MARK.length + 8L;
         long indexOffset = segmentOffset + segment.length;
@@ -59,17 +76,50 @@ final class KrkrXp3FixtureBuilder {
         return archive.toByteArray();
     }
 
-    static byte[] archiveWithCorruptCompressedIndex() throws IOException {
-        return archive(true, false);
+    public static byte[] archiveWithCorruptCompressedIndex() throws IOException {
+        return archive(true, false, STARTUP_NAME, 0);
     }
 
-    static byte[] archiveWithCorruptCompressedSegment() throws IOException {
-        return archive(false, true);
+    public static byte[] archiveWithTrailingCompressedIndex() throws IOException {
+        byte[] segment = deflate(STARTUP_SOURCE);
+        long segmentOffset = XP3_MARK.length + 8L;
+        byte[] index = index(segmentOffset, segment.length, STARTUP_NAME, 0);
+        byte[] compressed = deflate(index);
+        byte[] compressedIndex = Arrays.copyOf(compressed, compressed.length + 1);
+
+        long indexOffset = segmentOffset + segment.length;
+        ByteArrayOutputStream archive = new ByteArrayOutputStream();
+        archive.write(XP3_MARK);
+        writeU64(archive, indexOffset);
+        archive.write(segment);
+        writeIndexBlock(archive, index, compressedIndex, false, 0);
+        return archive.toByteArray();
+    }
+
+    public static void writeSparseArchiveWithLargeCompressedIndexOffset(
+        File file,
+        long indexOffset
+    ) throws IOException {
+        byte[] index = index(XP3_MARK.length + 8L, 0, STARTUP_NAME, 0);
+        byte[] block = indexBlock(index, false, 0);
+        try (RandomAccessFile archive = new RandomAccessFile(file, "rw")) {
+            archive.setLength(0);
+            archive.write(XP3_MARK);
+            writeU64(archive, indexOffset);
+            archive.seek(indexOffset);
+            archive.write(block);
+        }
+    }
+
+    public static byte[] archiveWithCorruptCompressedSegment() throws IOException {
+        return archive(false, true, STARTUP_NAME, 0);
     }
 
     private static byte[] archive(
         boolean corruptCompressedIndex,
-        boolean corruptCompressedSegment
+        boolean corruptCompressedSegment,
+        String fileName,
+        long infoFlags
     ) throws IOException {
         byte[] segment = deflate(STARTUP_SOURCE);
         if (corruptCompressedSegment) {
@@ -77,7 +127,7 @@ final class KrkrXp3FixtureBuilder {
         }
 
         long segmentOffset = XP3_MARK.length + 8L;
-        byte[] index = index(segmentOffset, segment.length);
+        byte[] index = index(segmentOffset, segment.length, fileName, infoFlags);
         byte[] compressedIndex = deflate(index);
         if (corruptCompressedIndex) {
             corruptPayload(compressedIndex);
@@ -92,10 +142,14 @@ final class KrkrXp3FixtureBuilder {
         return archive.toByteArray();
     }
 
-    private static byte[] index(long segmentOffset, int archivedSize)
-        throws IOException {
+    private static byte[] index(
+        long segmentOffset,
+        int archivedSize,
+        String fileName,
+        long infoFlags
+    ) throws IOException {
         ByteArrayOutputStream file = new ByteArrayOutputStream();
-        writeChunk(file, "info", info(archivedSize));
+        writeChunk(file, "info", info(archivedSize, fileName, infoFlags));
         writeChunk(file, "segm", segment(segmentOffset, archivedSize));
         writeChunk(file, "adlr", adler32());
 
@@ -104,14 +158,15 @@ final class KrkrXp3FixtureBuilder {
         return index.toByteArray();
     }
 
-    private static byte[] info(int archivedSize) throws IOException {
+    private static byte[] info(int archivedSize, String fileName, long infoFlags)
+        throws IOException {
         ByteArrayOutputStream info = new ByteArrayOutputStream();
-        writeU32(info, 0);
+        writeU32(info, (int) infoFlags);
         writeU64(info, STARTUP_SOURCE.length);
         writeU64(info, archivedSize);
-        writeU16(info, STARTUP_NAME.length());
-        for (int index = 0; index < STARTUP_NAME.length(); index++) {
-            writeU16(info, STARTUP_NAME.charAt(index));
+        writeU16(info, fileName.length());
+        for (int index = 0; index < fileName.length(); index++) {
+            writeU16(info, fileName.charAt(index));
         }
         return info.toByteArray();
     }
@@ -198,6 +253,13 @@ final class KrkrXp3FixtureBuilder {
     }
 
     private static void writeU64(ByteArrayOutputStream output, long value) {
+        for (int shift = 0; shift < 64; shift += 8) {
+            output.write((int) ((value >>> shift) & 0xff));
+        }
+    }
+
+    private static void writeU64(RandomAccessFile output, long value)
+        throws IOException {
         for (int shift = 0; shift < 64; shift += 8) {
             output.write((int) ((value >>> shift) & 0xff));
         }

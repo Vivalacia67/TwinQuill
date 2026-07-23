@@ -40,6 +40,13 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
     static final String KRKR_LOOSE_WITH_INVALID_XP3_ROOT_ID =
         "krkr-loose-with-invalid-xp3";
     static final String KRKR_XP3_ORDER_ROOT_ID = "krkr-xp3-order";
+    static final String KRKR_XP3_FALLBACK_ROOT_ID = "krkr-xp3-fallback";
+    static final String KRKR_NO_STARTUP_XP3_ROOT_ID =
+        "krkr-no-startup-xp3";
+    static final String KRKR_PROTECTED_XP3_ROOT_ID = "krkr-protected-xp3";
+    static final String KRKR_CONTINUED_XP3_ROOT_ID = "krkr-continued-xp3";
+    static final String KRKR_TRAILING_INDEX_XP3_ROOT_ID =
+        "krkr-trailing-index-xp3";
     static final String KRKR_AMBIGUOUS_STARTUP_ROOT_ID =
         "krkr-ambiguous-startup";
     static final String KRKR_EMPTY_ROOT_ID = "krkr-empty";
@@ -385,6 +392,11 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             || KRKR_INVALID_XP3_ROOT_ID.equals(documentId)
             || KRKR_LOOSE_WITH_INVALID_XP3_ROOT_ID.equals(documentId)
             || KRKR_XP3_ORDER_ROOT_ID.equals(documentId)
+            || KRKR_XP3_FALLBACK_ROOT_ID.equals(documentId)
+            || KRKR_NO_STARTUP_XP3_ROOT_ID.equals(documentId)
+            || KRKR_PROTECTED_XP3_ROOT_ID.equals(documentId)
+            || KRKR_CONTINUED_XP3_ROOT_ID.equals(documentId)
+            || KRKR_TRAILING_INDEX_XP3_ROOT_ID.equals(documentId)
             || KRKR_AMBIGUOUS_STARTUP_ROOT_ID.equals(documentId)
             || KRKR_EMPTY_ROOT_ID.equals(documentId);
     }
@@ -423,6 +435,11 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             || KRKR_INVALID_XP3_ROOT_ID.equals(rootId)
             || KRKR_LOOSE_WITH_INVALID_XP3_ROOT_ID.equals(rootId)
             || KRKR_XP3_ORDER_ROOT_ID.equals(rootId)
+            || KRKR_XP3_FALLBACK_ROOT_ID.equals(rootId)
+            || KRKR_NO_STARTUP_XP3_ROOT_ID.equals(rootId)
+            || KRKR_PROTECTED_XP3_ROOT_ID.equals(rootId)
+            || KRKR_CONTINUED_XP3_ROOT_ID.equals(rootId)
+            || KRKR_TRAILING_INDEX_XP3_ROOT_ID.equals(rootId)
             || KRKR_AMBIGUOUS_STARTUP_ROOT_ID.equals(rootId)
             || KRKR_EMPTY_ROOT_ID.equals(rootId);
     }
@@ -481,6 +498,11 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             KRKR_INVALID_XP3_ROOT_ID,
             KRKR_LOOSE_WITH_INVALID_XP3_ROOT_ID,
             KRKR_XP3_ORDER_ROOT_ID,
+            KRKR_XP3_FALLBACK_ROOT_ID,
+            KRKR_NO_STARTUP_XP3_ROOT_ID,
+            KRKR_PROTECTED_XP3_ROOT_ID,
+            KRKR_CONTINUED_XP3_ROOT_ID,
+            KRKR_TRAILING_INDEX_XP3_ROOT_ID,
             KRKR_AMBIGUOUS_STARTUP_ROOT_ID,
             KRKR_EMPTY_ROOT_ID
         }) {
@@ -702,6 +724,45 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
                             KrkrXp3FixtureBuilder.compressedStartupArchive()
                         ),
                         new KrkrDocument("beta.xp3", KRKR_INVALID_XP3)
+                    };
+                case KRKR_XP3_FALLBACK_ROOT_ID:
+                    return new KrkrDocument[] {
+                        new KrkrDocument(
+                            "Alpha.XP3",
+                            KrkrXp3FixtureBuilder.noStartupArchive()
+                        ),
+                        new KrkrDocument(
+                            "beta.xp3",
+                            KrkrXp3FixtureBuilder.compressedStartupArchive()
+                        )
+                    };
+                case KRKR_NO_STARTUP_XP3_ROOT_ID:
+                    return new KrkrDocument[] {
+                        new KrkrDocument(
+                            "data.xp3",
+                            KrkrXp3FixtureBuilder.noStartupArchive()
+                        )
+                    };
+                case KRKR_PROTECTED_XP3_ROOT_ID:
+                    return new KrkrDocument[] {
+                        new KrkrDocument(
+                            "data.xp3",
+                            KrkrXp3FixtureBuilder.protectedStartupArchive()
+                        )
+                    };
+                case KRKR_CONTINUED_XP3_ROOT_ID:
+                    return new KrkrDocument[] {
+                        new KrkrDocument(
+                            "data.xp3",
+                            KrkrXp3FixtureBuilder.archiveWithContinuedCompressedIndex()
+                        )
+                    };
+                case KRKR_TRAILING_INDEX_XP3_ROOT_ID:
+                    return new KrkrDocument[] {
+                        new KrkrDocument(
+                            "data.xp3",
+                            KrkrXp3FixtureBuilder.archiveWithTrailingCompressedIndex()
+                        )
                     };
                 case KRKR_AMBIGUOUS_STARTUP_ROOT_ID:
                     return new KrkrDocument[] {

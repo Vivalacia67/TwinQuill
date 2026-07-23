@@ -133,6 +133,44 @@ public final class GamePersistenceInstrumentedTest {
         assertFalse(UriPermissionManager.hasReadPermission(resolver, treeUri));
     }
 
+
+    @Test
+    public void detectsCompressedXp3StartupFromSafProvider() throws Exception {
+        GameEntity game = addFixtureRoot(
+            LauncherFixtureDocumentsProvider.KRKR_XP3_ROOT_ID
+        );
+        assertEquals(EngineType.KRKR.name(), game.detectedEngine);
+        assertNull(game.detectionConflict);
+    }
+
+    @Test
+    public void detectsProtectedXp3StartupEvidenceFromSafProvider()
+        throws Exception {
+        GameEntity game = addFixtureRoot(
+            LauncherFixtureDocumentsProvider.KRKR_PROTECTED_XP3_ROOT_ID
+        );
+        assertEquals(EngineType.KRKR.name(), game.detectedEngine);
+        assertNull(game.detectionConflict);
+    }
+
+    @Test
+    public void detectsContinuedXp3StartupFromSafProvider() throws Exception {
+        GameEntity game = addFixtureRoot(
+            LauncherFixtureDocumentsProvider.KRKR_CONTINUED_XP3_ROOT_ID
+        );
+        assertEquals(EngineType.KRKR.name(), game.detectedEngine);
+        assertNull(game.detectionConflict);
+    }
+
+    @Test
+    public void rejectsTrailingCompressedXp3IndexDuringSafDetection()
+        throws Exception {
+        GameEntity game = addFixtureRoot(
+            LauncherFixtureDocumentsProvider.KRKR_TRAILING_INDEX_XP3_ROOT_ID
+        );
+        assertEquals(EngineType.AUTO.name(), game.detectedEngine);
+        assertNotNull(game.detectionConflict);
+    }
     private GameEntity findByDirectoryUri(String uri) {
         for (GameEntity game : games.getAll()) {
             if (uri.equals(game.directoryUri)) {
@@ -142,6 +180,27 @@ public final class GamePersistenceInstrumentedTest {
         return null;
     }
 
+
+    private GameEntity addFixtureRoot(String rootId) throws Exception {
+        treeUri = LauncherFixtureDocumentsProvider.treeUri(rootId);
+        GameEntity stale = findByDirectoryUri(treeUri.toString());
+        if (stale != null) {
+            games.deleteById(stale.id);
+        }
+        UriPermissionManager.releaseReadPermission(resolver, treeUri);
+
+        Bundle grant = resolver.call(
+            Uri.parse("content://" + LauncherGrantBrokerProvider.AUTHORITY),
+            LauncherGrantBrokerProvider.METHOD_GRANT,
+            rootId,
+            null
+        );
+        assertNotNull(grant);
+
+        CallbackResult<GameEntity> added = new CallbackResult<>();
+        repository.addGame(treeUri, PICKER_FLAGS, added::complete);
+        return added.await();
+    }
     private static final class CallbackResult<T> {
         private final CountDownLatch latch = new CountDownLatch(1);
         private final AtomicReference<T> value = new AtomicReference<>();
