@@ -39,6 +39,8 @@ public final class KrkrEngineActivity extends Activity {
     private static final long VFS_NOT_FOUND = -3;
     private static final int LOOSE_OPEN_FAILURE = 11;
     private static final int XP3_OPEN_FAILURE = 30;
+    private static final int XP3_STARTUP_NOT_FOUND = 31;
+    private static final int XP3_INVALID_HEADER = 32;
 
     private static native int nativeRunLooseStartup(String startupPath);
     private static native int nativeRunLooseStartupDescriptor(int descriptor);
@@ -147,12 +149,22 @@ public final class KrkrEngineActivity extends Activity {
         if (archives == null || archives.length == 0) {
             throw new IllegalArgumentException("Missing root startup.tjs or XP3 archive");
         }
-        Arrays.sort(archives, Comparator.comparing(File::getName, String.CASE_INSENSITIVE_ORDER));
-        File archive = archives[0].getCanonicalFile();
-        if (!root.equals(archive.getParentFile())) {
-            throw new IllegalArgumentException("XP3 path escapes game root");
+        Arrays.sort(archives, Comparator.comparing(
+            File::getName,
+            String.CASE_INSENSITIVE_ORDER
+        ).thenComparing(File::getName));
+        List<File> canonicalArchives = new ArrayList<>(archives.length);
+        for (File candidate : archives) {
+            File archive = candidate.getCanonicalFile();
+            if (!root.equals(archive.getParentFile())) {
+                throw new IllegalArgumentException("XP3 path escapes game root");
+            }
+            if (!archive.isFile()) {
+                throw new IllegalArgumentException("XP3 archive is not a regular file");
+            }
+            canonicalArchives.add(archive);
         }
-        return LaunchTarget.localFile(archive, true);
+        return LaunchTarget.localFiles(canonicalArchives, true);
     }
 
     private static LaunchTarget resolveSafStartup(Uri root) throws IOException {
@@ -178,8 +190,8 @@ public final class KrkrEngineActivity extends Activity {
             throw new IllegalArgumentException("Missing root startup.tjs or XP3 archive");
         }
         rejectCaseInsensitiveDuplicates(archives);
-        archives.sort(String.CASE_INSENSITIVE_ORDER);
-        return LaunchTarget.contentFile(root, archives.get(0), true);
+        archives.sort(String.CASE_INSENSITIVE_ORDER.thenComparing(Comparator.naturalOrder()));
+        return LaunchTarget.contentFiles(root, archives, true);
     }
 
     private static List<String> validatedRootNames(String[] names) {
@@ -243,23 +255,81 @@ public final class KrkrEngineActivity extends Activity {
     }
 
     private static int runLaunchTarget(LaunchTarget target) {
-        if (target.contentRoot != null) {
-            return runContentStartup(target);
+        if (!target.xp3) {
+            if (target.contentRoot != null) {
+                return runContentStartup(target.contentRoot, target.relativePaths.get(0), false);
+            }
+            return nativeRunLooseStartup(target.paths.get(0));
         }
-        return target.xp3
-            ? nativeRunXp3Startup(target.path)
-            : nativeRunLooseStartup(target.path);
+        if (target.contentRoot != null) {
+            return runContentXp3Startup(target);
+        }
+        return runLocalXp3Startup(target);
     }
 
-    private static int runContentStartup(LaunchTarget target) {
-        int descriptor = NativeVfs.openReadOnlyDescriptor(target.contentRoot, target.relativePath);
+    private static int runLocalXp3Startup(LaunchTarget target) {
+        boolean sawStartupNotFound = false;
+        boolean sawInvalidHeader = false;
+        int count = target.paths.size();
+        for (int index = 0; index < count; index++) {
+            String archivePath = target.paths.get(index);
+            Log.i(LOG_TAG, "Trying Krkr XP3 archive "
+                + (index + 1) + "/" + count + ": " + new File(archivePath).getName());
+            int result = nativeRunXp3Startup(archivePath);
+            if (result == XP3_STARTUP_NOT_FOUND) {
+                sawStartupNotFound = true;
+                continue;
+            }
+            if (result == XP3_INVALID_HEADER) {
+                sawInvalidHeader = true;
+                continue;
+            }
+            return result;
+        }
+        return xp3FallbackResult(sawStartupNotFound, sawInvalidHeader);
+    }
+
+    private static int runContentXp3Startup(LaunchTarget target) {
+        boolean sawStartupNotFound = false;
+        boolean sawInvalidHeader = false;
+        int count = target.relativePaths.size();
+        for (int index = 0; index < count; index++) {
+            String relativePath = target.relativePaths.get(index);
+            Log.i(LOG_TAG, "Trying Krkr SAF XP3 archive "
+                + (index + 1) + "/" + count + ": " + relativePath);
+            int result = runContentStartup(target.contentRoot, relativePath, true);
+            if (result == XP3_STARTUP_NOT_FOUND) {
+                sawStartupNotFound = true;
+                continue;
+            }
+            if (result == XP3_INVALID_HEADER) {
+                sawInvalidHeader = true;
+                continue;
+            }
+            return result;
+        }
+        return xp3FallbackResult(sawStartupNotFound, sawInvalidHeader);
+    }
+
+    private static int xp3FallbackResult(boolean sawStartupNotFound, boolean sawInvalidHeader) {
+        if (sawStartupNotFound) {
+            return XP3_STARTUP_NOT_FOUND;
+        }
+        if (sawInvalidHeader) {
+            return XP3_INVALID_HEADER;
+        }
+        return XP3_OPEN_FAILURE;
+    }
+
+    private static int runContentStartup(Uri contentRoot, String relativePath, boolean xp3) {
+        int descriptor = NativeVfs.openReadOnlyDescriptor(contentRoot, relativePath);
         if (descriptor < 0) {
-            Log.e(LOG_TAG, "Unable to open Krkr SAF entry " + target.relativePath
+            Log.e(LOG_TAG, "Unable to open Krkr SAF entry " + relativePath
                 + " as a seekable descriptor: " + descriptor);
-            return target.xp3 ? XP3_OPEN_FAILURE : LOOSE_OPEN_FAILURE;
+            return xp3 ? XP3_OPEN_FAILURE : LOOSE_OPEN_FAILURE;
         }
         try {
-            int result = target.xp3
+            int result = xp3
                 ? nativeRunXp3StartupDescriptor(descriptor)
                 : nativeRunLooseStartupDescriptor(descriptor);
             descriptor = -1;
@@ -295,24 +365,41 @@ public final class KrkrEngineActivity extends Activity {
     }
 
     private static final class LaunchTarget {
-        final String path;
+        final List<String> paths;
         final Uri contentRoot;
-        final String relativePath;
+        final List<String> relativePaths;
         final boolean xp3;
 
-        private LaunchTarget(String path, Uri contentRoot, String relativePath, boolean xp3) {
-            this.path = path;
+        private LaunchTarget(
+            List<String> paths,
+            Uri contentRoot,
+            List<String> relativePaths,
+            boolean xp3
+        ) {
+            this.paths = new ArrayList<>(paths);
             this.contentRoot = contentRoot;
-            this.relativePath = relativePath;
+            this.relativePaths = new ArrayList<>(relativePaths);
             this.xp3 = xp3;
         }
 
         static LaunchTarget localFile(File file, boolean xp3) {
-            return new LaunchTarget(file.getAbsolutePath(), null, "", xp3);
+            return localFiles(Arrays.asList(file), xp3);
+        }
+
+        static LaunchTarget localFiles(List<File> files, boolean xp3) {
+            List<String> paths = new ArrayList<>(files.size());
+            for (File file : files) {
+                paths.add(file.getAbsolutePath());
+            }
+            return new LaunchTarget(paths, null, new ArrayList<>(), xp3);
         }
 
         static LaunchTarget contentFile(Uri root, String relativePath, boolean xp3) {
-            return new LaunchTarget("", root, relativePath, xp3);
+            return contentFiles(root, Arrays.asList(relativePath), xp3);
+        }
+
+        static LaunchTarget contentFiles(Uri root, List<String> relativePaths, boolean xp3) {
+            return new LaunchTarget(new ArrayList<>(), root, relativePaths, xp3);
         }
     }
 }

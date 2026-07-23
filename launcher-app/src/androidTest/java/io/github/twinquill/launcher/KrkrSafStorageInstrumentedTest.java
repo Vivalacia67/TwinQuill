@@ -36,7 +36,9 @@ import java.util.concurrent.TimeUnit;
 
 @RunWith(AndroidJUnit4.class)
 public final class KrkrSafStorageInstrumentedTest {
+    private static final int NO_STARTUP_DIAGNOSTIC = 31;
     private static final int BAD_XP3_HEADER_DIAGNOSTIC = 32;
+    private static final int PROTECTED_XP3_DIAGNOSTIC = 35;
     private static final int MALFORMED_XP3_REPEATS = 3;
 
     private Instrumentation instrumentation;
@@ -77,6 +79,51 @@ public final class KrkrSafStorageInstrumentedTest {
         }
     }
 
+
+    @Test
+    public void triesLaterXp3WhenEarlierSafArchiveHasNoStartup()
+        throws Exception {
+        Fixture fixture = fixture(
+            LauncherFixtureDocumentsProvider.KRKR_XP3_FALLBACK_ROOT_ID
+        );
+        try {
+            assertNormalKrkrExit(requestIntent(fixture));
+        } finally {
+            fixture.delete();
+        }
+    }
+
+    @Test
+    public void returnsScriptErrorWhenAllSafXp3ArchivesHaveNoStartup()
+        throws Exception {
+        Fixture fixture = fixture(
+            LauncherFixtureDocumentsProvider.KRKR_NO_STARTUP_XP3_ROOT_ID
+        );
+        try {
+            assertKrkrScriptError(
+                requestIntent(fixture),
+                NO_STARTUP_DIAGNOSTIC
+            );
+        } finally {
+            fixture.delete();
+        }
+    }
+
+    @Test
+    public void returnsProtectedDiagnosticForProtectedSafXp3Startup()
+        throws Exception {
+        Fixture fixture = fixture(
+            LauncherFixtureDocumentsProvider.KRKR_PROTECTED_XP3_ROOT_ID
+        );
+        try {
+            assertKrkrScriptError(
+                requestIntent(fixture),
+                PROTECTED_XP3_DIAGNOSTIC
+            );
+        } finally {
+            fixture.delete();
+        }
+    }
     @Test
     public void returnsScriptErrorForMalformedXp3FromSafContentRoot()
         throws Exception {
