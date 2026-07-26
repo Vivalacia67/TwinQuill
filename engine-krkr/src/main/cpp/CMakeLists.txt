@@ -138,6 +138,7 @@ add_library(twinquill_engine_krkr SHARED
     krkr_jni.cpp
     krkr_kag_platform.cpp
     krkr_kag_probe.cpp
+    krkr_kag_runtime.cpp
     krkr_storage.cpp
     krkr_storage_registry.cpp
     krkr_tjs_probe.cpp
