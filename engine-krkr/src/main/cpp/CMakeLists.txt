@@ -63,6 +63,7 @@ target_compile_options(twinquill_krkr_tjs2 PRIVATE
 )
 target_include_directories(twinquill_krkr_tjs2 PUBLIC
     "${TJS2_BUILD_DIR}"
+    "${KRKR2_CORE}/base"
     "${KRKR2_CORE}/environ"
     "${KRKR2_CORE}/utils"
     "${ONIG_DIR}/src"
@@ -71,7 +72,9 @@ target_link_libraries(twinquill_krkr_tjs2 PUBLIC onig)
 
 add_library(twinquill_engine_krkr SHARED
     krkr_jni.cpp
+    krkr_kag_probe.cpp
     krkr_storage.cpp
+    krkr_storage_registry.cpp
     krkr_tjs_probe.cpp
     krkr_xp3_archive.cpp
     krkr_xp3.cpp

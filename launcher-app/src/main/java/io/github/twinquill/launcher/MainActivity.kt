@@ -427,6 +427,8 @@ private fun krkrDiagnosticMessage(code: Int): String =
         33 -> "不支持的XP3编码或flags（33）"
         34 -> "XP3损坏或解压失败（34）"
         35 -> "受保护XP3当前尚未支持（35）"
+        40 -> "KAG场景缺失（40）"
+        41 -> "KAG预检读取或格式错误（41）"
         else -> "Krkr诊断码：$code"
     }
 
