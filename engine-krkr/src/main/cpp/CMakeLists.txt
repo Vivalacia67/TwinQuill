@@ -4,6 +4,7 @@ project(twinquill_engine_krkr LANGUAGES C CXX)
 set(TWINQUILL_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../../..")
 set(KRKR2_CORE "${TWINQUILL_ROOT}/vendor/kirikiroid2/src/core")
 set(TJS2_DIR "${KRKR2_CORE}/tjs2")
+set(KAG_DIR "${KRKR2_CORE}/utils")
 set(ONIG_DIR "${TWINQUILL_ROOT}/vendor/deps/krkr/oniguruma")
 set(ZLIB_DIR "${TWINQUILL_ROOT}/vendor/deps/krkr/zlib")
 
@@ -49,6 +50,69 @@ if(TJS_UTILS_CONTENT STREQUAL TJS_UTILS_PATCHED)
 endif()
 file(WRITE "${TJS2_BUILD_DIR}/tjsUtils.h" "${TJS_UTILS_PATCHED}")
 
+function(twinquill_required_replace input pattern replacement output label)
+    string(REPLACE "${pattern}" "${replacement}" patched "${input}")
+    if("${input}" STREQUAL "${patched}")
+        message(FATAL_ERROR "Kirikiroid2 ${label} patch did not apply")
+    endif()
+    set(${output} "${patched}" PARENT_SCOPE)
+endfunction()
+
+set(KAG_PARSER_BUILD_DIR "${CMAKE_BINARY_DIR}/generated/kag")
+file(REMOVE_RECURSE "${KAG_PARSER_BUILD_DIR}")
+file(MAKE_DIRECTORY "${KAG_PARSER_BUILD_DIR}")
+file(COPY
+    "${KAG_DIR}/KAGParser.h"
+    "${KAG_DIR}/KAGParser.cpp"
+    DESTINATION "${KAG_PARSER_BUILD_DIR}"
+)
+file(READ "${KAG_PARSER_BUILD_DIR}/KAGParser.h" KAG_PARSER_HEADER_CONTENT)
+twinquill_required_replace(
+    "${KAG_PARSER_HEADER_CONTENT}"
+    "#include \"StorageImpl.h\""
+    "#include \"StorageIntf.h\""
+    KAG_PARSER_HEADER_PATCHED
+    "KAGParser StorageIntf"
+)
+twinquill_required_replace(
+    "${KAG_PARSER_HEADER_PATCHED}"
+    "#include \"MsgIntf.h\""
+    "#include \"krkr_kag_platform.h\""
+    KAG_PARSER_HEADER_PATCHED
+    "KAGParser message shim"
+)
+twinquill_required_replace(
+    "${KAG_PARSER_HEADER_PATCHED}"
+    "#include \"PluginImpl.h\""
+    ""
+    KAG_PARSER_HEADER_PATCHED
+    "KAGParser plugin include removal"
+)
+twinquill_required_replace(
+    "${KAG_PARSER_HEADER_PATCHED}"
+    "#include \"CharacterSet.h\""
+    ""
+    KAG_PARSER_HEADER_PATCHED
+    "KAGParser charset include removal"
+)
+twinquill_required_replace(
+    "${KAG_PARSER_HEADER_PATCHED}"
+    "#include \"TransIntf.h\""
+    ""
+    KAG_PARSER_HEADER_PATCHED
+    "KAGParser transition include removal"
+)
+file(WRITE "${KAG_PARSER_BUILD_DIR}/KAGParser.h" "${KAG_PARSER_HEADER_PATCHED}")
+file(READ "${KAG_PARSER_BUILD_DIR}/KAGParser.cpp" KAG_PARSER_SOURCE_CONTENT)
+twinquill_required_replace(
+    "${KAG_PARSER_SOURCE_CONTENT}"
+    "#include \"EventIntf.h\""
+    "#include \"krkr_kag_platform.h\""
+    KAG_PARSER_SOURCE_PATCHED
+    "KAGParser compact event shim"
+)
+file(WRITE "${KAG_PARSER_BUILD_DIR}/KAGParser.cpp" "${KAG_PARSER_SOURCE_PATCHED}")
+
 file(GLOB TJS2_SOURCES CONFIGURE_DEPENDS "${TJS2_BUILD_DIR}/*.cpp")
 add_library(twinquill_krkr_tjs2 STATIC ${TJS2_SOURCES})
 target_compile_features(twinquill_krkr_tjs2 PUBLIC cxx_std_17)
@@ -72,15 +136,32 @@ target_link_libraries(twinquill_krkr_tjs2 PUBLIC onig)
 
 add_library(twinquill_engine_krkr SHARED
     krkr_jni.cpp
+    krkr_kag_platform.cpp
     krkr_kag_probe.cpp
     krkr_storage.cpp
     krkr_storage_registry.cpp
     krkr_tjs_probe.cpp
     krkr_xp3_archive.cpp
     krkr_xp3.cpp
+    "${KAG_PARSER_BUILD_DIR}/KAGParser.cpp"
 )
 target_compile_features(twinquill_engine_krkr PRIVATE cxx_std_17)
-target_compile_options(twinquill_engine_krkr PRIVATE -fvisibility=hidden)
+target_compile_definitions(twinquill_engine_krkr PRIVATE
+    _LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION
+)
+target_compile_options(twinquill_engine_krkr PRIVATE
+    -fexceptions
+    -fvisibility=hidden
+)
+target_include_directories(twinquill_engine_krkr PRIVATE
+    "${CMAKE_CURRENT_LIST_DIR}"
+    "${KAG_PARSER_BUILD_DIR}"
+    "${TJS2_BUILD_DIR}"
+    "${KRKR2_CORE}/base"
+    "${KRKR2_CORE}/environ"
+    "${KRKR2_CORE}/utils"
+    "${ONIG_DIR}/src"
+)
 target_link_libraries(twinquill_engine_krkr PRIVATE
     twinquill_krkr_tjs2
     twinquill_krkr_zlib

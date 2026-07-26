@@ -1,0 +1,29 @@
+From: TwinQuill contributors
+Subject: [PATCH] Narrow KAGParser platform includes for Android M3
+
+TwinQuill builds the full upstream KAGParser.cpp from a generated copy, but the
+parser only needs storage, text-stream, message, debug-log, compact-event, and
+expression-execution hooks for the M3 startup probe. Replace the broad desktop
+platform includes with first-party narrow declarations so the generated copy
+does not pull Cocos, rendering, plugin, media, or transition layers.
+
+--- a/src/core/utils/KAGParser.h
++++ b/src/core/utils/KAGParser.h
+@@
+-#include "StorageImpl.h"
++#include "StorageIntf.h"
+ #include "TextStream.h"
+-#include "MsgIntf.h"
+-#include "PluginImpl.h"
+-#include "CharacterSet.h"
+-#include "TransIntf.h"
++#include "krkr_kag_platform.h"
+ #include "tjsHashSearch.h"
+ #include <vector>
+--- a/src/core/utils/KAGParser.cpp
++++ b/src/core/utils/KAGParser.cpp
+@@
+ #include "KAGParser.h"
+-#include "EventIntf.h"
++#include "krkr_kag_platform.h"
+ namespace TJS { ttstr TJSMapGlobalStringMap(const ttstr & string); }

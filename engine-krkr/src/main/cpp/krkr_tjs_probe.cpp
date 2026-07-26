@@ -15,6 +15,7 @@
 #include <utility>
 
 #include "krkr_kag_probe.h"
+#include "krkr_kag_platform.h"
 #include "krkr_storage.h"
 #include "krkr_storage_registry.h"
 #include "StorageIntf.h"
@@ -225,6 +226,9 @@ int run_tjs_source(const std::string& source) {
     AndroidConsoleOutput output;
     ScopedTjsEngine engine(new TJS::tTJS());
     engine.get()->SetConsoleOutput(&output);
+    twinquill::krkr::KagRuntimeScope kag_runtime(
+        engine.get(),
+        engine.get()->GetGlobalNoAddRef());
     int result_code = 0;
     engine.get()->ExecScript(
         reinterpret_cast<const TJS::tjs_char*>(script.c_str()),
