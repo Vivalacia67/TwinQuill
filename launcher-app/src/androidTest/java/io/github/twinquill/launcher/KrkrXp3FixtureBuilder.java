@@ -33,6 +33,7 @@ public final class KrkrXp3FixtureBuilder {
         "global.twinQuillUnused = 7;".getBytes(StandardCharsets.US_ASCII);
     private static final String VALID_KAG_SCENARIO_TEXT =
         "*start\n"
+            + "plain text\n"
             + "[if exp=\"1\"]\n"
             + "[wait time=\"1\" canskip=true]\n"
             + "[else]\n"
@@ -49,6 +50,17 @@ public final class KrkrXp3FixtureBuilder {
     public static byte[] compressedStartupArchive() throws IOException {
         return archive(
             block(INDEX_METHOD_ZLIB, entry(STARTUP_NAME, STARTUP_SOURCE, 0, zlibSegment()))
+        );
+    }
+
+    public static byte[] archiveWithKagRuntimeStartup(String startupSource)
+        throws IOException {
+        byte[] source = startupSource.getBytes(StandardCharsets.US_ASCII);
+        return archive(
+            block(
+                INDEX_METHOD_ZLIB,
+                entry(STARTUP_NAME, source, 0, zlibSegment(source))
+            )
         );
     }
 
@@ -383,17 +395,22 @@ public final class KrkrXp3FixtureBuilder {
             .replace("\"", "\\\"");
         return (
             "var parser = new KAGParser();\n"
+                + "var runtime = new TwinQuillKagRuntime();\n"
                 + "parser.loadScenario(\"" + escaped + "\");\n"
-                + "var sawExpectedWait = false;\n"
                 + "while (true) {\n"
                 + "    var tag = parser.getNextTag();\n"
                 + "    if (tag == void) break;\n"
-                + "    if (tag.tagname == \"wait\" && tag.time == \"1\""
-                + " && tag.canskip == \"true\") {\n"
-                + "        sawExpectedWait = true;\n"
-                + "    }\n"
+                + "    runtime.consume(tag);\n"
                 + "}\n"
-                + "if (sawExpectedWait) {\n"
+                + "runtime.finish();\n"
+                + "if (runtime.finished"
+                + " && runtime.tagCount > 0"
+                + " && runtime.text == \"plain text\""
+                + " && runtime.lineBreakCount > 0"
+                + " && runtime.waitCount == 1"
+                + " && runtime.lastWaitTime == \"1\""
+                + " && runtime.lastWaitCanSkip == \"true\""
+                + " && runtime.lastTagName != \"\") {\n"
                 + "    global.twinQuillM0Result = 42;\n"
                 + "}\n"
         ).getBytes(StandardCharsets.US_ASCII);

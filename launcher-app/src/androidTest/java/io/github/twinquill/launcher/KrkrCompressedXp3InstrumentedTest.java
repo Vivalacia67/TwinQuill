@@ -39,6 +39,7 @@ public final class KrkrCompressedXp3InstrumentedTest {
     private static final int MALFORMED_XP3_DIAGNOSTIC = 34;
     private static final int KAG_SCENARIO_MISSING_DIAGNOSTIC = 40;
     private static final int KAG_SCENARIO_MALFORMED_DIAGNOSTIC = 41;
+    private static final int TJS_RUNTIME_DIAGNOSTIC = 20;
 
     private Instrumentation instrumentation;
     private Context context;
@@ -88,6 +89,125 @@ public final class KrkrCompressedXp3InstrumentedTest {
                 "scenario/intro.ks"
             ),
             2
+        );
+    }
+
+    @Test
+    public void rejectsKagRuntimeCharacterWithNonStringText() throws Exception {
+        assertScriptErrorResult(
+            "krkr-kag-runtime-bad-text-",
+            KrkrXp3FixtureBuilder.archiveWithKagRuntimeStartup(
+                "var runtime = new TwinQuillKagRuntime();\n"
+                    + "var tag = new Dictionary();\n"
+                    + "tag.tagname = \"ch\";\n"
+                    + "tag.text = 7;\n"
+                    + "runtime.consume(tag);\n"
+                    + "global.twinQuillM0Result = 42;\n"
+            ),
+            TJS_RUNTIME_DIAGNOSTIC
+        );
+    }
+
+    @Test
+    public void rejectsKagRuntimeFinishWithoutTags() throws Exception {
+        assertScriptErrorResult(
+            "krkr-kag-runtime-empty-finish-",
+            KrkrXp3FixtureBuilder.archiveWithKagRuntimeStartup(
+                "var runtime = new TwinQuillKagRuntime();\n"
+                    + "runtime.finish();\n"
+                    + "global.twinQuillM0Result = 42;\n"
+            ),
+            TJS_RUNTIME_DIAGNOSTIC
+        );
+    }
+
+    @Test
+    public void rejectsKagRuntimeConsumeAfterFinish() throws Exception {
+        assertScriptErrorResult(
+            "krkr-kag-runtime-consume-after-finish-",
+            KrkrXp3FixtureBuilder.archiveWithKagRuntimeStartup(
+                "var runtime = new TwinQuillKagRuntime();\n"
+                    + "var tag = new Dictionary();\n"
+                    + "tag.tagname = \"r\";\n"
+                    + "runtime.consume(tag);\n"
+                    + "runtime.finish();\n"
+                    + "runtime.consume(tag);\n"
+                    + "global.twinQuillM0Result = 42;\n"
+            ),
+            TJS_RUNTIME_DIAGNOSTIC
+        );
+    }
+
+    @Test
+    public void rejectsKagRuntimeDoubleFinish() throws Exception {
+        assertScriptErrorResult(
+            "krkr-kag-runtime-double-finish-",
+            KrkrXp3FixtureBuilder.archiveWithKagRuntimeStartup(
+                "var runtime = new TwinQuillKagRuntime();\n"
+                    + "var tag = new Dictionary();\n"
+                    + "tag.tagname = \"r\";\n"
+                    + "runtime.consume(tag);\n"
+                    + "runtime.finish();\n"
+                    + "runtime.finish();\n"
+                    + "global.twinQuillM0Result = 42;\n"
+            ),
+            TJS_RUNTIME_DIAGNOSTIC
+        );
+    }
+
+    @Test
+    public void acceptsKagRuntimeWaitWithoutOptionalCanSkip() throws Exception {
+        assertNormalExit(
+            "krkr-kag-runtime-optional-canskip-",
+            KrkrXp3FixtureBuilder.archiveWithKagRuntimeStartup(
+                "var runtime = new TwinQuillKagRuntime();\n"
+                    + "var tag = new Dictionary();\n"
+                    + "tag.tagname = \"wait\";\n"
+                    + "tag.time = \"2\";\n"
+                    + "runtime.consume(tag);\n"
+                    + "runtime.finish();\n"
+                    + "if (runtime.finished"
+                    + " && runtime.tagCount == 1"
+                    + " && runtime.waitCount == 1"
+                    + " && runtime.lastWaitTime == \"2\""
+                    + " && runtime.lastWaitCanSkip == \"\") {\n"
+                    + "    global.twinQuillM0Result = 42;\n"
+                    + "}\n"
+            )
+        );
+    }
+
+    @Test
+    public void rejectsKagRuntimeWaitWithNonStringCanSkip() throws Exception {
+        assertScriptErrorResult(
+            "krkr-kag-runtime-bad-canskip-",
+            KrkrXp3FixtureBuilder.archiveWithKagRuntimeStartup(
+                "var runtime = new TwinQuillKagRuntime();\n"
+                    + "var tag = new Dictionary();\n"
+                    + "tag.tagname = \"wait\";\n"
+                    + "tag.time = \"2\";\n"
+                    + "tag.canskip = 1;\n"
+                    + "runtime.consume(tag);\n"
+                    + "global.twinQuillM0Result = 42;\n"
+            ),
+            TJS_RUNTIME_DIAGNOSTIC
+        );
+    }
+
+    @Test
+    public void rejectsKagRuntimeTagCountBeyondBound() throws Exception {
+        assertScriptErrorResult(
+            "krkr-kag-runtime-tag-bound-",
+            KrkrXp3FixtureBuilder.archiveWithKagRuntimeStartup(
+                "var runtime = new TwinQuillKagRuntime();\n"
+                    + "var tag = new Dictionary();\n"
+                    + "tag.tagname = \"r\";\n"
+                    + "for (var i = 0; i < 65537; i++) {\n"
+                    + "    runtime.consume(tag);\n"
+                    + "}\n"
+                    + "global.twinQuillM0Result = 42;\n"
+            ),
+            TJS_RUNTIME_DIAGNOSTIC
         );
     }
 
