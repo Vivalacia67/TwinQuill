@@ -81,7 +81,7 @@ public final class KrkrSafStorageInstrumentedTest {
     }
 
     @Test
-    public void runsSafKagScenarioAndCleansRegistrationAcrossLaunches()
+    public void runsSafUtf16LeKagScenarioAndCleansRegistrationAcrossLaunches()
         throws Exception {
         Fixture fixture = fixture(LauncherFixtureDocumentsProvider.KRKR_KAG_XP3_ROOT_ID);
         try {
@@ -99,10 +99,12 @@ public final class KrkrSafStorageInstrumentedTest {
             LauncherFixtureDocumentsProvider.KRKR_KAG_MISSING_XP3_ROOT_ID
         );
         try {
-            assertKrkrScriptError(
-                requestIntent(fixture),
-                KAG_SCENARIO_MISSING_DIAGNOSTIC
-            );
+            for (int attempt = 0; attempt < 2; attempt++) {
+                assertKrkrScriptError(
+                    requestIntent(fixture),
+                    KAG_SCENARIO_MISSING_DIAGNOSTIC
+                );
+            }
         } finally {
             fixture.delete();
         }

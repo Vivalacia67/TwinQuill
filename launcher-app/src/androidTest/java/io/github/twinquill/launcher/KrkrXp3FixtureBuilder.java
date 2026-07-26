@@ -31,12 +31,17 @@ public final class KrkrXp3FixtureBuilder {
         "global.twinQuillM0Result = 42;".getBytes(StandardCharsets.US_ASCII);
     private static final byte[] NON_STARTUP_SOURCE =
         "global.twinQuillUnused = 7;".getBytes(StandardCharsets.US_ASCII);
-    private static final byte[] VALID_KAG_SCENARIO_SOURCE = (
+    private static final String VALID_KAG_SCENARIO_TEXT =
         "*start\n"
-            + "@wait time=1\n"
+            + "[if exp=\"1\"]\n"
+            + "[wait time=\"1\" canskip=true]\n"
+            + "[else]\n"
+            + "[wait time=\"999\"]\n"
+            + "[endif]\n"
             + "[jump target=*done]\n"
-            + "*done\n"
-    ).getBytes(StandardCharsets.UTF_8);
+            + "*done\n";
+    private static final byte[] VALID_KAG_SCENARIO_SOURCE =
+        VALID_KAG_SCENARIO_TEXT.getBytes(StandardCharsets.UTF_8);
 
     private KrkrXp3FixtureBuilder() {
     }
@@ -117,6 +122,40 @@ public final class KrkrXp3FixtureBuilder {
             VALID_KAG_SCENARIO_SOURCE,
             VALID_KAG_SCENARIO_SOURCE.length
         );
+    }
+
+    public static byte[] utf8BomKagScenarioSource() {
+        byte[] source = VALID_KAG_SCENARIO_TEXT.getBytes(StandardCharsets.UTF_8);
+        byte[] output = new byte[source.length + 3];
+        output[0] = (byte) 0xef;
+        output[1] = (byte) 0xbb;
+        output[2] = (byte) 0xbf;
+        System.arraycopy(source, 0, output, 3, source.length);
+        return output;
+    }
+
+    public static byte[] utf16LeBomKagScenarioSource() {
+        byte[] source = VALID_KAG_SCENARIO_TEXT.getBytes(StandardCharsets.UTF_16LE);
+        byte[] output = new byte[source.length + 2];
+        output[0] = (byte) 0xff;
+        output[1] = (byte) 0xfe;
+        System.arraycopy(source, 0, output, 2, source.length);
+        return output;
+    }
+
+    public static byte[] noLabelKagScenarioSource() {
+        return ("[wait time=\"1\" canskip=true]\n" + "plain text\n")
+            .getBytes(StandardCharsets.UTF_8);
+    }
+
+    public static byte[] malformedQuotedAttributeKagScenarioSource() {
+        return ("*start\n" + "[wait time=\"100]\n")
+            .getBytes(StandardCharsets.UTF_8);
+    }
+
+    public static byte[] invalidControlExpressionKagScenarioSource() {
+        return ("*start\n" + "[if exp=\"1 +\"]\n" + "[endif]\n")
+            .getBytes(StandardCharsets.UTF_8);
     }
 
     public static byte[] archiveWithRawAndCompressedStartupSegments()

@@ -30,7 +30,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import java.io.File;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.concurrent.TimeUnit;
 
@@ -68,12 +67,26 @@ public final class KrkrCompressedXp3InstrumentedTest {
     }
 
     @Test
-    public void runsKrkrStartupWithExplicitKagScenarioFromXp3() throws Exception {
+    public void runsKrkrStartupWithKagAttributesAndControlExpressionFromXp3()
+        throws Exception {
         assertNormalExit(
             "krkr-xp3-kag-ok-",
             KrkrXp3FixtureBuilder.archiveWithKagScenario(
                 "scenario/intro.ks",
                 "scenario/intro.ks"
+            )
+        );
+    }
+
+    @Test
+    public void runsKrkrStartupWithUtf8BomKagScenarioFromXp3()
+        throws Exception {
+        assertNormalExit(
+            "krkr-xp3-kag-utf8-bom-",
+            KrkrXp3FixtureBuilder.archiveWithKagScenario(
+                "scenario/utf8-bom.ks",
+                "scenario/utf8-bom.ks",
+                KrkrXp3FixtureBuilder.utf8BomKagScenarioSource()
             )
         );
     }
@@ -101,14 +114,41 @@ public final class KrkrCompressedXp3InstrumentedTest {
     }
 
     @Test
-    public void returnsMalformedScenarioDiagnosticWhenKagHasNoLabel()
+    public void acceptsKagScenarioWithoutLabelWhenUpstreamParserEmitsTag()
+        throws Exception {
+        assertNormalExit(
+            "krkr-xp3-kag-no-label-ok-",
+            KrkrXp3FixtureBuilder.archiveWithKagScenario(
+                "scenario/no-label.ks",
+                "scenario/no-label.ks",
+                KrkrXp3FixtureBuilder.noLabelKagScenarioSource()
+            )
+        );
+    }
+
+    @Test
+    public void returnsMalformedScenarioDiagnosticForUnclosedQuotedAttribute()
         throws Exception {
         assertScriptErrorResult(
-            "krkr-xp3-kag-no-label-",
+            "krkr-xp3-kag-unclosed-quote-",
             KrkrXp3FixtureBuilder.archiveWithKagScenario(
-                "scenario/broken.ks",
-                "scenario/broken.ks",
-                ("@wait time=1\n" + "plain text\n").getBytes(StandardCharsets.UTF_8)
+                "scenario/unclosed-quote.ks",
+                "scenario/unclosed-quote.ks",
+                KrkrXp3FixtureBuilder.malformedQuotedAttributeKagScenarioSource()
+            ),
+            KAG_SCENARIO_MALFORMED_DIAGNOSTIC
+        );
+    }
+
+    @Test
+    public void returnsMalformedScenarioDiagnosticForInvalidControlExpression()
+        throws Exception {
+        assertScriptErrorResult(
+            "krkr-xp3-kag-invalid-expression-",
+            KrkrXp3FixtureBuilder.archiveWithKagScenario(
+                "scenario/invalid-expression.ks",
+                "scenario/invalid-expression.ks",
+                KrkrXp3FixtureBuilder.invalidControlExpressionKagScenarioSource()
             ),
             KAG_SCENARIO_MALFORMED_DIAGNOSTIC
         );

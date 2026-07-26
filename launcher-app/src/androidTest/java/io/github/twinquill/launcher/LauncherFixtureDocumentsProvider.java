@@ -795,7 +795,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
                             "data.xp3",
                             KrkrXp3FixtureBuilder.archiveWithKagScenario(
                                 ".\\Scenario\\./Chapter01.KS",
-                                "scenario/chapter01.ks"
+                                "scenario/chapter01.ks",
+                                KrkrXp3FixtureBuilder.utf16LeBomKagScenarioSource()
                             )
                         )
                     };
