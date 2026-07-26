@@ -4,6 +4,7 @@
  */
 #include "krkr_kag_platform.h"
 
+#include "KAGParser.h"
 #include "StorageIntf.h"
 #include "TextStream.h"
 #include "tjsError.h"
@@ -288,6 +289,29 @@ twinquill::krkr::KagRuntimeScope::KagRuntimeScope(TJS::tTJS* engine, TJS::iTJSDi
     }
     if (g_runtime_state.engine != nullptr || g_runtime_state.context != nullptr) {
         throw TJS::eTJSError(TJS_W("Nested KAG runtime scopes are unsupported"));
+    }
+    iTJSDispatch2* class_dispatch = TVPCreateNativeClass_KAGParser();
+    if (class_dispatch == nullptr) {
+        throw TJS::eTJSError(TJS_W("Unable to create KAGParser native class"));
+    }
+    try {
+        TJS::tTJSVariant class_value(class_dispatch, nullptr);
+        class_dispatch->Release();
+        class_dispatch = nullptr;
+        tjs_error result = context->PropSet(
+            TJS_MEMBERENSURE | TJS_IGNOREPROP,
+            TJS_W("KAGParser"),
+            nullptr,
+            &class_value,
+            context);
+        if (TJS_FAILED(result)) {
+            TJS::TJSThrowFrom_tjs_error(result);
+        }
+    } catch (...) {
+        if (class_dispatch != nullptr) {
+            class_dispatch->Release();
+        }
+        throw;
     }
     g_runtime_state.engine = engine;
     g_runtime_state.context = context;
