@@ -29,6 +29,14 @@ public final class MainActivityResultMessageInstrumentedTest {
             "引擎返回：受保护XP3当前尚未支持（35）",
             MainActivityKt.engineResultMessage(EngineResult.SCRIPT_ERROR, 35)
         );
+        assertEquals(
+            "引擎返回：KAG场景缺失（40）",
+            MainActivityKt.engineResultMessage(EngineResult.SCRIPT_ERROR, 40)
+        );
+        assertEquals(
+            "引擎返回：KAG预检读取或格式错误（41）",
+            MainActivityKt.engineResultMessage(EngineResult.SCRIPT_ERROR, 41)
+        );
     }
 
     @Test

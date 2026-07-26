@@ -31,6 +31,12 @@ public final class KrkrXp3FixtureBuilder {
         "global.twinQuillM0Result = 42;".getBytes(StandardCharsets.US_ASCII);
     private static final byte[] NON_STARTUP_SOURCE =
         "global.twinQuillUnused = 7;".getBytes(StandardCharsets.US_ASCII);
+    private static final byte[] VALID_KAG_SCENARIO_SOURCE = (
+        "*start\n"
+            + "@wait time=1\n"
+            + "[jump target=*done]\n"
+            + "*done\n"
+    ).getBytes(StandardCharsets.UTF_8);
 
     private KrkrXp3FixtureBuilder() {
     }
@@ -66,6 +72,50 @@ public final class KrkrXp3FixtureBuilder {
                 entry(NON_STARTUP_NAME, NON_STARTUP_SOURCE, 0, zlibSegment()),
                 entry(STARTUP_NAME, STARTUP_SOURCE, 0, zlibSegment())
             )
+        );
+    }
+
+    public static byte[] archiveWithKagScenario(
+        String scenarioReference,
+        String scenarioEntryName
+    ) throws IOException {
+        return archiveWithKagScenario(
+            scenarioReference,
+            scenarioEntryName,
+            VALID_KAG_SCENARIO_SOURCE
+        );
+    }
+
+    public static byte[] archiveWithKagScenario(
+        String scenarioReference,
+        String scenarioEntryName,
+        byte[] scenarioSource
+    ) throws IOException {
+        byte[] startupSource = startupSourceForScenario(scenarioReference);
+        return archive(
+            block(
+                INDEX_METHOD_ZLIB,
+                entry(STARTUP_NAME, startupSource, 0, zlibSegment(startupSource)),
+                entry(scenarioEntryName, scenarioSource, 0, zlibSegment(scenarioSource))
+            )
+        );
+    }
+
+    public static byte[] archiveWithMissingKagScenario(String scenarioReference)
+        throws IOException {
+        byte[] startupSource = startupSourceForScenario(scenarioReference);
+        return archive(
+            block(
+                INDEX_METHOD_ZLIB,
+                entry(STARTUP_NAME, startupSource, 0, zlibSegment(startupSource))
+            )
+        );
+    }
+
+    public static byte[] validKagScenarioSource() {
+        return Arrays.copyOf(
+            VALID_KAG_SCENARIO_SOURCE,
+            VALID_KAG_SCENARIO_SOURCE.length
         );
     }
 
@@ -249,6 +299,14 @@ public final class KrkrXp3FixtureBuilder {
                 .prepared(segmentOffset, segment.length)
         );
         return archiveWithPayloadAndIndex(segment, index, INDEX_METHOD_ZLIB);
+    }
+
+    private static byte[] startupSourceForScenario(String scenarioReference) {
+        String escaped = scenarioReference.replace("\\", "\\\\").replace("\"", "\\\"");
+        return (
+            "global.twinQuillM0Result = 42;"
+                + "global.twinQuillM3KagProbeScenario = \"" + escaped + "\";"
+        ).getBytes(StandardCharsets.US_ASCII);
     }
 
     private static byte[] archive(IndexBlockSpec... blocks) throws IOException {

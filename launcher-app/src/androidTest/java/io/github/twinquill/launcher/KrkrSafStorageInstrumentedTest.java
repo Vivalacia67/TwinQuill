@@ -39,6 +39,7 @@ public final class KrkrSafStorageInstrumentedTest {
     private static final int NO_STARTUP_DIAGNOSTIC = 31;
     private static final int BAD_XP3_HEADER_DIAGNOSTIC = 32;
     private static final int PROTECTED_XP3_DIAGNOSTIC = 35;
+    private static final int KAG_SCENARIO_MISSING_DIAGNOSTIC = 40;
     private static final int MALFORMED_XP3_REPEATS = 3;
 
     private Instrumentation instrumentation;
@@ -74,6 +75,34 @@ public final class KrkrSafStorageInstrumentedTest {
         Fixture fixture = fixture(LauncherFixtureDocumentsProvider.KRKR_XP3_ROOT_ID);
         try {
             assertNormalKrkrExit(requestIntent(fixture));
+        } finally {
+            fixture.delete();
+        }
+    }
+
+    @Test
+    public void runsSafKagScenarioAndCleansRegistrationAcrossLaunches()
+        throws Exception {
+        Fixture fixture = fixture(LauncherFixtureDocumentsProvider.KRKR_KAG_XP3_ROOT_ID);
+        try {
+            for (int attempt = 0; attempt < 2; attempt++) {
+                assertNormalKrkrExit(requestIntent(fixture));
+            }
+        } finally {
+            fixture.delete();
+        }
+    }
+
+    @Test
+    public void returnsMissingSafKagScenarioDiagnostic() throws Exception {
+        Fixture fixture = fixture(
+            LauncherFixtureDocumentsProvider.KRKR_KAG_MISSING_XP3_ROOT_ID
+        );
+        try {
+            assertKrkrScriptError(
+                requestIntent(fixture),
+                KAG_SCENARIO_MISSING_DIAGNOSTIC
+            );
         } finally {
             fixture.delete();
         }
@@ -136,6 +165,7 @@ public final class KrkrSafStorageInstrumentedTest {
             fixture.delete();
         }
     }
+
     @Test
     public void returnsScriptErrorForMalformedXp3FromSafContentRoot()
         throws Exception {

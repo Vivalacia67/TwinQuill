@@ -30,6 +30,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.concurrent.TimeUnit;
 
@@ -37,6 +38,8 @@ import java.util.concurrent.TimeUnit;
 public final class KrkrCompressedXp3InstrumentedTest {
     private static final int UNSUPPORTED_XP3_DIAGNOSTIC = 33;
     private static final int MALFORMED_XP3_DIAGNOSTIC = 34;
+    private static final int KAG_SCENARIO_MISSING_DIAGNOSTIC = 40;
+    private static final int KAG_SCENARIO_MALFORMED_DIAGNOSTIC = 41;
 
     private Instrumentation instrumentation;
     private Context context;
@@ -61,6 +64,67 @@ public final class KrkrCompressedXp3InstrumentedTest {
         assertNormalExit(
             "krkr-xp3-ok-",
             KrkrXp3FixtureBuilder.compressedStartupArchive()
+        );
+    }
+
+    @Test
+    public void runsKrkrStartupWithExplicitKagScenarioFromXp3() throws Exception {
+        assertNormalExit(
+            "krkr-xp3-kag-ok-",
+            KrkrXp3FixtureBuilder.archiveWithKagScenario(
+                "scenario/intro.ks",
+                "scenario/intro.ks"
+            )
+        );
+    }
+
+    @Test
+    public void normalizesKagScenarioStorageNameWhenReadingXp3Entry()
+        throws Exception {
+        assertNormalExit(
+            "krkr-xp3-kag-normalized-",
+            KrkrXp3FixtureBuilder.archiveWithKagScenario(
+                ".\\Scenario\\./Chapter01.KS",
+                "scenario/chapter01.ks"
+            )
+        );
+    }
+
+    @Test
+    public void returnsMissingScenarioDiagnosticForExplicitKagScenario()
+        throws Exception {
+        assertScriptErrorResult(
+            "krkr-xp3-kag-missing-",
+            KrkrXp3FixtureBuilder.archiveWithMissingKagScenario("scenario/missing.ks"),
+            KAG_SCENARIO_MISSING_DIAGNOSTIC
+        );
+    }
+
+    @Test
+    public void returnsMalformedScenarioDiagnosticWhenKagHasNoLabel()
+        throws Exception {
+        assertScriptErrorResult(
+            "krkr-xp3-kag-no-label-",
+            KrkrXp3FixtureBuilder.archiveWithKagScenario(
+                "scenario/broken.ks",
+                "scenario/broken.ks",
+                ("@wait time=1\n" + "plain text\n").getBytes(StandardCharsets.UTF_8)
+            ),
+            KAG_SCENARIO_MALFORMED_DIAGNOSTIC
+        );
+    }
+
+    @Test
+    public void returnsMalformedScenarioDiagnosticForInvalidUtf8Kag()
+        throws Exception {
+        assertScriptErrorResult(
+            "krkr-xp3-kag-invalid-utf8-",
+            KrkrXp3FixtureBuilder.archiveWithKagScenario(
+                "scenario/invalid.ks",
+                "scenario/invalid.ks",
+                new byte[] {0x2a, 0x73, 0x74, 0x61, 0x72, 0x74, 0x0a, (byte) 0xc3, 0x28, 0x0a}
+            ),
+            KAG_SCENARIO_MALFORMED_DIAGNOSTIC
         );
     }
 

@@ -52,6 +52,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
     static final String KRKR_AMBIGUOUS_STARTUP_ROOT_ID =
         "krkr-ambiguous-startup";
     static final String KRKR_EMPTY_ROOT_ID = "krkr-empty";
+    static final String KRKR_KAG_XP3_ROOT_ID = "krkr-kag-xp3";
+    static final String KRKR_KAG_MISSING_XP3_ROOT_ID = "krkr-kag-missing-xp3";
 
     private static final byte[] KRKR_STARTUP_SOURCE = (
         "global.twinQuillM0Result = 42;"
@@ -401,7 +403,9 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             || KRKR_MULTI_SEGMENT_XP3_ROOT_ID.equals(documentId)
             || KRKR_TRAILING_INDEX_XP3_ROOT_ID.equals(documentId)
             || KRKR_AMBIGUOUS_STARTUP_ROOT_ID.equals(documentId)
-            || KRKR_EMPTY_ROOT_ID.equals(documentId);
+            || KRKR_EMPTY_ROOT_ID.equals(documentId)
+            || KRKR_KAG_XP3_ROOT_ID.equals(documentId)
+            || KRKR_KAG_MISSING_XP3_ROOT_ID.equals(documentId);
     }
 
     private static String scriptId(String rootId) {
@@ -445,7 +449,9 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             || KRKR_MULTI_SEGMENT_XP3_ROOT_ID.equals(rootId)
             || KRKR_TRAILING_INDEX_XP3_ROOT_ID.equals(rootId)
             || KRKR_AMBIGUOUS_STARTUP_ROOT_ID.equals(rootId)
-            || KRKR_EMPTY_ROOT_ID.equals(rootId);
+            || KRKR_EMPTY_ROOT_ID.equals(rootId)
+            || KRKR_KAG_XP3_ROOT_ID.equals(rootId)
+            || KRKR_KAG_MISSING_XP3_ROOT_ID.equals(rootId);
     }
 
     private static String rootDisplayName(String rootId) {
@@ -509,7 +515,9 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             KRKR_MULTI_SEGMENT_XP3_ROOT_ID,
             KRKR_TRAILING_INDEX_XP3_ROOT_ID,
             KRKR_AMBIGUOUS_STARTUP_ROOT_ID,
-            KRKR_EMPTY_ROOT_ID
+            KRKR_EMPTY_ROOT_ID,
+            KRKR_KAG_XP3_ROOT_ID,
+            KRKR_KAG_MISSING_XP3_ROOT_ID
         }) {
             KrkrDocument[] documents = krkrDocuments(rootId);
             for (int index = 0; index < documents.length; index++) {
@@ -780,6 +788,25 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
                     return new KrkrDocument[] {
                         new KrkrDocument("startup.tjs", KRKR_STARTUP_SOURCE),
                         new KrkrDocument("STARTUP.TJS", KRKR_STARTUP_SOURCE)
+                    };
+                case KRKR_KAG_XP3_ROOT_ID:
+                    return new KrkrDocument[] {
+                        new KrkrDocument(
+                            "data.xp3",
+                            KrkrXp3FixtureBuilder.archiveWithKagScenario(
+                                ".\\Scenario\\./Chapter01.KS",
+                                "scenario/chapter01.ks"
+                            )
+                        )
+                    };
+                case KRKR_KAG_MISSING_XP3_ROOT_ID:
+                    return new KrkrDocument[] {
+                        new KrkrDocument(
+                            "data.xp3",
+                            KrkrXp3FixtureBuilder.archiveWithMissingKagScenario(
+                                "scenario/missing.ks"
+                            )
+                        )
                     };
                 case KRKR_EMPTY_ROOT_ID:
                     return new KrkrDocument[0];
