@@ -53,6 +53,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         "krkr-ambiguous-startup";
     static final String KRKR_EMPTY_ROOT_ID = "krkr-empty";
     static final String KRKR_KAG_XP3_ROOT_ID = "krkr-kag-xp3";
+    static final String KRKR_REGISTERED_KAG_XP3_ROOT_ID =
+        "krkr-registered-kag-xp3";
     static final String KRKR_KAG_MISSING_XP3_ROOT_ID = "krkr-kag-missing-xp3";
 
     private static final byte[] KRKR_STARTUP_SOURCE = (
@@ -405,6 +407,7 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             || KRKR_AMBIGUOUS_STARTUP_ROOT_ID.equals(documentId)
             || KRKR_EMPTY_ROOT_ID.equals(documentId)
             || KRKR_KAG_XP3_ROOT_ID.equals(documentId)
+            || KRKR_REGISTERED_KAG_XP3_ROOT_ID.equals(documentId)
             || KRKR_KAG_MISSING_XP3_ROOT_ID.equals(documentId);
     }
 
@@ -451,6 +454,7 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             || KRKR_AMBIGUOUS_STARTUP_ROOT_ID.equals(rootId)
             || KRKR_EMPTY_ROOT_ID.equals(rootId)
             || KRKR_KAG_XP3_ROOT_ID.equals(rootId)
+            || KRKR_REGISTERED_KAG_XP3_ROOT_ID.equals(rootId)
             || KRKR_KAG_MISSING_XP3_ROOT_ID.equals(rootId);
     }
 
@@ -517,6 +521,7 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             KRKR_AMBIGUOUS_STARTUP_ROOT_ID,
             KRKR_EMPTY_ROOT_ID,
             KRKR_KAG_XP3_ROOT_ID,
+            KRKR_REGISTERED_KAG_XP3_ROOT_ID,
             KRKR_KAG_MISSING_XP3_ROOT_ID
         }) {
             KrkrDocument[] documents = krkrDocuments(rootId);
@@ -794,6 +799,17 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
                         new KrkrDocument(
                             "data.xp3",
                             KrkrXp3FixtureBuilder.archiveWithKagScenario(
+                                ".\\Scenario\\./Chapter01.KS",
+                                "scenario/chapter01.ks",
+                                KrkrXp3FixtureBuilder.utf16LeBomKagScenarioSource()
+                            )
+                        )
+                    };
+                case KRKR_REGISTERED_KAG_XP3_ROOT_ID:
+                    return new KrkrDocument[] {
+                        new KrkrDocument(
+                            "data.xp3",
+                            KrkrXp3FixtureBuilder.archiveWithRegisteredKagParserScenario(
                                 ".\\Scenario\\./Chapter01.KS",
                                 "scenario/chapter01.ks",
                                 KrkrXp3FixtureBuilder.utf16LeBomKagScenarioSource()

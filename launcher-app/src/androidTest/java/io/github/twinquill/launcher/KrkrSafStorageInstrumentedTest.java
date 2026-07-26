@@ -94,6 +94,21 @@ public final class KrkrSafStorageInstrumentedTest {
     }
 
     @Test
+    public void runsSafRegisteredKagParserScenarioAcrossLaunches()
+        throws Exception {
+        Fixture fixture = fixture(
+            LauncherFixtureDocumentsProvider.KRKR_REGISTERED_KAG_XP3_ROOT_ID
+        );
+        try {
+            for (int attempt = 0; attempt < 2; attempt++) {
+                assertNormalKrkrExit(requestIntent(fixture));
+            }
+        } finally {
+            fixture.delete();
+        }
+    }
+
+    @Test
     public void returnsMissingSafKagScenarioDiagnostic() throws Exception {
         Fixture fixture = fixture(
             LauncherFixtureDocumentsProvider.KRKR_KAG_MISSING_XP3_ROOT_ID

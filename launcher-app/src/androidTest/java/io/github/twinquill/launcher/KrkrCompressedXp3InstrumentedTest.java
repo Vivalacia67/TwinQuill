@@ -79,6 +79,19 @@ public final class KrkrCompressedXp3InstrumentedTest {
     }
 
     @Test
+    public void runsRegisteredKagParserStartupFromXp3AcrossLaunches()
+        throws Exception {
+        assertNormalExitAcrossLaunches(
+            "krkr-xp3-registered-kag-ok-",
+            KrkrXp3FixtureBuilder.archiveWithRegisteredKagParserScenario(
+                "scenario/intro.ks",
+                "scenario/intro.ks"
+            ),
+            2
+        );
+    }
+
+    @Test
     public void runsKrkrStartupWithUtf8BomKagScenarioFromXp3()
         throws Exception {
         assertNormalExit(
@@ -278,6 +291,30 @@ public final class KrkrCompressedXp3InstrumentedTest {
                 0,
                 result.getIntExtra(KrkrEngineActivity.EXTRA_RESULT_CODE, -1)
             );
+        } finally {
+            fixture.delete();
+        }
+    }
+
+    private void assertNormalExitAcrossLaunches(
+        String gameIdPrefix,
+        byte[] archive,
+        int launchCount
+    ) throws Exception {
+        Fixture fixture = createFixture(gameIdPrefix, archive);
+        try {
+            for (int attempt = 0; attempt < launchCount; attempt++) {
+                Intent result = launchAndAwait(requestIntent(fixture));
+                assertEquals(Activity.RESULT_OK, host.engineResultCode());
+                assertEquals(
+                    EngineResult.NORMAL_EXIT.code(),
+                    result.getIntExtra(EngineContract.EXTRA_RESULT, -1)
+                );
+                assertEquals(
+                    0,
+                    result.getIntExtra(KrkrEngineActivity.EXTRA_RESULT_CODE, -1)
+                );
+            }
         } finally {
             fixture.delete();
         }

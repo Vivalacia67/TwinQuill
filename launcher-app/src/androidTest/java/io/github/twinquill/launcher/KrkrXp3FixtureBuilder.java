@@ -106,6 +106,33 @@ public final class KrkrXp3FixtureBuilder {
         );
     }
 
+    public static byte[] archiveWithRegisteredKagParserScenario(
+        String scenarioReference,
+        String scenarioEntryName
+    ) throws IOException {
+        return archiveWithRegisteredKagParserScenario(
+            scenarioReference,
+            scenarioEntryName,
+            VALID_KAG_SCENARIO_SOURCE
+        );
+    }
+
+    public static byte[] archiveWithRegisteredKagParserScenario(
+        String scenarioReference,
+        String scenarioEntryName,
+        byte[] scenarioSource
+    ) throws IOException {
+        byte[] startupSource =
+            startupSourceForRegisteredKagParserScenario(scenarioReference);
+        return archive(
+            block(
+                INDEX_METHOD_ZLIB,
+                entry(STARTUP_NAME, startupSource, 0, zlibSegment(startupSource)),
+                entry(scenarioEntryName, scenarioSource, 0, zlibSegment(scenarioSource))
+            )
+        );
+    }
+
     public static byte[] archiveWithMissingKagScenario(String scenarioReference)
         throws IOException {
         byte[] startupSource = startupSourceForScenario(scenarioReference);
@@ -346,6 +373,36 @@ public final class KrkrXp3FixtureBuilder {
             "global.twinQuillM0Result = 42;"
                 + "global.twinQuillM3KagProbeScenario = \"" + escaped + "\";"
         ).getBytes(StandardCharsets.US_ASCII);
+    }
+
+    private static byte[] startupSourceForRegisteredKagParserScenario(
+        String scenarioReference
+    ) {
+        String escaped = storageReferenceForScenario(scenarioReference)
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"");
+        return (
+            "var parser = new KAGParser();\n"
+                + "parser.loadScenario(\"" + escaped + "\");\n"
+                + "var sawExpectedWait = false;\n"
+                + "while (true) {\n"
+                + "    var tag = parser.getNextTag();\n"
+                + "    if (tag == void) break;\n"
+                + "    if (tag.tagname == \"wait\" && tag.time == \"1\""
+                + " && tag.canskip == \"true\") {\n"
+                + "        sawExpectedWait = true;\n"
+                + "    }\n"
+                + "}\n"
+                + "if (sawExpectedWait) {\n"
+                + "    global.twinQuillM0Result = 42;\n"
+                + "}\n"
+        ).getBytes(StandardCharsets.US_ASCII);
+    }
+
+    private static String storageReferenceForScenario(String scenarioReference) {
+        return scenarioReference.contains("://")
+            ? scenarioReference
+            : "twinquill://./" + scenarioReference;
     }
 
     private static byte[] archive(IndexBlockSpec... blocks) throws IOException {
