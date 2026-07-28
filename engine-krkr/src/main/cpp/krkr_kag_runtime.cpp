@@ -6,13 +6,20 @@
 
 #include "tjsError.h"
 #include "tjsNative.h"
+#include "math/CCAffineTransform.h"
+#include "math/CCGeometry.h"
 
+#include <algorithm>
 #include <cstddef>
 
 namespace {
 
 constexpr std::size_t kMaxTags = 65536;
 constexpr std::size_t kMaxTextCodeUnits = 1024 * 1024;
+constexpr float kGlyphAdvance = 8.0F;
+constexpr float kLineHeight = 16.0F;
+constexpr float kLayoutOffsetX = 4.0F;
+constexpr float kLayoutOffsetY = -2.0F;
 
 #undef TJS_NATIVE_SET_ClassID
 #define TJS_NATIVE_SET_ClassID ClassID_TwinQuillKagRuntime = TJS_NCM_CLASSID;
@@ -77,6 +84,8 @@ public:
         const bool is_character = tag_name == TJS_W("ch");
         const bool is_line_break = tag_name == TJS_W("r");
         const bool is_wait = tag_name == TJS_W("wait");
+        std::size_t next_line_code_units = current_line_code_units_;
+        std::size_t next_max_line_code_units = max_line_code_units_;
         if (is_character) {
             get_string_member(object, TJS_W("text"), true, &text);
             const std::size_t text_length = static_cast<std::size_t>(text.GetLen());
@@ -84,6 +93,8 @@ public:
             if (text_length > kMaxTextCodeUnits - current_length) {
                 throw_runtime_error(TJS_W("KAG runtime text limit exceeded"));
             }
+            next_line_code_units += text_length;
+            next_max_line_code_units = std::max(next_max_line_code_units, next_line_code_units);
         } else if (is_wait) {
             get_string_member(object, TJS_W("time"), true, &wait_time);
             get_string_member(object, TJS_W("canskip"), false, &wait_can_skip);
@@ -93,7 +104,11 @@ public:
         last_tag_name_ = tag_name;
         if (is_character) {
             text_ += text;
+            current_line_code_units_ = next_line_code_units;
+            max_line_code_units_ = next_max_line_code_units;
         } else if (is_line_break) {
+            max_line_code_units_ = std::max(max_line_code_units_, current_line_code_units_);
+            current_line_code_units_ = 0;
             ++line_break_count_;
         } else if (is_wait) {
             ++wait_count_;
@@ -109,6 +124,23 @@ public:
         if (tag_count_ == 0) {
             throw_runtime_error(TJS_W("KAG runtime cannot finish without tags"));
         }
+
+        const std::size_t layout_line_width =
+            std::max(max_line_code_units_, current_line_code_units_);
+        const std::size_t layout_line_count = line_break_count_ + 1;
+        const cocos2d::Size layout_size(
+            static_cast<float>(layout_line_width) * kGlyphAdvance,
+            static_cast<float>(layout_line_count) * kLineHeight);
+        const cocos2d::Rect layout_bounds(0.0F, 0.0F, layout_size.width, layout_size.height);
+        const cocos2d::AffineTransform layout_transform = cocos2d::AffineTransformTranslate(
+            cocos2d::AffineTransform::IDENTITY,
+            kLayoutOffsetX,
+            kLayoutOffsetY);
+        const cocos2d::Rect transformed_bounds =
+            cocos2d::RectApplyAffineTransform(layout_bounds, layout_transform);
+
+        cocos_layout_bounds_ = transformed_bounds;
+        cocos_layout_ready_ = true;
         finished_ = true;
     }
 
@@ -122,6 +154,11 @@ public:
     const TJS::ttstr& LastWaitCanSkip() const { return last_wait_can_skip_; }
     const TJS::ttstr& LastTagName() const { return last_tag_name_; }
     bool Finished() const { return finished_; }
+    bool CocosLayoutReady() const { return cocos_layout_ready_; }
+    double CocosLayoutX() const { return static_cast<double>(cocos_layout_bounds_.origin.x); }
+    double CocosLayoutY() const { return static_cast<double>(cocos_layout_bounds_.origin.y); }
+    double CocosLayoutWidth() const { return static_cast<double>(cocos_layout_bounds_.size.width); }
+    double CocosLayoutHeight() const { return static_cast<double>(cocos_layout_bounds_.size.height); }
 
 private:
     std::size_t tag_count_ = 0;
@@ -131,6 +168,10 @@ private:
     TJS::ttstr last_wait_time_;
     TJS::ttstr last_wait_can_skip_;
     TJS::ttstr last_tag_name_;
+    std::size_t current_line_code_units_ = 0;
+    std::size_t max_line_code_units_ = 0;
+    cocos2d::Rect cocos_layout_bounds_;
+    bool cocos_layout_ready_ = false;
     bool finished_ = false;
 };
 
@@ -197,6 +238,13 @@ TJS::iTJSDispatch2* TVPCreateNativeClass_TwinQuillKagRuntime() {
     TWINQUILL_READ_ONLY_PROPERTY(lastWaitCanSkip, instance->LastWaitCanSkip())
     TWINQUILL_READ_ONLY_PROPERTY(lastTagName, instance->LastTagName())
     TWINQUILL_READ_ONLY_PROPERTY(finished, static_cast<TJS::tjs_int>(instance->Finished()))
+    TWINQUILL_READ_ONLY_PROPERTY(
+        cocosLayoutReady,
+        static_cast<TJS::tjs_int>(instance->CocosLayoutReady()))
+    TWINQUILL_READ_ONLY_PROPERTY(cocosLayoutX, instance->CocosLayoutX())
+    TWINQUILL_READ_ONLY_PROPERTY(cocosLayoutY, instance->CocosLayoutY())
+    TWINQUILL_READ_ONLY_PROPERTY(cocosLayoutWidth, instance->CocosLayoutWidth())
+    TWINQUILL_READ_ONLY_PROPERTY(cocosLayoutHeight, instance->CocosLayoutHeight())
 
 #undef TWINQUILL_READ_ONLY_PROPERTY
 

@@ -89,6 +89,8 @@ twinquill_required_replace(
 file(WRITE "${COCOS36_BUILD_DIR}/cocos/math/MathUtil.cpp" "${COCOS36_MATH_UTIL_PATCHED}")
 
 add_library(twinquill_krkr_cocos_math STATIC
+    "${COCOS36_BUILD_DIR}/cocos/math/CCAffineTransform.cpp"
+    "${COCOS36_BUILD_DIR}/cocos/math/CCGeometry.cpp"
     "${COCOS36_BUILD_DIR}/cocos/math/Mat4.cpp"
     "${COCOS36_BUILD_DIR}/cocos/math/MathUtil.cpp"
     "${COCOS36_BUILD_DIR}/cocos/math/Quaternion.cpp"
