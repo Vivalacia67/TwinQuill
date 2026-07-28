@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import hashlib
 import sys
 import tomllib
@@ -39,9 +40,85 @@ def source_destinations(root: Path) -> dict[str, tuple[Path, dict[str, Any]]]:
 
 def snapshot_file(destination: Path, relative: str, label: str) -> Path:
     path = PurePosixPath(relative)
-    if path.is_absolute() or ".." in path.parts:
+    if (
+        not relative
+        or "\\" in relative
+        or "\0" in relative
+        or path.is_absolute()
+        or ".." in path.parts
+        or any(":" in part for part in path.parts)
+        or path.as_posix() != relative
+    ):
         raise ValueError(f"unsafe {label}: {relative}")
     return destination.joinpath(*path.parts)
+
+
+def validate_repository_license_files(
+    root: Path,
+    source_id: str,
+    source: dict[str, Any],
+) -> None:
+    repository_license_files = source.get("repository_license_files")
+    if repository_license_files is None:
+        return
+    if not isinstance(repository_license_files, list) or not repository_license_files:
+        raise ValueError(f"invalid repository license files for source: {source_id}")
+    for relative in repository_license_files:
+        if not isinstance(relative, str):
+            raise ValueError(f"invalid repository license file for source: {source_id}")
+        license_path = snapshot_file(root, relative, "repository license path")
+        resolved = license_path.resolve()
+        if not resolved.is_relative_to(root.resolve()):
+            raise ValueError(f"unsafe repository license path: {relative}")
+        if license_path.is_symlink() or not license_path.is_file():
+            raise FileNotFoundError(f"missing repository license file: {license_path}")
+
+
+def snapshot_files(
+    source_id: str,
+    destination: Path,
+    source: dict[str, Any],
+) -> list[Path]:
+    candidates: list[Path] = []
+    for candidate in destination.rglob("*"):
+        if candidate.is_symlink():
+            raise ValueError(f"symbolic links are not allowed in snapshots: {candidate}")
+        if candidate.is_file():
+            candidates.append(candidate)
+
+    included_paths = source.get("included_paths")
+    if included_paths is None:
+        return candidates
+    if not isinstance(included_paths, list) or not included_paths:
+        raise ValueError(f"invalid included paths for source: {source_id}")
+
+    relative_candidates = {
+        candidate.relative_to(destination).as_posix(): candidate
+        for candidate in candidates
+    }
+    covered: set[str] = set()
+    for pattern in included_paths:
+        if not isinstance(pattern, str):
+            raise ValueError(f"invalid included path for source: {source_id}")
+        snapshot_file(destination, pattern, "included path pattern")
+        matches = {
+            relative
+            for relative in relative_candidates
+            if fnmatch.fnmatchcase(relative, pattern)
+        }
+        if not matches:
+            raise ValueError(
+                f"included path pattern matches no files for source {source_id}: {pattern}"
+            )
+        covered.update(matches)
+
+    unexpected = sorted(relative_candidates.keys() - covered)
+    if unexpected:
+        raise ValueError(
+            f"snapshot file is not covered by included paths for source {source_id}: "
+            f"{unexpected[0]}"
+        )
+    return candidates
 
 
 def validate_source_files(
@@ -82,12 +159,9 @@ def collect(root: Path) -> dict[str, str]:
     for source_id, (destination, source) in source_destinations(root).items():
         if not destination.is_dir():
             raise FileNotFoundError(f"missing source snapshot: {destination}")
+        validate_repository_license_files(root, source_id, source)
         validate_source_files(source_id, destination, source)
-        for candidate in destination.rglob("*"):
-            if candidate.is_symlink():
-                raise ValueError(f"symbolic links are not allowed in snapshots: {candidate}")
-            if not candidate.is_file():
-                continue
+        for candidate in snapshot_files(source_id, destination, source):
             relative = candidate.relative_to(destination).as_posix()
             manifest_path = f"{source_id}/{relative}"
             entries[manifest_path] = sha256(candidate)
