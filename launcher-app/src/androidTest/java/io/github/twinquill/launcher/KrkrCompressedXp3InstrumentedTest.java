@@ -93,6 +93,34 @@ public final class KrkrCompressedXp3InstrumentedTest {
     }
 
     @Test
+    public void buildsCocosLayoutGeometryFromKagRuntimeState() throws Exception {
+        assertNormalExit(
+            "krkr-kag-runtime-cocos-layout-",
+            KrkrXp3FixtureBuilder.archiveWithKagRuntimeStartup(
+                "var runtime = new TwinQuillKagRuntime();\n"
+                    + "var character = new Dictionary();\n"
+                    + "character.tagname = \"ch\";\n"
+                    + "character.text = \"ab\";\n"
+                    + "runtime.consume(character);\n"
+                    + "var lineBreak = new Dictionary();\n"
+                    + "lineBreak.tagname = \"r\";\n"
+                    + "runtime.consume(lineBreak);\n"
+                    + "character.text = \"c\";\n"
+                    + "runtime.consume(character);\n"
+                    + "runtime.finish();\n"
+                    + "if (runtime.finished"
+                    + " && runtime.cocosLayoutReady"
+                    + " && runtime.cocosLayoutX == 4"
+                    + " && runtime.cocosLayoutY == -2"
+                    + " && runtime.cocosLayoutWidth == 16"
+                    + " && runtime.cocosLayoutHeight == 32) {\n"
+                    + "    global.twinQuillM0Result = 42;\n"
+                    + "}\n"
+            )
+        );
+    }
+
+    @Test
     public void rejectsKagRuntimeCharacterWithNonStringText() throws Exception {
         assertScriptErrorResult(
             "krkr-kag-runtime-bad-text-",

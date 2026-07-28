@@ -410,7 +410,12 @@ public final class KrkrXp3FixtureBuilder {
                 + " && runtime.waitCount == 1"
                 + " && runtime.lastWaitTime == \"1\""
                 + " && runtime.lastWaitCanSkip == \"true\""
-                + " && runtime.lastTagName != \"\") {\n"
+                + " && runtime.lastTagName != \"\""
+                + " && runtime.cocosLayoutReady"
+                + " && runtime.cocosLayoutX == 4"
+                + " && runtime.cocosLayoutY == -2"
+                + " && runtime.cocosLayoutWidth > 0"
+                + " && runtime.cocosLayoutHeight > 0) {\n"
                 + "    global.twinQuillM0Result = 42;\n"
                 + "}\n"
         ).getBytes(StandardCharsets.US_ASCII);
