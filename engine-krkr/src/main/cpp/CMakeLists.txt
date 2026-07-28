@@ -7,6 +7,7 @@ set(TJS2_DIR "${KRKR2_CORE}/tjs2")
 set(KAG_DIR "${KRKR2_CORE}/utils")
 set(ONIG_DIR "${TWINQUILL_ROOT}/vendor/deps/krkr/oniguruma")
 set(ZLIB_DIR "${TWINQUILL_ROOT}/vendor/deps/krkr/zlib")
+set(COCOS36_DIR "${TWINQUILL_ROOT}/vendor/deps/krkr/cocos2d-x-3.6")
 
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build Krkr dependencies statically" FORCE)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -57,6 +58,58 @@ function(twinquill_required_replace input pattern replacement output label)
     endif()
     set(${output} "${patched}" PARENT_SCOPE)
 endfunction()
+
+# Apply the recorded modern-NDK adaptation to a generated Cocos2d-x copy.
+# The selected upstream snapshot remains byte-identical to the pinned tree.
+set(COCOS36_BUILD_DIR "${CMAKE_BINARY_DIR}/generated/cocos36")
+file(REMOVE_RECURSE "${COCOS36_BUILD_DIR}")
+file(MAKE_DIRECTORY "${COCOS36_BUILD_DIR}")
+file(COPY "${COCOS36_DIR}/cocos" DESTINATION "${COCOS36_BUILD_DIR}")
+file(READ "${COCOS36_BUILD_DIR}/cocos/math/MathUtil.cpp" COCOS36_MATH_UTIL_CONTENT)
+string(REPLACE
+    "\r\n"
+    "\n"
+    COCOS36_MATH_UTIL_CONTENT
+    "${COCOS36_MATH_UTIL_CONTENT}"
+)
+twinquill_required_replace(
+    "${COCOS36_MATH_UTIL_CONTENT}"
+    "#include <cpu-features.h>"
+    ""
+    COCOS36_MATH_UTIL_PATCHED
+    "Cocos2d-x cpu-features include removal"
+)
+twinquill_required_replace(
+    "${COCOS36_MATH_UTIL_PATCHED}"
+    "    #elif defined (__ARM_NEON__)\n    #define INCLUDE_NEON32\n    #else\n    #endif"
+    "    #elif defined (__ARM_NEON__)\n    // TwinQuill uses the portable scalar path on modern NDK ARMv7.\n    #else\n    #endif"
+    COCOS36_MATH_UTIL_PATCHED
+    "Cocos2d-x ARMv7 portable math"
+)
+file(WRITE "${COCOS36_BUILD_DIR}/cocos/math/MathUtil.cpp" "${COCOS36_MATH_UTIL_PATCHED}")
+
+add_library(twinquill_krkr_cocos_math STATIC
+    "${COCOS36_BUILD_DIR}/cocos/math/Mat4.cpp"
+    "${COCOS36_BUILD_DIR}/cocos/math/MathUtil.cpp"
+    "${COCOS36_BUILD_DIR}/cocos/math/Quaternion.cpp"
+    "${COCOS36_BUILD_DIR}/cocos/math/Vec2.cpp"
+    "${COCOS36_BUILD_DIR}/cocos/math/Vec3.cpp"
+    "${COCOS36_BUILD_DIR}/cocos/math/Vec4.cpp"
+)
+target_compile_features(twinquill_krkr_cocos_math PUBLIC cxx_std_17)
+target_compile_definitions(twinquill_krkr_cocos_math PRIVATE
+    COCOS2D_DEBUG=0
+    CC_ENABLE_SCRIPT_BINDING=0
+)
+set_target_properties(twinquill_krkr_cocos_math PROPERTIES
+    CXX_VISIBILITY_PRESET hidden
+    POSITION_INDEPENDENT_CODE ON
+    VISIBILITY_INLINES_HIDDEN ON
+)
+target_compile_options(twinquill_krkr_cocos_math PRIVATE -fvisibility=hidden)
+target_include_directories(twinquill_krkr_cocos_math PUBLIC
+    "${COCOS36_BUILD_DIR}/cocos"
+)
 
 set(KAG_PARSER_BUILD_DIR "${CMAKE_BINARY_DIR}/generated/kag")
 file(REMOVE_RECURSE "${KAG_PARSER_BUILD_DIR}")
@@ -135,6 +188,7 @@ target_include_directories(twinquill_krkr_tjs2 PUBLIC
 target_link_libraries(twinquill_krkr_tjs2 PUBLIC onig)
 
 add_library(twinquill_engine_krkr SHARED
+    krkr_cocos_math.cpp
     krkr_jni.cpp
     krkr_kag_platform.cpp
     krkr_kag_probe.cpp
@@ -164,6 +218,7 @@ target_include_directories(twinquill_engine_krkr PRIVATE
     "${ONIG_DIR}/src"
 )
 target_link_libraries(twinquill_engine_krkr PRIVATE
+    twinquill_krkr_cocos_math
     twinquill_krkr_tjs2
     twinquill_krkr_zlib
     android

@@ -42,6 +42,37 @@ license = "Zlib"
 license_files = ["README", "zlib.h"]
 
 [[sources]]
+id = "cocos2d-x-3.6-math"
+source_type = "git-archive"
+destination = "vendor/deps/krkr/cocos2d-x-3.6"
+url = "https://github.com/cocos2d/cocos2d-x.git"
+commit = "c785b7a0218150cd42a94026d38a949a36c03b7e"
+tree = "ecb6e2677ff6a374cbd2a1c6e7fd5e5ee151a8c3"
+archive_sha256 = "c5d89725e8e16ace2a85f2cb6cf1f532ab585403c9bc3f71d27d3ff0a863bec9"
+license = "LicenseRef-Cocos2d-x-math-MIT-BSD-Apache-2.0-composite"
+license_files = ["licenses/LICENSE_cocos2d-x.txt", "licenses/LICENSE_Kazmath.txt"]
+repository_license_files = ["third_party/licenses/Apache-2.0.txt"]
+included_paths = [
+    "cocos/math/**",
+    "cocos/base/ccConfig.h",
+    "cocos/base/CCConsole.h",
+    "cocos/base/ccMacros.h",
+    "cocos/base/ccRandom.h",
+    "cocos/base/CCRef.h",
+    "cocos/platform/CCPlatformConfig.h",
+    "cocos/platform/CCPlatformDefine.h",
+    "cocos/platform/CCPlatformMacros.h",
+    "cocos/platform/CCStdC.h",
+    "cocos/platform/android/CCPlatformDefine-android.h",
+    "cocos/platform/android/CCStdC-android.h",
+    "licenses/LICENSE_cocos2d-x.txt",
+    "licenses/LICENSE_Kazmath.txt",
+]
+patches = [
+    "vendor/patches/cocos2d-x-3.6-math/0001-modern-ndk-armv7-math.patch",
+]
+
+[[sources]]
 id = "onscripter-yuri"
 destination = "vendor/onscripter-yuri"
 url = "https://github.com/ShallCanyon/OnscripterYuri.git"

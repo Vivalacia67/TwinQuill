@@ -1,0 +1,22 @@
+From: TwinQuill contributors
+Subject: [PATCH] Use portable Cocos math on modern NDK ARMv7
+
+The modern Android NDK no longer supplies the legacy cpu-features header in
+the include path used by this standalone math subset. Avoid the runtime ARMv7
+NEON dispatch that depended on that header and use the portable scalar path.
+Keep the compile-time arm64 NEON path unchanged.
+
+--- a/cocos/math/MathUtil.cpp
++++ b/cocos/math/MathUtil.cpp
+@@ -24,3 +24,2 @@
+ #if (CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID)
+-#include <cpu-features.h>
+ #endif
+@@ -46,6 +45,6 @@
+     #define USE_NEON64
+     #define INCLUDE_NEON64
+     #elif defined (__ARM_NEON__)
+-    #define INCLUDE_NEON32
++    // TwinQuill uses the portable scalar path on modern NDK ARMv7.
+     #else
+     #endif

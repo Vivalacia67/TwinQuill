@@ -4,6 +4,8 @@
  */
 #include <jni.h>
 
+#include "krkr_cocos_math.h"
+
 extern "C" int twinquill_engine_krkr_run_loose_startup(const char* startup_path);
 extern "C" int twinquill_engine_krkr_run_loose_startup_fd(int descriptor);
 extern "C" int twinquill_engine_krkr_run_xp3_startup(const char* archive_path);
@@ -13,6 +15,8 @@ namespace {
 
 using PathRunner = int (*)(const char*);
 using DescriptorRunner = int (*)(int);
+
+constexpr jint kCocosMathInvariantFailure = 50;
 
 class ScopedUtfChars final {
 public:
@@ -47,6 +51,9 @@ jint run_path_target(
     jstring path,
     PathRunner runner,
     jint invalid_code) {
+    if (!twinquill_krkr_cocos_math_ready()) {
+        return kCocosMathInvariantFailure;
+    }
     if (path == nullptr || runner == nullptr) {
         return invalid_code;
     }
@@ -59,6 +66,9 @@ jint run_path_target(
 }
 
 jint run_descriptor_target(jint descriptor, DescriptorRunner runner, jint invalid_code) {
+    if (!twinquill_krkr_cocos_math_ready()) {
+        return kCocosMathInvariantFailure;
+    }
     if (descriptor < 0 || runner == nullptr) {
         return invalid_code;
     }
