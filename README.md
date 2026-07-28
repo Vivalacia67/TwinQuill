@@ -1,28 +1,47 @@
 # TwinQuill
 
-TwinQuill is a GPL Android runtime that will manage ONScripter and
-Kirikiri/Kirikiri Z games in one launcher and execute each engine in an
-isolated Android process.
+TwinQuill is a GPL-2.0-or-later Android launcher and source-built runtime for
+standard ONScripter and Kirikiri/Kirikiri Z games. It keeps each engine in an
+isolated app-private process and builds every packaged native component from
+pinned, auditable source.
 
-The project is currently in milestone M0. It has source-built runtime probes,
-not a general-purpose playable release:
+> [!IMPORTANT]
+> TwinQuill is under active development, not a general-purpose compatibility
+> release. The ONS runtime has completed its M2 acceptance milestone; the
+> Kirikiri runtime is still progressing through M3 and does not yet provide a
+> complete Cocos scene, rendering, media, or title-compatibility stack.
 
-- ONScripterYuri runs a self-authored minimal `0.txt` fixture.
-- Kirikiroid2's TJS2 core runs loose `startup.tjs` and an unprotected,
-  uncompressed XP3 fixture.
-- Both engine entry points run in app-private Android processes.
+## Project status
 
-Game compatibility, SAF-backed storage, launcher UI, save redirection, full
-KAG/Cocos rendering, compressed XP3 support, media, and plugin handling remain
-future milestones. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+- **Launcher and storage:** game detection, launch flow, Storage Access
+  Framework integration, read-only native VFS access, and per-game private
+  runtime state are implemented.
+- **ONScripter:** the accepted M2 runtime includes SAF-backed launches,
+  ONScripterYuri built from source, common script encodings, NSA/SAR archives,
+  CJK font fallback, private saves, Lua, PCM audio, Android platform video,
+  audio focus, and an immersive runtime window.
+- **Kirikiri/Kirikiri Z:** the active M3 runtime builds its TJS2, Oniguruma,
+  KAG parser, XP3, and selected Cocos2d-x 3.6 boundaries from pinned source.
+  Local and SAF storage, loose and standard unprotected XP3 startup, script-
+  driven KAG parsing, bounded KAG runtime state, and a real Cocos
+  geometry/affine-transform bridge are covered by Android tests.
+- **Still in progress:** Cocos `Node`/`Scene`/`Layer`, visible rendering, input,
+  lifecycle, Krkr media and save integration, plugins and filters, protected
+  or title-specific XP3 behavior, and a broad real-game/device compatibility
+  matrix.
+
+TwinQuill does not promise support for proprietary plugins, unknown DRM, or
+runtime-loaded native libraries. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+and [`docs/SOURCE_POLICY.md`](docs/SOURCE_POLICY.md) for the architecture and
+source-integrity boundaries.
 
 ## Modules
 
-- `launcher-app`: Android launcher application.
+- `launcher-app`: Android game library, detection, and launch application.
 - `engine-api`: shared engine detection and launch contracts.
 - `native-vfs`: Storage Access Framework to native filesystem bridge.
-- `engine-ons`: ONScripter engine integration.
-- `engine-krkr`: Kirikiri/Kirikiri Z engine integration.
+- `engine-ons`: source-built ONScripterYuri engine integration.
+- `engine-krkr`: staged source-built Kirikiri/Kirikiri Z engine integration.
 
 ## Build baseline
 
