@@ -15,6 +15,7 @@ import android.os.Bundle;
 public final class LauncherGrantBrokerProvider extends ContentProvider {
     static final String AUTHORITY = "io.github.twinquill.test.grants";
     static final String METHOD_GRANT = "grant";
+    static final String METHOD_REVOKE = "revoke";
     static final String METHOD_RESET_ARCHIVE_OPEN_COUNT =
         "reset-archive-open-count";
     static final String METHOD_ARCHIVE_OPEN_COUNT = "archive-open-count";
@@ -65,6 +66,18 @@ public final class LauncherGrantBrokerProvider extends ContentProvider {
                 LauncherFixtureDocumentsProvider.videoOpenCount()
             );
             return result;
+        }
+        if (METHOD_REVOKE.equals(method)) {
+            if (argument == null) {
+                throw new IllegalArgumentException("A fixture root is required");
+            }
+            Uri treeUri = LauncherFixtureDocumentsProvider.treeUri(argument);
+            getContext().revokeUriPermission(
+                "io.github.twinquill",
+                treeUri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            );
+            return Bundle.EMPTY;
         }
         if (!METHOD_GRANT.equals(method)) {
             throw new IllegalArgumentException("Unknown fixture method");

@@ -23,7 +23,9 @@ jmethodID g_read = nullptr;
 jmethodID g_seek = nullptr;
 jmethodID g_close = nullptr;
 jmethodID g_stat = nullptr;
-jmethodID g_list = nullptr;
+jmethodID g_list_public = nullptr;
+jmethodID g_list_framed = nullptr;
+
 jmethodID g_mkdir = nullptr;
 jmethodID g_rename = nullptr;
 jmethodID g_delete = nullptr;
@@ -125,9 +127,13 @@ Java_io_github_twinquill_nativevfs_NativeVfs_nativeInstall(JNIEnv* env, jclass) 
     g_seek = env->GetStaticMethodID(g_backend, "seek", "(JJI)J");
     g_close = env->GetStaticMethodID(g_backend, "close", "(J)I");
     g_stat = env->GetStaticMethodID(g_backend, "stat", "([B[B)[J");
-    g_list = env->GetStaticMethodID(
+    g_list_public = env->GetStaticMethodID(
         g_backend,
         "list",
+        "([B[B)[[B");
+    g_list_framed = env->GetStaticMethodID(
+        g_backend,
+        "listFramed",
         "([B[B)[[B");
     g_mkdir = env->GetStaticMethodID(g_backend, "mkdir", "([B[B)I");
     g_rename = env->GetStaticMethodID(g_backend, "rename", "([B[B[B)I");
@@ -226,7 +232,7 @@ Java_io_github_twinquill_nativevfs_NativeVfs_nativeList(
     jbyteArray path) {
     return ready(env)
         ? static_cast<jobjectArray>(
-            env->CallStaticObjectMethod(g_backend, g_list, tree, path))
+            env->CallStaticObjectMethod(g_backend, g_list_public, tree, path))
         : nullptr;
 }
 
@@ -381,16 +387,44 @@ extern "C" TQ_VFS_API int tq_vfs_list(
     jbyteArray tree = bytes(env, tree_uri_utf8);
     jbyteArray path = bytes(env, relative_path_utf8);
     jobjectArray names = static_cast<jobjectArray>(
-        env->CallStaticObjectMethod(g_backend, g_list, tree, path));
+        env->CallStaticObjectMethod(g_backend, g_list_framed, tree, path));
     env->DeleteLocalRef(tree);
     env->DeleteLocalRef(path);
-    if (names == nullptr) {
+    if (names == nullptr || env->GetArrayLength(names) == 0) {
         return TQ_VFS_ERROR;
     }
+    jbyteArray frame = static_cast<jbyteArray>(env->GetObjectArrayElement(names, 0));
+    if (frame == nullptr || env->GetArrayLength(frame) != 4) {
+        if (frame != nullptr) env->DeleteLocalRef(frame);
+        env->DeleteLocalRef(names);
+        return TQ_VFS_ERROR;
+    }
+    jbyte status_bytes[4]{};
+    env->GetByteArrayRegion(frame, 0, 4, status_bytes);
+    env->DeleteLocalRef(frame);
+    const std::uint32_t unsigned_status =
+        (static_cast<std::uint32_t>(status_bytes[0]) & 0xffU) << 24 |
+        (static_cast<std::uint32_t>(status_bytes[1]) & 0xffU) << 16 |
+        (static_cast<std::uint32_t>(status_bytes[2]) & 0xffU) << 8 |
+        (static_cast<std::uint32_t>(status_bytes[3]) & 0xffU);
+    const int status = static_cast<int>(static_cast<std::int32_t>(unsigned_status));
+    if (status != TQ_VFS_OK && status != TQ_VFS_ERROR && status != TQ_VFS_PERMISSION &&
+        status != TQ_VFS_NOT_FOUND && status != TQ_VFS_INVALID) {
+        env->DeleteLocalRef(names);
+        return TQ_VFS_ERROR;
+    }
+    if (status != TQ_VFS_OK) {
+        env->DeleteLocalRef(names);
+        return status;
+    }
     const jsize count = env->GetArrayLength(names);
-    for (jsize index = 0; index < count; ++index) {
+    for (jsize index = 1; index < count; ++index) {
         jbyteArray name =
             static_cast<jbyteArray>(env->GetObjectArrayElement(names, index));
+        if (name == nullptr) {
+            env->DeleteLocalRef(names);
+            return TQ_VFS_ERROR;
+        }
         const jsize length = env->GetArrayLength(name);
         std::vector<char> utf8(static_cast<std::size_t>(length) + 1, '\0');
         if (length > 0) {
@@ -400,11 +434,16 @@ extern "C" TQ_VFS_API int tq_vfs_list(
                 length,
                 reinterpret_cast<jbyte*>(utf8.data()));
         }
-        const int status = callback(utf8.data(), user_data);
-        env->DeleteLocalRef(name);
-        if (status != 0) {
+        if (std::find(utf8.begin(), utf8.end() - 1, '\0') != utf8.end() - 1) {
+            env->DeleteLocalRef(name);
             env->DeleteLocalRef(names);
-            return status;
+            return TQ_VFS_INVALID;
+        }
+        const int callback_status = callback(utf8.data(), user_data);
+        env->DeleteLocalRef(name);
+        if (callback_status != 0) {
+            env->DeleteLocalRef(names);
+            return callback_status;
         }
     }
     env->DeleteLocalRef(names);

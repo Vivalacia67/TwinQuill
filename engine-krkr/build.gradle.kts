@@ -15,6 +15,7 @@ android {
         externalNativeBuild {
             cmake {
                 arguments += "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+                arguments += "-DANDROID_STL=c++_shared"
             }
         }
     }

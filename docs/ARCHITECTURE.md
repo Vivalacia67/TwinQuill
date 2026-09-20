@@ -8,17 +8,19 @@ plugins, unknown DRM, or runtime-loaded native libraries.
 
 M0 establishes a reproducible source and toolchain baseline. Its runtime code
 is intentionally narrow: the ONS probe runs a minimal script, while the Krkr
-probe executes ASCII TJS from a loose file or a raw, unprotected XP3 archive.
-These probes prove the difficult native integration path; they are not the M2
-or M3 compatibility implementation.
+probe executes self-authored ASCII TJS from a loose file, a raw, unprotected
+XP3 archive, or a read-only SAF tree via `tqsaf`/`native-vfs`. These probes
+prove the difficult native integration path; they are not the M2 or M3
+compatibility implementation.
 
 ## Module graph
 
 - `launcher-app` packages the application and will own the Compose/Room game
   library in M1.
 - `engine-api` will define detection, launch requests, and structured results.
-- `native-vfs` will bridge Android Storage Access Framework documents to native
-  stream operations in M1.
+- `native-vfs` currently provides a read-only Krkr SAF probe via
+  `tqsaf`/`native-vfs`; generic media registration and writable/save
+  capabilities remain future work.
 - `engine-ons` builds ONScripterYuri, SDL2, FreeType, Lua, bzip2, and selected
   codecs from pinned source.
 - `engine-krkr` currently builds the Kirikiroid2 TJS2 core and the exact krkrz
@@ -36,9 +38,11 @@ rendering and audio stacks, crash domains, and memory reclamation. Both
 activities are non-exported in release builds. A debug-only manifest override
 allows explicit ADB launches for legal M0 smoke fixtures.
 
-M1 will replace direct filesystem test paths with a shared launch request and
-SAF-backed VFS. Game content remains read-only; writable state is redirected to
-a per-game private save directory.
+The current Krkr probe accepts explicit loose-file, raw XP3, and read-only SAF
+launch targets. `EngineLaunchRequest` currently routes content into those
+probe targets; it is not the future M1 shared request. Game content remains
+read-only. Writable Krkr save-media, save redirection, and broader KAG/Cocos
+rendering, media, and playable support remain future work.
 
 ## Source and binary policy
 
@@ -48,10 +52,14 @@ snapshots contain no nested Git metadata or precompiled native libraries.
 TwinQuill-specific compatibility changes are recorded under `vendor/patches/`
 and applied to ignored build copies.
 
-The APK may contain only libraries produced by the current build. CI rejects
-tracked native binaries, the accidental generic Krkr dependency `libonig.so`,
-missing engine libraries, missing planned ABIs, and ELF load alignment below
-16 KB.
+The APK may contain only libraries produced by the current build, except for
+the selected C++ runtime that the pinned NDK injects into ignored build/APK
+outputs. CI rejects tracked native binaries, the accidental generic Krkr
+dependency `libonig.so`, missing engine libraries, missing planned ABIs, and
+ABI-mismatched ELF files. Every TwinQuill-built ELF and the arm64-v8a NDK
+runtime must have PT_LOAD alignment at least 16 KiB (0x4000); the only 4 KiB
+(0x1000) exception is a validated ELF32/EM_ARM
+`lib/armeabi-v7a/libc++_shared.so` from that pinned NDK.
 
 ## M0 XP3 boundary
 

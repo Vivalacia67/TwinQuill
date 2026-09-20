@@ -2,8 +2,11 @@
 
 TwinQuill builds every native component from auditable source. Precompiled
 `.so`, `.a`, `.o`, `.dll`, `.dylib`, and `.lib` files are prohibited from the
-source tree and from `vendor/`. Generated native outputs may exist only in
-ignored build directories or CI artifacts.
+source tree and from `vendor/`. The pinned NDK may inject its selected
+`libc++_shared.so` runtime into ignored build/APK outputs; that toolchain
+runtime is the only binary exception and must never enter source or vendor
+trees. All other APK native libraries must be current-build outputs. Generated
+native outputs may exist only in ignored build directories or CI artifacts.
 
 ## Source snapshots
 

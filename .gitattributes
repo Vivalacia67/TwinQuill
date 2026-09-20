@@ -21,6 +21,8 @@
 # upstream archive's exact bytes. TwinQuill-authored patch files are LF text.
 /vendor/** -text -eol -working-tree-encoding
 /vendor/patches/** text eol=lf
+# Unified-diff context markers precede upstream tab indentation.
+/vendor/patches/** whitespace=-space-before-tab
 
 # Audited font assets and their license files are hash-verified snapshots.
 /third_party/fonts/** -text -eol -working-tree-encoding

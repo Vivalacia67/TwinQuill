@@ -3,6 +3,14 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
+val krkrRuntimeInstrumentation =
+    providers.gradleProperty("twinquillKrkrRuntimeInstrumentation")
+        .orNull
+        ?.toBoolean() == true
+val androidTestTargetProcess =
+    if (krkrRuntimeInstrumentation) "io.github.twinquill:krkr" else "io.github.twinquill"
+val krkrRuntimeTestClass = "io.github.twinquill.engine.krkr.KrkrRuntimeHostInstrumentedTest"
+
 android {
     namespace = "io.github.twinquill.launcher"
     compileSdk = 36
@@ -14,6 +22,12 @@ android {
         versionCode = 1
         versionName = "0.1.0-m1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders["twinquillTargetProcesses"] = androidTestTargetProcess
+        if (krkrRuntimeInstrumentation) {
+            testInstrumentationRunnerArguments["class"] = krkrRuntimeTestClass
+        } else {
+            testInstrumentationRunnerArguments["notClass"] = krkrRuntimeTestClass
+        }
 
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")

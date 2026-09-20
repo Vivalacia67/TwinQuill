@@ -33,6 +33,10 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
     static final String ONS_LUA_ROOT_ID = "ons-lua";
     static final String ONS_AUDIO_ROOT_ID = "ons-audio";
     static final String ONS_VIDEO_ROOT_ID = "ons-video";
+    static final String KRKR_ROOT_ID = "krkr";
+    static final String KRKR_MISSING_ROOT_ID = "krkr-missing";
+    static final String KRKR_REVOKED_ROOT_ID = "krkr-revoked";
+    static final String KRKR_AMBIGUOUS_ROOT_ID = "krkr-ambiguous";
 
     private static final byte[] UTF8_SCRIPT = script(
         "UTF-8 中文測試",
@@ -92,6 +96,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             + "savegame 6\n"
             + "end\n"
     ).getBytes(StandardCharsets.UTF_8);
+    private static final byte[] KRKR_SCRIPT =
+        "global.twinQuillM0Result = 42;".getBytes(StandardCharsets.US_ASCII);
     private static final byte[] VIDEO_SCRIPT = (
         "*define\n"
             + "game\n"
@@ -195,7 +201,12 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             throw new FileNotFoundException(parentDocumentId);
         }
         MatrixCursor result = documentCursor(projection);
-        addDocument(result, scriptId(parentDocumentId));
+        if (!KRKR_MISSING_ROOT_ID.equals(parentDocumentId)) {
+            addDocument(result, scriptId(parentDocumentId));
+            if (KRKR_AMBIGUOUS_ROOT_ID.equals(parentDocumentId)) {
+                addDocument(result, krkrUpperScriptId());
+            }
+        }
         if (isArchiveRoot(parentDocumentId)) {
             addDocument(result, archiveId(parentDocumentId));
         }
@@ -240,6 +251,10 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
                     || (
                         ONS_VIDEO_ROOT_ID.equals(parentDocumentId)
                             && videoId(parentDocumentId).equals(documentId)
+                    )
+                    || (
+                        KRKR_AMBIGUOUS_ROOT_ID.equals(parentDocumentId)
+                            && krkrUpperScriptId().equals(documentId)
                     )
             );
     }
@@ -336,7 +351,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             && rootForArchive(documentId) == null
             && rootForLua(documentId) == null
             && rootForAudio(documentId) == null
-            && rootForVideo(documentId) == null) {
+            && rootForVideo(documentId) == null
+            && rootForUpperScript(documentId) == null) {
             throw new FileNotFoundException(documentId);
         }
     }
@@ -351,11 +367,19 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             || ONS_SAR_ROOT_ID.equals(documentId)
             || ONS_LUA_ROOT_ID.equals(documentId)
             || ONS_AUDIO_ROOT_ID.equals(documentId)
-            || ONS_VIDEO_ROOT_ID.equals(documentId);
+            || ONS_VIDEO_ROOT_ID.equals(documentId)
+            || KRKR_ROOT_ID.equals(documentId)
+            || KRKR_MISSING_ROOT_ID.equals(documentId)
+            || KRKR_REVOKED_ROOT_ID.equals(documentId)
+            || KRKR_AMBIGUOUS_ROOT_ID.equals(documentId);
     }
 
     private static String scriptId(String rootId) {
         return rootId + "-script";
+    }
+
+    private static String krkrUpperScriptId() {
+        return KRKR_AMBIGUOUS_ROOT_ID + "-startup-upper";
     }
 
     private static String archiveId(String rootId) {
@@ -384,6 +408,12 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             : "TwinQuill ONS 测试";
     }
 
+    private static String rootForUpperScript(String documentId) {
+        return krkrUpperScriptId().equals(documentId)
+            ? KRKR_AMBIGUOUS_ROOT_ID
+            : null;
+    }
+
     private static String rootForScript(String documentId) {
         for (String rootId : new String[] {
             ROOT_ID,
@@ -395,7 +425,11 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             ONS_SAR_ROOT_ID,
             ONS_LUA_ROOT_ID,
             ONS_AUDIO_ROOT_ID,
-            ONS_VIDEO_ROOT_ID
+            ONS_VIDEO_ROOT_ID,
+            KRKR_ROOT_ID,
+            KRKR_MISSING_ROOT_ID,
+            KRKR_REVOKED_ROOT_ID,
+            KRKR_AMBIGUOUS_ROOT_ID
         }) {
             if (scriptId(rootId).equals(documentId)) {
                 return rootId;
@@ -452,7 +486,16 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         if (rootForVideo(documentId) != null) {
             return "clip.mp4";
         }
-        if (rootForScript(documentId) != null) {
+        if (rootForUpperScript(documentId) != null) {
+            return "STARTUP.TJS";
+        }
+        String scriptRoot = rootForScript(documentId);
+        if (KRKR_ROOT_ID.equals(scriptRoot)
+            || KRKR_REVOKED_ROOT_ID.equals(scriptRoot)
+            || KRKR_AMBIGUOUS_ROOT_ID.equals(scriptRoot)) {
+            return "startup.tjs";
+        }
+        if (scriptRoot != null) {
             return "0.txt";
         }
         throw new FileNotFoundException(documentId);
@@ -487,6 +530,9 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
                 throw failure;
             }
         }
+        if (rootForUpperScript(documentId) != null) {
+            return KRKR_SCRIPT;
+        }
         return scriptBytes(documentId);
     }
 
@@ -513,6 +559,10 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
                 return AUDIO_SCRIPT;
             case ONS_VIDEO_ROOT_ID:
                 return VIDEO_SCRIPT;
+            case KRKR_ROOT_ID:
+            case KRKR_REVOKED_ROOT_ID:
+            case KRKR_AMBIGUOUS_ROOT_ID:
+                return KRKR_SCRIPT;
             case ROOT_ID:
             case ONS_UTF8_ROOT_ID:
                 return UTF8_SCRIPT;

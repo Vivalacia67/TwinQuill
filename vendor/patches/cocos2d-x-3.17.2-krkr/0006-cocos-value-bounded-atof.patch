@@ -1,0 +1,33 @@
+TwinQuill rationale: keep CCValue parsing within the admitted standard-library seam without ccUtils/ConvertUTF dependencies.
+Verification: focused isolated apply checks std::atof is present and blocked utility dependencies are absent.
+
+diff --git a/cocos/base/CCValue.cpp b/cocos/base/CCValue.cpp
+--- a/cocos/base/CCValue.cpp
++++ b/cocos/base/CCValue.cpp
+@@ -27,7 +27,7 @@
+ #include <cmath>
+ #include <sstream>
+ #include <iomanip>
+-#include "base/ccUtils.h"
++#include <cstdlib>
+ 
+ NS_CC_BEGIN
+ 
+@@ -583,7 +583,7 @@ float Value::asFloat() const
+ 
+     if (_type == Type::STRING)
+     {
+-        return utils::atof(_field.strVal->c_str());
++        return std::atof(_field.strVal->c_str());
+     }
+ 
+     if (_type == Type::INTEGER)
+@@ -624,7 +624,7 @@ double Value::asDouble() const
+ 
+     if (_type == Type::STRING)
+     {
+-        return static_cast<double>(utils::atof(_field.strVal->c_str()));
++        return static_cast<double>(std::atof(_field.strVal->c_str()));
+     }
+ 
+     if (_type == Type::INTEGER)

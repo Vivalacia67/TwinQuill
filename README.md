@@ -8,13 +8,14 @@ The project is currently in milestone M0. It has source-built runtime probes,
 not a general-purpose playable release:
 
 - ONScripterYuri runs a self-authored minimal `0.txt` fixture.
-- Kirikiroid2's TJS2 core runs loose `startup.tjs` and an unprotected,
-  uncompressed XP3 fixture.
+- Kirikiroid2's TJS2 core runs a self-authored ASCII `startup.tjs` from loose
+  storage, a raw unprotected XP3 fixture, and a read-only SAF fixture via
+  `tqsaf`/`native-vfs`.
 - Both engine entry points run in app-private Android processes.
 
-Game compatibility, SAF-backed storage, launcher UI, save redirection, full
-KAG/Cocos rendering, compressed XP3 support, media, and plugin handling remain
-future milestones. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+Game compatibility, launcher UI, save redirection, full KAG/Cocos rendering,
+compressed XP3 support, media, and plugin handling remain future milestones.
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Modules
 
@@ -38,9 +39,10 @@ Create an ignored `local.properties` that points at the Android SDK, then run:
 ./gradlew assembleDebug
 ```
 
-On Windows, use `gradlew.bat`. A clean build compiles every packaged native
-library from the pinned source snapshots; generated `.so` files remain ignored
-build products.
+On Windows, use `gradlew.bat`. A clean build compiles every TwinQuill native
+component from pinned source snapshots; the only additional packaged native
+binary is the selected `libc++_shared.so` injected by the pinned NDK into
+ignored build/APK outputs.
 
 Repository and build-output gates can be run with:
 

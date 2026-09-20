@@ -5,13 +5,23 @@ Kirikiroid2's custom vector wrapper previously returned the removed element,
 but the current source resolves these calls to std::vector, whose pop_back()
 returns void. Read the element first and then remove it.
 
+Tested-by: tests/test_krkr_tjs2_source_admission.py focused git-apply unittest; forced Android CMake configure.
+
 --- a/src/core/tjs2/tjsUtils.h
 +++ b/src/core/tjs2/tjsUtils.h
-@@
+@@ -485,5 +485,6 @@
+ 		_ensureCapacity();
 -		int currentIndex = UnusedIndexStack.pop_back();
 +		int currentIndex = UnusedIndexStack.back();
 +		UnusedIndexStack.pop_back();
-@@
+ 		_tVectorList_Node &Node = PointerBuffPtr[currentIndex];
+ 		_tVectorList_Node &PrevNode = PointerBuffPtr[IteratorNode.prevIndex];
+ 		Node.Data = _Val;
+@@ -515,5 +516,6 @@
+ 		_ensureCapacity();
 -		int currentIndex = UnusedIndexStack.pop_back();
 +		int currentIndex = UnusedIndexStack.back();
 +		UnusedIndexStack.pop_back();
+ 		_tVectorList_Node &Node = PointerBuffPtr[currentIndex];
+ 		_tVectorList_Node &NextNode = PointerBuffPtr[IteratorNode.nextIndex];
+ 		Node.Data = _Val;

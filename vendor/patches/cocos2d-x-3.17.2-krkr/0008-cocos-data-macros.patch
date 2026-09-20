@@ -1,0 +1,14 @@
+TwinQuill rationale: make CCData use the admitted ccMacros boundary for assertions and logging.
+Verification: focused isolated apply checks the macro include and deterministic data path after patch application.
+
+diff --git a/cocos/base/CCData.cpp b/cocos/base/CCData.cpp
+--- a/cocos/base/CCData.cpp
++++ b/cocos/base/CCData.cpp
+@@ -25,6 +25,7 @@
+  ****************************************************************************/
+ 
+ #include "base/CCData.h"
++#include "base/ccMacros.h"
+ 
+ NS_CC_BEGIN
+ 

@@ -1,0 +1,77 @@
+TwinQuill rationale: remove stock platform lifecycle and retain only generic GL/file boundaries admitted by the Slice04 source ceiling.
+Verification: focused isolated apply checks blocked Android lifecycle, Java/JNI, and dependency tokens are absent.
+
+diff --git a/cocos/math/MathUtil.cpp b/cocos/math/MathUtil.cpp
+index 0b60dbd..cd8b6f3 100644
+--- a/cocos/math/MathUtil.cpp
++++ b/cocos/math/MathUtil.cpp
+@@ -22,10 +22,6 @@ This file was modified to fit the cocos2d-x project
+ #include "math/MathUtil.h"
+ #include "base/ccMacros.h"
+ 
+-#if (CC_TARGET_PLATFORM == CC_PLATFORM_ANDROID)
+-#include <cpu-features.h>
+-#endif
+-
+ //#define USE_NEON32        : neon 32 code will be used
+ //#define USE_NEON64        : neon 64 code will be used
+ //#define INCLUDE_NEON32    : neon 32 code included
+diff --git a/cocos/platform/CCGLView.cpp b/cocos/platform/CCGLView.cpp
+index 4e84bda..3de6faf 100644
+--- a/cocos/platform/CCGLView.cpp
++++ b/cocos/platform/CCGLView.cpp
+@@ -32,8 +32,6 @@ THE SOFTWARE.
+ #include "2d/CCCamera.h"
+ #include "2d/CCScene.h"
+ #include "renderer/CCRenderer.h"
+-#include "vr/CCVRProtocol.h"
+-#include "vr/CCVRGenericRenderer.h"
+ 
+ NS_CC_BEGIN
+ 
+@@ -110,7 +108,7 @@ GLView::GLView()
+ , _scaleX(1.0f)
+ , _scaleY(1.0f)
+ , _resolutionPolicy(ResolutionPolicy::UNKNOWN)
+-, _vrImpl(nullptr)
++
+ {
+ }
+ 
+@@ -494,35 +492,7 @@ void GLView::renderScene(Scene* scene, Renderer* renderer)
+     CCASSERT(scene, "Invalid Scene");
+     CCASSERT(renderer, "Invalid Renderer");
+ 
+-    if (_vrImpl)
+-    {
+-        _vrImpl->render(scene, renderer);
+-    }
+-    else
+-    {
+-        scene->render(renderer, Mat4::IDENTITY, nullptr);
+-    }
+-}
+-
+-VRIRenderer* GLView::getVR() const
+-{
+-    return _vrImpl;
+-}
+-
+-void GLView::setVR(VRIRenderer* vrRenderer)
+-{
+-    if (_vrImpl != vrRenderer)
+-    {
+-        if (_vrImpl) {
+-            _vrImpl->cleanup();
+-            delete _vrImpl;
+-        }
+-
+-        if (vrRenderer)
+-            vrRenderer->setup(this);
+-
+-        _vrImpl = vrRenderer;
+-    }
++    scene->render(renderer, Mat4::IDENTITY, nullptr);
+ }
+ 
+ NS_CC_END

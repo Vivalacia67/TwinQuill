@@ -213,11 +213,25 @@ final class SafVfsBackend {
     }
 
     static byte[][] list(byte[] treeBytes, byte[] pathBytes) {
+        byte[][] framed = listFramed(treeBytes, pathBytes);
+        if (framed == null || framed.length == 0 || framed[0].length != 4) {
+            return null;
+        }
+        if (decodeStatus(framed[0]) != 0) {
+            return null;
+        }
+        byte[][] names = new byte[framed.length - 1][];
+        System.arraycopy(framed, 1, names, 0, names.length);
+        return names;
+    }
+
+    /** Internal status-framed list used by the native bridge; not public API. */
+    static byte[][] listFramed(byte[] treeBytes, byte[] pathBytes) {
         try {
             Uri treeUri = parseTree(treeBytes);
             Uri directory = resolve(treeUri, text(pathBytes), true, true);
             if (directory == null) {
-                return null;
+                return statusFrame(NOT_FOUND);
             }
             Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(
                 treeUri,
@@ -232,7 +246,7 @@ final class SafVfsBackend {
                 null
             )) {
                 if (cursor == null) {
-                    return null;
+                    return statusFrame(ERROR);
                 }
                 while (cursor.moveToNext()) {
                     String name = cursor.getString(0);
@@ -241,16 +255,45 @@ final class SafVfsBackend {
                     }
                 }
             }
-            byte[][] encoded = new byte[names.size()][];
+            byte[][] framed = new byte[names.size() + 1][];
+            framed[0] = statusBytes(0);
             for (int index = 0; index < names.size(); index++) {
-                encoded[index] = names.get(index).getBytes(StandardCharsets.UTF_8);
+                framed[index + 1] = names.get(index).getBytes(StandardCharsets.UTF_8);
             }
-            return encoded;
-        } catch (SecurityException | FileNotFoundException | IllegalArgumentException exception) {
-            return null;
+            return framed;
+        } catch (SecurityException exception) {
+            return statusFrame(PERMISSION);
+        } catch (FileNotFoundException exception) {
+            return statusFrame(NOT_FOUND);
+        } catch (IllegalArgumentException exception) {
+            return statusFrame(INVALID);
+        } catch (RuntimeException exception) {
+            return statusFrame(ERROR);
         }
     }
 
+    private static byte[][] statusFrame(int status) {
+        return new byte[][] {statusBytes(status)};
+    }
+
+    private static byte[] statusBytes(int status) {
+        return new byte[] {
+            (byte) (status >>> 24),
+            (byte) (status >>> 16),
+            (byte) (status >>> 8),
+            (byte) status
+        };
+    }
+
+    private static int decodeStatus(byte[] frame) {
+        if (frame == null || frame.length != 4) {
+            return ERROR;
+        }
+        return ((frame[0] & 0xff) << 24)
+            | ((frame[1] & 0xff) << 16)
+            | ((frame[2] & 0xff) << 8)
+            | (frame[3] & 0xff);
+    }
     static int mkdir(byte[] treeBytes, byte[] pathBytes) {
         try {
             PathParts parts = splitParent(text(pathBytes));

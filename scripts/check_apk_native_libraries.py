@@ -15,10 +15,24 @@ REQUIRED_LIBRARIES = {
     "libtwinquill_engine_krkr.so",
     "libtwinquill_engine_ons.so",
     "libtwinquill_native_vfs.so",
+    "libc++_shared.so",
 }
 FORBIDDEN_LIBRARIES = {"libonig.so"}
 MINIMUM_LOAD_ALIGNMENT = 0x4000
+ARMEABI_V7A_LIBCXX_MINIMUM_LOAD_ALIGNMENT = 0x1000
 PT_LOAD = 1
+EM_ARM = 40
+EM_AARCH64 = 183
+
+
+def elf_identity(data: bytes) -> tuple[int, int]:
+    if len(data) < 20 or data[:4] != b"\x7fELF" or data[5] != 1:
+        raise ValueError("not a supported little-endian ELF file")
+    elf_class = data[4]
+    if elf_class not in (1, 2):
+        raise ValueError(f"unsupported ELF class: {elf_class}")
+    machine = struct.unpack_from("<H", data, 18)[0]
+    return elf_class, machine
 
 
 def load_alignments(data: bytes) -> list[int]:
@@ -69,15 +83,34 @@ def verify_apk(path: Path) -> list[str]:
             if library in FORBIDDEN_LIBRARIES:
                 failures.append(f"{path}: forbidden native library: {entry.filename}")
             try:
-                alignments = load_alignments(apk.read(entry))
+                data = apk.read(entry)
+                elf_class, machine = elf_identity(data)
+                alignments = load_alignments(data)
             except (KeyError, ValueError, struct.error) as error:
                 failures.append(f"{path}: invalid native library {entry.filename}: {error}")
                 continue
+            expected_identity = (
+                (2, EM_AARCH64) if abi == "arm64-v8a" else (1, EM_ARM)
+            )
+            if (elf_class, machine) != expected_identity:
+                failures.append(
+                    f"{path}: {entry.filename} has ELF identity "
+                    f"class={elf_class}, machine={machine}; expected "
+                    f"class={expected_identity[0]}, machine={expected_identity[1]}"
+                )
+            minimum_alignment = MINIMUM_LOAD_ALIGNMENT
+            identity_valid = (elf_class, machine) == expected_identity
+            if (
+                identity_valid
+                and abi == "armeabi-v7a"
+                and library == "libc++_shared.so"
+            ):
+                minimum_alignment = ARMEABI_V7A_LIBCXX_MINIMUM_LOAD_ALIGNMENT
             for alignment in alignments:
-                if alignment < MINIMUM_LOAD_ALIGNMENT:
+                if alignment < minimum_alignment:
                     failures.append(
                         f"{path}: {entry.filename} PT_LOAD alignment "
-                        f"0x{alignment:x} is below 0x{MINIMUM_LOAD_ALIGNMENT:x}"
+                        f"0x{alignment:x} is below 0x{minimum_alignment:x}"
                     )
 
     actual_abis = set(libraries)

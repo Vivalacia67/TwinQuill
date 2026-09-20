@@ -9,6 +9,12 @@ tree = "fc0bf7616b23ce5978eaeaa2eaa4cc92d9cf1fa6"
 archive_sha256 = "655295e9b5d4d506cdb1ee058cfe575bbb4bbe237504a6e5ac0a5cc22c596e3d"
 license = "LicenseRef-Kirikiri-composite"
 license_files = ["LICENSE"]
+patches = [
+    "vendor/patches/kirikiroid2/0001-fix-tjs-vector-pop-back.patch",
+]
+patch_sha256 = [
+    "49dd651830e8a3ee2d8c3e776c1335435e9228b115d2f333338c84e70e71b4ae",
+]
 
 [[sources]]
 id = "krkrz"
@@ -32,6 +38,52 @@ license = "BSD-2-Clause"
 license_files = ["COPYING"]
 
 [[sources]]
+id = "freetype-2.14.3-krkr"
+source_type = "git-archive"
+destination = "vendor/deps/krkr/freetype-2.14.3"
+url = "https://gitlab.freedesktop.org/freetype/freetype.git"
+tag = "VER-2-14-3"
+tag_object = "c740f0fda4274d6ffd2e5b64a25b06ef69803a07"
+commit = "0a0221a1347e2f1e07c395263540026e9a0aa7c7"
+tree = "589225074ab1eb876682820c482069693c251e88"
+archive_sha256 = "bd37baed5d6a1f2b8c26993d1e06618b41fa384e6f183e78460dae31435fe840"
+license = "FTL"
+license_files = ["LICENSE.TXT", "docs/FTL.TXT"]
+
+[[sources]]
+id = "libpng-1.6.58-krkr"
+source_type = "release-archive"
+destination = "vendor/deps/krkr/libpng-1.6.58"
+url = "https://sourceforge.net/projects/libpng/files/libpng16/1.6.58/libpng-1.6.58.tar.gz"
+archive_sha256 = "8c9b05b675ca7301a458df2c2e46f26e1d41ff36b8863f8c33530bc58c2e6225"
+license = "libpng-2.0"
+license_files = ["LICENSE"]
+patches = [
+    "vendor/patches/libpng-1.6.58-krkr/0001-decoder-only-config.patch",
+]
+patch_sha256 = [
+    "2b9fbffad4fa9215ed1035d82d96ce8ef310f7ded3cb599ae6b7e0f99392d666",
+]
+
+[[sources]]
+id = "zlib-1.3.2-krkr"
+source_type = "release-archive"
+destination = "vendor/deps/krkr/zlib-1.3.2"
+url = "https://zlib.net/zlib-1.3.2.tar.gz"
+archive_sha256 = "bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16"
+license = "Zlib"
+license_files = ["LICENSE"]
+
+[[sources]]
+id = "libjpeg-turbo-3.1.4.1-krkr"
+source_type = "release-archive"
+destination = "vendor/deps/krkr/libjpeg-turbo-3.1.4.1"
+url = "https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.1.4.1/libjpeg-turbo-3.1.4.1.tar.gz"
+archive_sha256 = "ecae8008e2cc9ade2f2c1bb9d5e6d4fb73e7c433866a056bd82980741571a022"
+license = "LicenseRef-libjpeg-turbo-composite"
+license_files = ["LICENSE.md", "README.ijg"]
+
+[[sources]]
 id = "onscripter-yuri"
 destination = "vendor/onscripter-yuri"
 url = "https://github.com/ShallCanyon/OnscripterYuri.git"
@@ -42,6 +94,9 @@ license = "GPL-2.0-or-later"
 license_files = ["LICENSE", "src/onsyuri/COPYING"]
 patches = [
     "vendor/patches/onscripter-yuri/0001-android-return-from-sdl-main.patch",
+]
+patch_sha256 = [
+    "c930c81e9f50866f9fcdee1310aa105ecac1544c984f900b4c9bd91e96ca4738",
 ]
 
 [[gitlinks]]
@@ -223,3 +278,248 @@ asset_file = "NotoSansCJKsc-Regular.otf"
 asset_sha256 = "2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b"
 license = "OFL-1.1"
 license_files = ["OFL.txt"]
+
+[[sources]]
+id = "cocos2d-x-3.17.2-krkr"
+source_type = "git-archive-subset"
+destination = "vendor/cocos2d-x-3.17.2-krkr"
+url = "https://github.com/cocos2d/cocos2d-x.git"
+tag = "cocos2d-x-3.17.2"
+tag_type = "lightweight"
+commit = "1528ea01d2749b4ef65e97f79cffa6135fe13c4d"
+tree = "ddcc1e3a9878bc2f81ab391b35de8b901d5caf50"
+archive_sha256 = "7f5b53bd136e146fd64b25fbccfc49434bc30a513ab6ffb6b47e303bf7882287"
+license = "MIT"
+license_files = ["licenses/LICENSE_cocos2d-x.txt"]
+file_count = 191
+compiled_tu_count = 17
+included_paths = [
+    "cocos/math/CCAffineTransform.cpp",
+    "cocos/math/CCGeometry.cpp",
+    "cocos/math/CCVertex.cpp",
+    "cocos/math/Mat4.cpp",
+    "cocos/math/MathUtil.cpp",
+    "cocos/math/Quaternion.cpp",
+    "cocos/math/TransformUtils.cpp",
+    "cocos/math/Vec2.cpp",
+    "cocos/math/Vec3.cpp",
+    "cocos/math/Vec4.cpp",
+    "cocos/base/CCAutoreleasePool.cpp",
+    "cocos/base/CCConfiguration.cpp",
+    "cocos/base/CCData.cpp",
+    "cocos/base/CCDirector.cpp",
+    "cocos/base/CCEvent.cpp",
+    "cocos/base/CCEventCustom.cpp",
+    "cocos/base/CCEventDispatcher.cpp",
+    "cocos/base/CCEventKeyboard.cpp",
+    "cocos/base/CCEventListener.cpp",
+    "cocos/base/CCEventListenerCustom.cpp",
+    "cocos/base/CCEventListenerKeyboard.cpp",
+    "cocos/base/CCEventListenerTouch.cpp",
+    "cocos/base/CCEventTouch.cpp",
+    "cocos/base/CCIMEDispatcher.cpp",
+    "cocos/base/CCNS.cpp",
+    "cocos/base/CCRef.cpp",
+    "cocos/base/CCScheduler.cpp",
+    "cocos/base/CCScriptSupport.cpp",
+    "cocos/base/CCTouch.cpp",
+    "cocos/base/CCValue.cpp",
+    "cocos/base/ccCArray.cpp",
+    "cocos/base/ccTypes.cpp",
+    "cocos/base/ccUTF8.cpp",
+    "cocos/platform/CCThread.cpp",
+    "cocos/platform/CCGLView.cpp",
+    "cocos/platform/CCFileUtils.cpp",
+    "cocos/platform/CCImage.cpp",
+    "cocos/2d/CCAction.cpp",
+    "cocos/2d/CCActionManager.cpp",
+    "cocos/2d/CCCamera.cpp",
+    "cocos/2d/CCComponent.cpp",
+    "cocos/2d/CCComponentContainer.cpp",
+    "cocos/2d/CCFont.cpp",
+    "cocos/2d/CCFontAtlas.cpp",
+    "cocos/2d/CCFontAtlasCache.cpp",
+    "cocos/2d/CCFontFreeType.cpp",
+    "cocos/2d/CCLabel.cpp",
+    "cocos/2d/CCLabelTextFormatter.cpp",
+    "cocos/2d/CCNode.cpp",
+    "cocos/2d/CCScene.cpp",
+    "cocos/2d/CCSprite.cpp",
+    "cocos/2d/CCSpriteBatchNode.cpp",
+    "cocos/2d/CCSpriteFrame.cpp",
+    "cocos/2d/CCTextFieldTTF.cpp",
+    "cocos/renderer/CCBatchCommand.cpp",
+    "cocos/renderer/CCCustomCommand.cpp",
+    "cocos/renderer/CCFrameBuffer.cpp",
+    "cocos/renderer/CCGLProgram.cpp",
+    "cocos/renderer/CCGLProgramCache.cpp",
+    "cocos/renderer/CCGLProgramState.cpp",
+    "cocos/renderer/CCGLProgramStateCache.cpp",
+    "cocos/renderer/CCGroupCommand.cpp",
+    "cocos/renderer/CCQuadCommand.cpp",
+    "cocos/renderer/CCRenderCommand.cpp",
+    "cocos/renderer/CCRenderState.cpp",
+    "cocos/renderer/CCRenderer.cpp",
+    "cocos/renderer/CCTexture2D.cpp",
+    "cocos/renderer/CCTextureAtlas.cpp",
+    "cocos/renderer/CCTextureCache.cpp",
+    "cocos/renderer/CCTrianglesCommand.cpp",
+    "cocos/renderer/ccGLStateCache.cpp",
+    "cocos/renderer/ccShaders.cpp",
+    "licenses/LICENSE_cocos2d-x.txt",
+]
+included_support_paths = [
+    "cocos/2d/CCAction.h",
+    "cocos/2d/CCActionManager.h",
+    "cocos/2d/CCCamera.h",
+    "cocos/2d/CCComponent.h",
+    "cocos/2d/CCComponentContainer.h",
+    "cocos/2d/CCFont.h",
+    "cocos/2d/CCFontAtlas.h",
+    "cocos/2d/CCFontAtlasCache.h",
+    "cocos/2d/CCFontFreeType.h",
+    "cocos/2d/CCLabel.h",
+    "cocos/2d/CCLabelTextFormatter.h",
+    "cocos/2d/CCNode.h",
+    "cocos/2d/CCScene.h",
+    "cocos/2d/CCSprite.h",
+    "cocos/2d/CCSpriteBatchNode.h",
+    "cocos/2d/CCSpriteFrame.h",
+    "cocos/2d/CCTextFieldTTF.h",
+    "cocos/base/CCAutoreleasePool.h",
+    "cocos/base/CCConfiguration.h",
+    "cocos/base/CCData.h",
+    "cocos/base/CCDirector.h",
+    "cocos/base/CCEvent.h",
+    "cocos/base/CCEventCustom.h",
+    "cocos/base/CCEventDispatcher.h",
+    "cocos/base/CCEventKeyboard.h",
+    "cocos/base/CCEventListener.h",
+    "cocos/base/CCEventListenerCustom.h",
+    "cocos/base/CCEventListenerKeyboard.h",
+    "cocos/base/CCEventListenerTouch.h",
+    "cocos/base/CCEventTouch.h",
+    "cocos/base/CCEventType.h",
+    "cocos/base/CCIMEDelegate.h",
+    "cocos/base/CCIMEDispatcher.h",
+    "cocos/base/CCMap.h",
+    "cocos/base/CCNS.h",
+    "cocos/base/CCProtocols.h",
+    "cocos/base/CCRef.h",
+    "cocos/base/CCScheduler.h",
+    "cocos/base/CCScriptSupport.h",
+    "cocos/base/CCTouch.h",
+    "cocos/base/CCValue.h",
+    "cocos/base/CCVector.h",
+    "cocos/base/ccCArray.h",
+    "cocos/base/ccConfig.h",
+    "cocos/base/ccMacros.h",
+    "cocos/base/ccTypes.h",
+    "cocos/base/ccUTF8.h",
+    "cocos/math/CCAffineTransform.h",
+    "cocos/math/CCGeometry.h",
+    "cocos/math/CCMath.h",
+    "cocos/math/CCMathBase.h",
+    "cocos/math/CCVertex.h",
+    "cocos/math/Mat4.h",
+    "cocos/math/Mat4.inl",
+    "cocos/math/MathUtil.h",
+    "cocos/math/MathUtil.inl",
+    "cocos/math/MathUtilNeon64.inl",
+    "cocos/math/Quaternion.h",
+    "cocos/math/Quaternion.inl",
+    "cocos/math/TransformUtils.h",
+    "cocos/math/Vec2.h",
+    "cocos/math/Vec2.inl",
+    "cocos/math/Vec3.h",
+    "cocos/math/Vec3.inl",
+    "cocos/math/Vec4.h",
+    "cocos/math/Vec4.inl",
+    "cocos/platform/CCCommon.h",
+    "cocos/platform/CCFileUtils.h",
+    "cocos/platform/CCGL.h",
+    "cocos/platform/CCGLView.h",
+    "cocos/platform/CCImage.h",
+    "cocos/platform/CCPlatformConfig.h",
+    "cocos/platform/CCPlatformDefine.h",
+    "cocos/platform/CCPlatformMacros.h",
+    "cocos/platform/CCStdC.h",
+    "cocos/platform/CCThread.h",
+    "cocos/platform/android/CCFileUtils-android.h",
+    "cocos/platform/android/CCGL-android.h",
+    "cocos/platform/android/CCPlatformDefine-android.h",
+    "cocos/platform/android/CCStdC-android.h",
+    "cocos/renderer/CCBatchCommand.h",
+    "cocos/renderer/CCCustomCommand.h",
+    "cocos/renderer/CCFrameBuffer.h",
+    "cocos/renderer/CCGLProgram.h",
+    "cocos/renderer/CCGLProgramCache.h",
+    "cocos/renderer/CCGLProgramState.h",
+    "cocos/renderer/CCGLProgramStateCache.h",
+    "cocos/renderer/CCGroupCommand.h",
+    "cocos/renderer/CCQuadCommand.h",
+    "cocos/renderer/CCRenderCommand.h",
+    "cocos/renderer/CCRenderState.h",
+    "cocos/renderer/CCRenderer.h",
+    "cocos/renderer/CCTexture2D.h",
+    "cocos/renderer/CCTextureAtlas.h",
+    "cocos/renderer/CCTextureCache.h",
+    "cocos/renderer/CCTrianglesCommand.h",
+    "cocos/renderer/ccGLStateCache.h",
+    "cocos/renderer/ccShader_Label.vert",
+    "cocos/renderer/ccShader_Label_normal.frag",
+    "cocos/renderer/ccShader_Position.vert",
+    "cocos/renderer/ccShader_PositionColor.frag",
+    "cocos/renderer/ccShader_PositionColor.vert",
+    "cocos/renderer/ccShader_PositionColorLengthTexture.frag",
+    "cocos/renderer/ccShader_PositionColorLengthTexture.vert",
+    "cocos/renderer/ccShader_PositionTexture.frag",
+    "cocos/renderer/ccShader_PositionTexture.vert",
+    "cocos/renderer/ccShader_PositionTextureA8Color.frag",
+    "cocos/renderer/ccShader_PositionTextureA8Color.vert",
+    "cocos/renderer/ccShader_PositionTextureColor.frag",
+    "cocos/renderer/ccShader_PositionTextureColor.vert",
+    "cocos/renderer/ccShader_PositionTextureColorAlphaTest.frag",
+    "cocos/renderer/ccShader_PositionTextureColor_noMVP.frag",
+    "cocos/renderer/ccShader_PositionTextureColor_noMVP.vert",
+    "cocos/renderer/ccShader_PositionTexture_uColor.frag",
+    "cocos/renderer/ccShader_PositionTexture_uColor.vert",
+    "cocos/renderer/ccShader_Position_uColor.frag",
+    "cocos/renderer/ccShader_Position_uColor.vert",
+    "cocos/renderer/ccShaders.h",
+]
+excluded_families = [
+    "3d", "physics", "physics3d", "navmesh", "vr", "audio", "network",
+    "storage", "ui", "editor-support", "scripting", "extensions",
+    "deprecated", "tests", "templates", "tools", "external",
+]
+excluded_gitlinks = [
+    "tests/cpp-tests/Resources/ccs-res",
+    "tools/bindings-generator",
+    "tools/cocos2d-console",
+    "web",
+]
+excluded_files = [
+    "tests/cpp-tests/Resources/NavMesh/scene.obj",
+    "tests/cpp-tests/Resources/Sprite3DTest/boss.obj",
+    "tests/cpp-tests/Resources/Sprite3DTest/boss1.obj",
+]
+excluded_suffixes = [".a", ".so", ".dll", ".dylib", ".lib", ".o", ".obj", ".jar", ".aar"]
+patches = [
+    "vendor/patches/cocos2d-x-3.17.2-krkr/0001-cocos-platform-boundary.patch",
+    "vendor/patches/cocos2d-x-3.17.2-krkr/0002-cocos-image-decode-only.patch",
+    "vendor/patches/cocos2d-x-3.17.2-krkr/0004-cocos-macros-no-console.patch",
+    "vendor/patches/cocos2d-x-3.17.2-krkr/0005-cocos-math-armv7-scalar.patch",
+    "vendor/patches/cocos2d-x-3.17.2-krkr/0006-cocos-value-bounded-atof.patch",
+    "vendor/patches/cocos2d-x-3.17.2-krkr/0007-cocos-data-no-console.patch",
+    "vendor/patches/cocos2d-x-3.17.2-krkr/0008-cocos-data-macros.patch",
+]
+patch_sha256 = [
+    "48c149cc9c10af7feb7b01504723f2a3911e6d98b6fd1dcc8829a1de635bd7d8",
+    "8f5c4f379fc03709c6023e27b6a405440d6399787147280668709a6b460a428f",
+    "4ea1f3f9433dd366a45f808a16f3cde7e2c6651cc5b525c50049feb6867e59f0",
+    "7acede3c93a72a81098a54fb6c2ce338bd8fbdeb044ef0dfc6b7cbe85ac3382f",
+    "2f839b844983f40989b4f80222eaef7e644251a27c71c7a025222dc4eaae0def",
+    "638f3344a86d18d61a7000a9935bc357d4609c6c70ccbf22d03c948de343107e",
+    "141a9477fc9db954b8eb7579dcc8ce3bb4a7c3aca277652471eb042bcbe9344a",
+]

@@ -28,6 +28,7 @@ import io.github.twinquill.engine.api.EngineLaunchRequest;
 import io.github.twinquill.engine.api.EngineResult;
 import io.github.twinquill.engine.api.EngineType;
 import io.github.twinquill.engine.krkr.KrkrEngineActivity;
+import io.github.twinquill.engine.krkr.KrkrRuntimeActivity;
 import io.github.twinquill.engine.ons.OnsEngineActivity;
 
 import org.junit.After;
@@ -106,13 +107,7 @@ public final class EngineProcessProtocolInstrumentedTest {
         assertEquals(16_437_364L, fallbackFont.length());
         int onsPid = requireProcessPid(context.getPackageName() + ":ons");
 
-        Intent krkr = requestIntent(KrkrEngineActivity.class, EngineType.KRKR, "krkr-test");
-        assertBoundaryResult(krkr);
-        int krkrPid = requireProcessPid(context.getPackageName() + ":krkr");
-
         assertNotEquals(mainPid, onsPid);
-        assertNotEquals(mainPid, krkrPid);
-        assertNotEquals(onsPid, krkrPid);
     }
 
     @Test
@@ -362,6 +357,166 @@ public final class EngineProcessProtocolInstrumentedTest {
     }
 
     @Test
+    public void executesKrkrSafStartupInIsolatedProcess() throws Exception {
+        Instrumentation.ActivityMonitor runtimeMonitor = instrumentation.addMonitor(
+            KrkrRuntimeActivity.class.getName(),
+            null,
+            false
+        );
+        try {
+            Intent launch = requestIntent(
+                KrkrEngineActivity.class,
+                EngineType.KRKR,
+                "krkr-valid-" + android.os.SystemClock.elapsedRealtime(),
+                grantFixture(LauncherFixtureDocumentsProvider.KRKR_ROOT_ID),
+                Bundle.EMPTY
+            );
+            instrumentation.runOnMainSync(() -> host.launchEngine(launch));
+            Activity runtime = instrumentation.waitForMonitorWithTimeout(
+                runtimeMonitor,
+                15_000
+            );
+            assertNotNull("Krkr runtime Activity was not launched", runtime);
+            int krkrPid = requireProcessPid(context.getPackageName() + ":krkr");
+            assertNotEquals(android.os.Process.myPid(), krkrPid);
+            instrumentation.runOnMainSync(runtime::onBackPressed);
+            assertTrue(host.awaitEngineResult(15, TimeUnit.SECONDS));
+        } finally {
+            instrumentation.removeMonitor(runtimeMonitor);
+        }
+        assertEquals(Activity.RESULT_OK, host.engineResultCode());
+        Intent resultIntent = host.engineResultData();
+        assertNotNull(resultIntent);
+        assertEquals(
+            EngineResult.NORMAL_EXIT.code(),
+            resultIntent.getIntExtra(EngineContract.EXTRA_RESULT, -1)
+        );
+        assertEquals(
+            0,
+            resultIntent.getIntExtra(KrkrEngineActivity.EXTRA_RESULT_CODE, -1)
+        );
+        int mainAppPid = requireProcessPid(context.getPackageName());
+        int krkrPid = requireProcessPid(context.getPackageName() + ":krkr");
+        assertNotEquals(mainAppPid, krkrPid);
+    }
+
+    @Test
+    public void recreatingKrkrBrokerDoesNotLaunchRuntimeTwice() throws Exception {
+        Instrumentation.ActivityMonitor brokerMonitor = instrumentation.addMonitor(
+            KrkrEngineActivity.class.getName(),
+            null,
+            false
+        );
+        Instrumentation.ActivityMonitor runtimeMonitor = instrumentation.addMonitor(
+            KrkrRuntimeActivity.class.getName(),
+            null,
+            false
+        );
+        try {
+            Intent launch = requestIntent(
+                KrkrEngineActivity.class,
+                EngineType.KRKR,
+                "krkr-recreate-" + android.os.SystemClock.elapsedRealtime(),
+                grantFixture(LauncherFixtureDocumentsProvider.KRKR_ROOT_ID),
+                Bundle.EMPTY
+            );
+            instrumentation.runOnMainSync(() -> host.launchEngine(launch));
+            Activity broker = instrumentation.waitForMonitorWithTimeout(
+                brokerMonitor,
+                10_000
+            );
+            assertNotNull("Krkr broker Activity was not launched", broker);
+            instrumentation.runOnMainSync(broker::recreate);
+
+            Activity runtime = instrumentation.waitForMonitorWithTimeout(
+                runtimeMonitor,
+                15_000
+            );
+            assertNotNull("Krkr runtime Activity was not launched", runtime);
+            assertEquals(1, runtimeMonitor.getHits());
+            instrumentation.runOnMainSync(runtime::onBackPressed);
+            assertTrue(host.awaitEngineResult(15, TimeUnit.SECONDS));
+            assertEquals(Activity.RESULT_OK, host.engineResultCode());
+        } finally {
+            instrumentation.removeMonitor(runtimeMonitor);
+            instrumentation.removeMonitor(brokerMonitor);
+        }
+    }
+
+    @Test
+    public void mapsKrkrAmbiguousRootToInvalidRequest() throws Exception {
+        Intent resultIntent = launchAndAwait(
+            requestIntent(
+                KrkrEngineActivity.class,
+                EngineType.KRKR,
+                "krkr-ambiguous-" + android.os.SystemClock.elapsedRealtime(),
+                grantFixture(LauncherFixtureDocumentsProvider.KRKR_AMBIGUOUS_ROOT_ID),
+                Bundle.EMPTY
+            )
+        );
+        assertEquals(Activity.RESULT_CANCELED, host.engineResultCode());
+        assertEquals(
+            EngineResult.INVALID_REQUEST.code(),
+            resultIntent.getIntExtra(EngineContract.EXTRA_RESULT, -1)
+        );
+        assertEquals(
+            10,
+            resultIntent.getIntExtra(KrkrEngineActivity.EXTRA_RESULT_CODE, -1)
+        );
+    }
+
+    @Test
+    public void mapsKrkrMissingStartupToInvalidRequest() throws Exception {
+        Intent resultIntent = launchAndAwait(
+            requestIntent(
+                KrkrEngineActivity.class,
+                EngineType.KRKR,
+                "krkr-missing-" + android.os.SystemClock.elapsedRealtime(),
+                grantFixture(LauncherFixtureDocumentsProvider.KRKR_MISSING_ROOT_ID),
+                Bundle.EMPTY
+            )
+        );
+        assertEquals(Activity.RESULT_CANCELED, host.engineResultCode());
+        assertEquals(
+            EngineResult.INVALID_REQUEST.code(),
+            resultIntent.getIntExtra(EngineContract.EXTRA_RESULT, -1)
+        );
+        assertEquals(
+            11,
+            resultIntent.getIntExtra(KrkrEngineActivity.EXTRA_RESULT_CODE, -1)
+        );
+    }
+
+    @Test
+    public void mapsKrkrRevokedListPermissionToPermissionRevoked() throws Exception {
+        Uri revokedRoot = grantFixture(LauncherFixtureDocumentsProvider.KRKR_REVOKED_ROOT_ID);
+        Bundle revoke = context.getContentResolver().call(
+            Uri.parse("content://" + LauncherGrantBrokerProvider.AUTHORITY),
+            LauncherGrantBrokerProvider.METHOD_REVOKE,
+            LauncherFixtureDocumentsProvider.KRKR_REVOKED_ROOT_ID,
+            null
+        );
+        assertNotNull(revoke);
+        Intent resultIntent = launchAndAwait(
+            requestIntent(
+                KrkrEngineActivity.class,
+                EngineType.KRKR,
+                "krkr-revoked-" + android.os.SystemClock.elapsedRealtime(),
+                revokedRoot,
+                Bundle.EMPTY
+            )
+        );
+        assertEquals(Activity.RESULT_CANCELED, host.engineResultCode());
+        assertEquals(
+            EngineResult.PERMISSION_REVOKED.code(),
+            resultIntent.getIntExtra(EngineContract.EXTRA_RESULT, -1)
+        );
+        assertEquals(
+            40,
+            resultIntent.getIntExtra(KrkrEngineActivity.EXTRA_RESULT_CODE, -1)
+        );
+    }
+    @Test
     public void rejectsRequestForTheWrongEngine() throws Exception {
         Intent mismatch =
             requestIntent(OnsEngineActivity.class, EngineType.KRKR, "mismatch-test");
@@ -470,14 +625,6 @@ public final class EngineProcessProtocolInstrumentedTest {
             .putExtra(EngineContract.EXTRA_LAUNCH_REQUEST, request);
     }
 
-    private void assertBoundaryResult(Intent intent) throws Exception {
-        Intent data = launchAndAwait(intent);
-        assertEquals(Activity.RESULT_CANCELED, host.engineResultCode());
-        assertEquals(
-            EngineResult.VFS_UNAVAILABLE.code(),
-            data.getIntExtra(EngineContract.EXTRA_RESULT, -1)
-        );
-    }
 
     private Intent launchAndAwait(Intent intent) throws Exception {
         instrumentation.runOnMainSync(() -> host.launchEngine(intent));

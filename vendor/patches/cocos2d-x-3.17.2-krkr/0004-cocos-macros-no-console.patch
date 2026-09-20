@@ -1,0 +1,23 @@
+TwinQuill rationale: keep the admitted Cocos macro boundary independent of stock CCConsole and removed random helpers.
+Verification: focused isolated apply checks console/random includes remain absent and the patched macro source applies cleanly.
+
+diff --git a/cocos/base/ccMacros.h b/cocos/base/ccMacros.h
+--- a/cocos/base/ccMacros.h
++++ b/cocos/base/ccMacros.h
+@@ -33,7 +33,6 @@ THE SOFTWARE.
+ #define _USE_MATH_DEFINES
+ #endif
+ 
+-#include "base/CCConsole.h"
+ #include "platform/CCStdC.h"
+ 
+ #ifndef CCASSERT
+@@ -71,8 +70,6 @@ simple macro that swaps 2 variables
+     x = y; y = temp;        \
+ }
+ 
+-#include "base/ccRandom.h"
+-
+ /** @def CCRANDOM_MINUS1_1
+  returns a random float between -1 and 1
+  */

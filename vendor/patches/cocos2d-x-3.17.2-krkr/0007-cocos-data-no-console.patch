@@ -1,0 +1,14 @@
+TwinQuill rationale: remove CCData direct CCConsole coupling while preserving the approved first-party macro logging boundary.
+Verification: focused isolated apply checks CCData has no CCConsole include and retains the macro include.
+
+diff --git a/cocos/base/CCData.cpp b/cocos/base/CCData.cpp
+--- a/cocos/base/CCData.cpp
++++ b/cocos/base/CCData.cpp
+@@ -25,7 +25,6 @@
+  ****************************************************************************/
+ 
+ #include "base/CCData.h"
+-#include "base/CCConsole.h"
+ 
+ NS_CC_BEGIN
+ 
