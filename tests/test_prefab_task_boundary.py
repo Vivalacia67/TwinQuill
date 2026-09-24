@@ -102,7 +102,13 @@ class PrefabTaskBoundaryTests(unittest.TestCase):
         assert prefab_match is not None
         assert target_match is not None
         self.assertEqual(prefab_match.group("name"), target_match.group("name"))
-        self.assertNotIn("libraryName", body)
+        library_matches = re.findall(
+            r'^\s*libraryName\s*=\s*"(?P<name>[^"]+)"\s*$',
+            body,
+            flags=re.MULTILINE,
+        )
+        self.assertEqual(library_matches, ["libtwinquill_native_vfs"])
+        self.assertEqual(library_matches, [f"lib{target_match.group('name')}"])
 
     def test_prefab_refresh_is_bounded_to_configuration_tasks(self) -> None:
         self.assertEqual(self.script.count("outputs.upToDateWhen { false }"), 2)

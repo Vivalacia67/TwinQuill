@@ -36,7 +36,7 @@ android {
 
     prefab {
         create("twinquill_native_vfs") {
-            libraryName = "twinquill_native_vfs"
+            libraryName = "libtwinquill_native_vfs"
             headers = "src/main/cpp/include"
         }
     }
