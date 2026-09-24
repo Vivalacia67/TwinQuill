@@ -166,6 +166,7 @@ int status_from_result(std::int64_t result) {
     if (result == TQ_VFS_PERMISSION) return TQ_VFS_PERMISSION;
     if (result == TQ_VFS_NOT_FOUND) return TQ_VFS_NOT_FOUND;
     if (result == TQ_VFS_INVALID) return TQ_VFS_INVALID;
+    if (result == TQ_VFS_UNSUPPORTED) return TQ_VFS_UNSUPPORTED;
     return TQ_VFS_ERROR;
 }
 
