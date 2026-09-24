@@ -10,6 +10,11 @@ val krkrRuntimeInstrumentation =
 val androidTestTargetProcess =
     if (krkrRuntimeInstrumentation) "io.github.twinquill:krkr" else "io.github.twinquill"
 val krkrRuntimeTestClass = "io.github.twinquill.engine.krkr.KrkrRuntimeHostInstrumentedTest"
+val krkrBrokerLifecycleTestClass = "io.github.twinquill.launcher.KrkrBrokerLifecycleInstrumentedTest"
+val krkrRuntimeTestClasses = listOf(
+    krkrRuntimeTestClass,
+    krkrBrokerLifecycleTestClass
+).joinToString(",")
 
 android {
     namespace = "io.github.twinquill.launcher"
@@ -24,9 +29,9 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["twinquillTargetProcesses"] = androidTestTargetProcess
         if (krkrRuntimeInstrumentation) {
-            testInstrumentationRunnerArguments["class"] = krkrRuntimeTestClass
+            testInstrumentationRunnerArguments["class"] = krkrRuntimeTestClasses
         } else {
-            testInstrumentationRunnerArguments["notClass"] = krkrRuntimeTestClass
+            testInstrumentationRunnerArguments["notClass"] = krkrRuntimeTestClasses
         }
 
         ndk {

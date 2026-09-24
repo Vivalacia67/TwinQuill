@@ -15,10 +15,14 @@ import static org.junit.Assert.fail;
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.Instrumentation;
+import android.app.UiAutomation;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import android.net.Uri;
 import android.os.Bundle;
+import android.view.KeyEvent;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -344,6 +348,10 @@ public final class EngineProcessProtocolInstrumentedTest {
     }
 
     private Uri grantFixture(String rootId) {
+        return grantFixture(context, rootId);
+    }
+
+    static Uri grantFixture(Context context, String rootId) {
         Bundle grant = context.getContentResolver().call(
             Uri.parse("content://" + LauncherGrantBrokerProvider.AUTHORITY),
             LauncherGrantBrokerProvider.METHOD_GRANT,
@@ -358,10 +366,12 @@ public final class EngineProcessProtocolInstrumentedTest {
 
     @Test
     public void executesKrkrSafStartupInIsolatedProcess() throws Exception {
-        Instrumentation.ActivityMonitor runtimeMonitor = instrumentation.addMonitor(
-            KrkrRuntimeActivity.class.getName(),
-            null,
-            false
+        int mainPid = android.os.Process.myPid();
+        int taskId = host.getTaskId();
+        String krkrProcessName = context.getPackageName() + ":krkr";
+        ComponentName runtimeComponent = new ComponentName(
+            context,
+            KrkrRuntimeActivity.class
         );
         try {
             Intent launch = requestIntent(
@@ -372,17 +382,21 @@ public final class EngineProcessProtocolInstrumentedTest {
                 Bundle.EMPTY
             );
             instrumentation.runOnMainSync(() -> host.launchEngine(launch));
-            Activity runtime = instrumentation.waitForMonitorWithTimeout(
-                runtimeMonitor,
-                15_000
+            assertTrue(
+                "Krkr runtime Activity was not visible in the host task",
+                waitForTaskTopActivity(
+                    taskId,
+                    runtimeComponent,
+                    krkrProcessName,
+                    15_000
+                )
             );
-            assertNotNull("Krkr runtime Activity was not launched", runtime);
-            int krkrPid = requireProcessPid(context.getPackageName() + ":krkr");
-            assertNotEquals(android.os.Process.myPid(), krkrPid);
-            instrumentation.runOnMainSync(runtime::onBackPressed);
+            int krkrPid = requireProcessPid(krkrProcessName);
+            assertNotEquals(mainPid, krkrPid);
+            assertTrue("Unable to inject Back into Krkr runtime", injectBackKey());
             assertTrue(host.awaitEngineResult(15, TimeUnit.SECONDS));
         } finally {
-            instrumentation.removeMonitor(runtimeMonitor);
+            dismissRuntimeIfVisible(taskId, runtimeComponent, krkrProcessName);
         }
         assertEquals(Activity.RESULT_OK, host.engineResultCode());
         Intent resultIntent = host.engineResultData();
@@ -400,46 +414,84 @@ public final class EngineProcessProtocolInstrumentedTest {
         assertNotEquals(mainAppPid, krkrPid);
     }
 
-    @Test
-    public void recreatingKrkrBrokerDoesNotLaunchRuntimeTwice() throws Exception {
-        Instrumentation.ActivityMonitor brokerMonitor = instrumentation.addMonitor(
-            KrkrEngineActivity.class.getName(),
-            null,
-            false
-        );
-        Instrumentation.ActivityMonitor runtimeMonitor = instrumentation.addMonitor(
-            KrkrRuntimeActivity.class.getName(),
-            null,
-            false
-        );
-        try {
-            Intent launch = requestIntent(
-                KrkrEngineActivity.class,
-                EngineType.KRKR,
-                "krkr-recreate-" + android.os.SystemClock.elapsedRealtime(),
-                grantFixture(LauncherFixtureDocumentsProvider.KRKR_ROOT_ID),
-                Bundle.EMPTY
-            );
-            instrumentation.runOnMainSync(() -> host.launchEngine(launch));
-            Activity broker = instrumentation.waitForMonitorWithTimeout(
-                brokerMonitor,
-                10_000
-            );
-            assertNotNull("Krkr broker Activity was not launched", broker);
-            instrumentation.runOnMainSync(broker::recreate);
+    private boolean waitForTaskTopActivity(
+        int taskId,
+        ComponentName expectedTopActivity,
+        String processName,
+        long timeoutMillis
+    ) throws InterruptedException {
+        long deadline = android.os.SystemClock.elapsedRealtime() + timeoutMillis;
+        while (android.os.SystemClock.elapsedRealtime() < deadline) {
+            if (findProcessPid(processName) != 0
+                && isTaskTopActivity(taskId, expectedTopActivity)) {
+                return true;
+            }
+            Thread.sleep(50);
+        }
+        return findProcessPid(processName) != 0
+            && isTaskTopActivity(taskId, expectedTopActivity);
+    }
 
-            Activity runtime = instrumentation.waitForMonitorWithTimeout(
-                runtimeMonitor,
-                15_000
-            );
-            assertNotNull("Krkr runtime Activity was not launched", runtime);
-            assertEquals(1, runtimeMonitor.getHits());
-            instrumentation.runOnMainSync(runtime::onBackPressed);
-            assertTrue(host.awaitEngineResult(15, TimeUnit.SECONDS));
-            assertEquals(Activity.RESULT_OK, host.engineResultCode());
-        } finally {
-            instrumentation.removeMonitor(runtimeMonitor);
-            instrumentation.removeMonitor(brokerMonitor);
+    private boolean isTaskTopActivity(int taskId, ComponentName expectedTopActivity) {
+        ActivityManager manager =
+            (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+        for (ActivityManager.AppTask appTask : manager.getAppTasks()) {
+            ActivityManager.RecentTaskInfo taskInfo = appTask.getTaskInfo();
+            if (taskInfo != null
+                && taskInfoId(taskInfo) == taskId
+                && expectedTopActivity.equals(taskInfo.topActivity)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @SuppressWarnings("deprecation")
+    private int taskInfoId(ActivityManager.RecentTaskInfo taskInfo) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            return taskInfo.taskId;
+        }
+        return taskInfo.id;
+    }
+
+    private boolean injectBackKey() {
+        UiAutomation automation = instrumentation.getUiAutomation();
+        long downTime = android.os.SystemClock.uptimeMillis();
+        boolean downSent = automation.injectInputEvent(
+            new KeyEvent(
+                downTime,
+                downTime,
+                KeyEvent.ACTION_DOWN,
+                KeyEvent.KEYCODE_BACK,
+                0
+            ),
+            true
+        );
+        boolean upSent = automation.injectInputEvent(
+            new KeyEvent(
+                downTime,
+                android.os.SystemClock.uptimeMillis(),
+                KeyEvent.ACTION_UP,
+                KeyEvent.KEYCODE_BACK,
+                0
+            ),
+            true
+        );
+        return downSent && upSent;
+    }
+
+    private void dismissRuntimeIfVisible(
+        int taskId,
+        ComponentName runtimeComponent,
+        String processName
+    ) {
+        try {
+            if (waitForTaskTopActivity(taskId, runtimeComponent, processName, 1_000)) {
+                injectBackKey();
+                host.awaitEngineResult(5, TimeUnit.SECONDS);
+            }
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
         }
     }
 

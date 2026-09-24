@@ -38,10 +38,9 @@ public final class EngineLaunchRequest implements Parcelable {
 
     private EngineLaunchRequest(Parcel source) {
         gameId = requireGameId(source.readString());
-        gameRootUri = Objects.requireNonNull(source.readParcelable(
-            Uri.class.getClassLoader(),
-            Uri.class
-        ));
+        gameRootUri = Objects.requireNonNull(
+            source.readParcelable(Uri.class.getClassLoader())
+        );
         saveDirectoryPath = Objects.requireNonNull(source.readString());
         engineType = EngineType.valueOf(Objects.requireNonNull(source.readString()));
         Bundle readArguments = source.readBundle(Bundle.class.getClassLoader());
