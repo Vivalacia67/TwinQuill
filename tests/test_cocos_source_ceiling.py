@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (C) 2026 TwinQuill contributors
+
 """Focused source-admission and link-boundary checks for Slice04 Cocos."""
 
 from __future__ import annotations
@@ -223,7 +226,7 @@ class CocosSourceCeilingTests(unittest.TestCase):
             patch = patch_dir / name
             self.assertTrue(patch.is_file(), patch)
             result = subprocess.run(
-                ["git", "apply", "--check", str(patch)],
+                ["git", "apply", "--check", "--ignore-space-change", str(patch)],
                 cwd=destination,
                 capture_output=True,
                 text=True,
@@ -240,7 +243,13 @@ class CocosSourceCeilingTests(unittest.TestCase):
             shutil.copytree(destination, applied)
             for name in REQUIRED_PATCHES:
                 result = subprocess.run(
-                    ["git", "apply", "--unsafe-paths", str(patch_dir / name)],
+                    [
+                        "git",
+                        "apply",
+                        "--unsafe-paths",
+                        "--ignore-space-change",
+                        str(patch_dir / name),
+                    ],
                     cwd=applied,
                     capture_output=True,
                     text=True,
@@ -301,7 +310,7 @@ class CocosSourceCeilingTests(unittest.TestCase):
             self.assertIn("png_set_tRNS_to_alpha", image)
             self.assertIn("png_set_strip_16", image)
             self.assertIn("png_set_gray_to_rgb", image)
-            self.assertIn("png_set_filler", image)
+            self.assertIn("png_set_add_alpha", image)
             self.assertIn("PNG_COLOR_TYPE_RGBA", image)
             self.assertIn("std::malloc", image)
             self.assertNotIn("std::vector", image)

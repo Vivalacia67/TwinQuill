@@ -1862,7 +1862,7 @@ Verification: focused isolated apply checks checked dimensions before decoder al
 +    if (state->color_type == PNG_COLOR_TYPE_GRAY || state->color_type == PNG_COLOR_TYPE_GRAY_ALPHA)
 +        png_set_gray_to_rgb(state->png);
 +    if (!state->has_alpha_channel)
-+        png_set_filler(state->png, 0xffU, PNG_FILLER_AFTER);
++        png_set_add_alpha(state->png, 0xffU, PNG_FILLER_AFTER);
 +    png_set_interlace_handling(state->png);
 +    png_read_update_info(state->png, state->info);
 +

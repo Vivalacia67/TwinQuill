@@ -44,6 +44,7 @@ foreach(TWINQUILL_COCOS_PATCH IN LISTS TWINQUILL_COCOS_PATCHES)
     endif()
     execute_process(
         COMMAND "${GIT_EXECUTABLE}" -c core.fsmonitor=false apply --check
+                --ignore-space-change
                 --directory=${TWINQUILL_COCOS_BUILD_RELATIVE_DIR}
                 "${TWINQUILL_COCOS_PATCH}"
         WORKING_DIRECTORY "${TWINQUILL_ROOT}"
@@ -58,6 +59,7 @@ foreach(TWINQUILL_COCOS_PATCH IN LISTS TWINQUILL_COCOS_PATCHES)
     endif()
     execute_process(
         COMMAND "${GIT_EXECUTABLE}" -c core.fsmonitor=false apply
+                --ignore-space-change
                 --directory=${TWINQUILL_COCOS_BUILD_RELATIVE_DIR}
                 "${TWINQUILL_COCOS_PATCH}"
         WORKING_DIRECTORY "${TWINQUILL_ROOT}"
@@ -104,12 +106,13 @@ set_target_properties(twinquill_krkr_cocos_core PROPERTIES
     OUTPUT_NAME twinquill_krkr_cocos_core
 )
 target_compile_features(twinquill_krkr_cocos_core PUBLIC cxx_std_17)
-target_compile_definitions(twinquill_krkr_cocos_core PRIVATE
+target_compile_definitions(twinquill_krkr_cocos_core
+    PUBLIC CC_ENABLE_SCRIPT_BINDING=0
+    PRIVATE
     CC_USE_PNG=1
     CC_USE_JPEG=1
     CC_USE_TIFF=0
     CC_USE_WEBP=0
-    CC_ENABLE_SCRIPT_BINDING=0
     CC_USE_PHYSICS=0
     CC_USE_3D_PHYSICS=0
     CC_USE_NAVMESH=0
@@ -139,6 +142,7 @@ target_link_libraries(twinquill_krkr_cocos_core
 # targets for an eventual adb/instrumentation run.
 add_executable(twinquill_krkr_cocos_image_decode_test EXCLUDE_FROM_ALL
     "${TWINQUILL_ROOT}/tests/native/krkr_cocos_image_decode_test.cpp")
+target_link_options(twinquill_krkr_cocos_image_decode_test PRIVATE -static-libstdc++)
 target_compile_features(twinquill_krkr_cocos_image_decode_test PRIVATE cxx_std_17)
 target_compile_definitions(twinquill_krkr_cocos_image_decode_test PRIVATE
     CC_USE_PNG=1
