@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (C) 2026 TwinQuill contributors
+
 """Unit tests for the explicit adb native decoder runner."""
 
 from __future__ import annotations

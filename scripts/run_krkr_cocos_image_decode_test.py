@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (C) 2026 TwinQuill contributors
+
 """Push and execute the Android-native Cocos image decoder seam.
 
 Every adb operation is an argv list (never a shell string). The executable and

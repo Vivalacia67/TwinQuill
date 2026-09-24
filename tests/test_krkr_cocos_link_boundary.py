@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (C) 2026 TwinQuill contributors
+
 """Fixtures for the generated Krkr Cocos link-boundary checker."""
 
 from __future__ import annotations

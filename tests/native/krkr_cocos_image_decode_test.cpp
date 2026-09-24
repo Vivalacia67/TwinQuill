@@ -1,3 +1,8 @@
+/*
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ * Copyright (C) 2026 TwinQuill contributors
+ */
+
 // Android-native compile/link seam for the exact Cocos image decoder closure.
 // Runtime execution requires an Android device (or emulator); this target is
 // EXCLUDE_FROM_ALL so the ordinary engine build remains unchanged.

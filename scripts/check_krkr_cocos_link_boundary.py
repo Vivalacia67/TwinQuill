@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (C) 2026 TwinQuill contributors
+
 """Strict post-configure link-boundary checker for the Krkr Cocos closure.
 
 The source-ceiling unit test checks the declarative CMake blocks.  This script

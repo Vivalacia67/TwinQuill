@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (C) 2026 TwinQuill contributors
+
 """Static B1 native-host boundary checks.
 
 These checks deliberately inspect only first-party runtime sources and the
