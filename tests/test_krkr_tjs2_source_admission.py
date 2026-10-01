@@ -22,6 +22,10 @@ PATCH_RELATIVE = Path(
     "vendor/patches/kirikiroid2/0001-fix-tjs-vector-pop-back.patch"
 )
 PATCH = ROOT / PATCH_RELATIVE
+PATCH_RELATIVES = (
+    PATCH_RELATIVE,
+    Path("vendor/patches/kirikiroid2/0002-fix-tjs-free-null.patch"),
+)
 
 
 class KrkrTjs2SourceAdmissionTests(unittest.TestCase):
@@ -72,21 +76,25 @@ class KrkrTjs2SourceAdmissionTests(unittest.TestCase):
         record = next(item for item in manifest["sources"] if item["id"] == "kirikiroid2")
         patches = record.get("patches", [])
         digests = record.get("patch_sha256", [])
-        patch_name = PATCH_RELATIVE.as_posix()
-        self.assertIn(patch_name, patches)
-        patch_index = patches.index(patch_name)
-        self.assertEqual(
-            digests[patch_index],
-            hashlib.sha256(PATCH.read_bytes()).hexdigest(),
-        )
+        for relative in PATCH_RELATIVES:
+            patch_name = relative.as_posix()
+            with self.subTest(patch=patch_name):
+                self.assertIn(patch_name, patches)
+                patch_index = patches.index(patch_name)
+                self.assertEqual(
+                    digests[patch_index],
+                    hashlib.sha256((ROOT / relative).read_bytes()).hexdigest(),
+                )
 
     def test_numbered_tjs2_patch_records_focused_how_tested(self) -> None:
-        description = PATCH.read_text(encoding="utf-8").split("\n--- ", 1)[0]
-        self.assertRegex(
-            description,
-            r"(?im)^Tested-by:.*tests/test_krkr_tjs2_source_admission\.py"
-            r".*focused git-apply unittest.*forced Android CMake configure",
-        )
+        for relative in PATCH_RELATIVES:
+            description = (ROOT / relative).read_text(encoding="utf-8").split("\n--- ", 1)[0]
+            with self.subTest(patch=relative):
+                self.assertRegex(
+                    description,
+                    r"(?im)^Tested-by:.*tests/test_krkr_tjs2_source_admission\.py"
+                    r".*focused git-apply unittest.*forced Android CMake configure",
+                )
 
     def test_numbered_tjs2_patch_applies_to_generated_layout(self) -> None:
         git = shutil.which("git")
@@ -97,6 +105,7 @@ class KrkrTjs2SourceAdmissionTests(unittest.TestCase):
             generated_tjs2 = generated_root / "src" / "core" / "tjs2"
             generated_tjs2.mkdir(parents=True)
             shutil.copy2(TJS2_DIR / "tjsUtils.h", generated_tjs2 / "tjsUtils.h")
+            shutil.copy2(TJS2_DIR / "tjsConfig.cpp", generated_tjs2 / "tjsConfig.cpp")
             subprocess.run(
                 [git, "init", "--quiet"],
                 cwd=generated_root,
@@ -104,22 +113,24 @@ class KrkrTjs2SourceAdmissionTests(unittest.TestCase):
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-            result = subprocess.run(
-                [
-                    git,
-                    "-c",
-                    "core.fsmonitor=false",
-                    "apply",
-                    "--check",
-                    "--unsafe-paths",
-                    str(PATCH),
-                ],
-                cwd=generated_root,
-                check=False,
-                capture_output=True,
-                encoding="utf-8",
-            )
-        self.assertEqual(result.returncode, 0, result.stderr)
+            for relative in PATCH_RELATIVES:
+                with self.subTest(patch=relative):
+                    result = subprocess.run(
+                        [
+                            git,
+                            "-c",
+                            "core.fsmonitor=false",
+                            "apply",
+                            "--check",
+                            "--unsafe-paths",
+                            str(ROOT / relative),
+                        ],
+                        cwd=generated_root,
+                        check=False,
+                        capture_output=True,
+                        encoding="utf-8",
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
 
 
 if __name__ == "__main__":

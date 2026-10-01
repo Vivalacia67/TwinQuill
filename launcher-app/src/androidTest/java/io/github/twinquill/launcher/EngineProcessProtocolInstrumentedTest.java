@@ -450,6 +450,82 @@ public final class EngineProcessProtocolInstrumentedTest {
 
     @Test
     public void executesKrkrSafStartupInIsolatedProcess() throws Exception {
+        assertNormalKrkrExit(
+            grantFixture(LauncherFixtureDocumentsProvider.KRKR_ROOT_ID)
+        );
+    }
+
+    @Test
+    public void executesUnicodeKrkrSafScriptsWithoutM0Sentinel() throws Exception {
+        for (String rootId : new String[] {
+            LauncherFixtureDocumentsProvider.KRKR_UTF8_ROOT_ID,
+            LauncherFixtureDocumentsProvider.KRKR_UTF8_BOM_ROOT_ID,
+            LauncherFixtureDocumentsProvider.KRKR_UTF16_LE_ROOT_ID,
+            LauncherFixtureDocumentsProvider.KRKR_UTF16_BE_ROOT_ID
+        }) {
+            assertNormalKrkrExit(grantFixture(rootId));
+        }
+    }
+
+    @Test
+    public void mapsKrkrScriptAndEncodingErrorsAndRecovers() throws Exception {
+        for (String rootId : new String[] {
+            LauncherFixtureDocumentsProvider.KRKR_SCRIPT_ERROR_ROOT_ID,
+            LauncherFixtureDocumentsProvider.KRKR_SYNTAX_ERROR_ROOT_ID,
+            LauncherFixtureDocumentsProvider.KRKR_ENCODING_ERROR_ROOT_ID
+        }) {
+            Intent resultIntent = launchAndAwait(
+                requestIntent(
+                    KrkrEngineActivity.class,
+                    EngineType.KRKR,
+                    rootId,
+                    grantFixture(rootId),
+                    Bundle.EMPTY
+                )
+            );
+            assertEquals(Activity.RESULT_CANCELED, host.engineResultCode());
+            assertEquals(
+                EngineResult.SCRIPT_ERROR.code(),
+                resultIntent.getIntExtra(EngineContract.EXTRA_RESULT, -1)
+            );
+            assertEquals(20, resultIntent.getIntExtra(KrkrEngineActivity.EXTRA_RESULT_CODE, -1));
+        }
+        assertNormalKrkrExit(grantFixture(LauncherFixtureDocumentsProvider.KRKR_UTF8_ROOT_ID));
+    }
+
+    @Test
+    public void executesUnicodeKrkrLooseStartup() throws Exception {
+        File gameRoot = new File(context.getCacheDir(),
+            "krkr-unicode-" + android.os.SystemClock.elapsedRealtime());
+        assertTrue(gameRoot.mkdirs());
+        try {
+            Files.write(new File(gameRoot, "startup.tjs").toPath(),
+                LauncherFixtureDocumentsProvider.KRKR_UNICODE_SCRIPT.getBytes(StandardCharsets.UTF_8));
+            assertNormalKrkrExit(Uri.fromFile(gameRoot));
+        } finally {
+            finishHost();
+            deleteFixture(gameRoot);
+        }
+    }
+
+    @Test
+    public void executesUnicodeKrkrXp3Startup() throws Exception {
+        File gameRoot = new File(context.getCacheDir(),
+            "krkr-xp3-" + android.os.SystemClock.elapsedRealtime());
+        assertTrue(gameRoot.mkdirs());
+        try {
+            byte[] script = ("\ufeff" + LauncherFixtureDocumentsProvider.KRKR_UNICODE_SCRIPT)
+                .getBytes(StandardCharsets.UTF_16BE);
+            Files.write(new File(gameRoot, "data.xp3").toPath(),
+                LauncherFixtureDocumentsProvider.rawKrkrXp3(script));
+            assertNormalKrkrExit(Uri.fromFile(gameRoot));
+        } finally {
+            finishHost();
+            deleteFixture(gameRoot);
+        }
+    }
+
+    private void assertNormalKrkrExit(Uri gameRoot) throws Exception {
         int mainPid = android.os.Process.myPid();
         int taskId = host.getTaskId();
         String krkrProcessName = context.getPackageName() + ":krkr";
@@ -462,7 +538,7 @@ public final class EngineProcessProtocolInstrumentedTest {
                 KrkrEngineActivity.class,
                 EngineType.KRKR,
                 "krkr-valid-" + android.os.SystemClock.elapsedRealtime(),
-                grantFixture(LauncherFixtureDocumentsProvider.KRKR_ROOT_ID),
+                gameRoot,
                 Bundle.EMPTY
             );
             instrumentation.runOnMainSync(() -> host.launchEngine(launch));

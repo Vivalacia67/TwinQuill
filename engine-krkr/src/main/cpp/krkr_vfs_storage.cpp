@@ -14,10 +14,10 @@
 
 #include "tjs.h"
 #include "tjsError.h"
+#include "krkr_tjs_entry.h"
+#include "krkr_tjs_text.h"
 
 namespace {
-
-constexpr std::uint64_t kProbeSourceLimit = 16U * 1024U * 1024U;
 
 class TqVfsException final : public std::runtime_error {
 public:
@@ -340,8 +340,6 @@ void TqSafMedia::GetListAt(const ttstr& name, iTVPStorageLister* lister) {
 
 void TqSafMedia::GetLocallyAccessibleName(ttstr& name) { name = ttstr(""); }
 
-extern int run_tjs_source(const std::string& source);
-
 int run_tqsaf_startup(const char* tree_uri_utf8) {
     if (tree_uri_utf8 == nullptr || tree_uri_utf8[0] == '\0') return 10;
     try {
@@ -357,7 +355,9 @@ int run_tqsaf_startup(const char* tree_uri_utf8) {
         }
         std::unique_ptr<tTJSBinaryStream> stream(media.Open(ttstr("./startup.tjs"), TJS_BS_READ));
         const tjs_uint64 size = stream->GetSize();
-        if (size == 0 || size > kProbeSourceLimit || size > std::numeric_limits<std::size_t>::max()) return 11;
+        if (size == 0) return 11;
+        if (size > twinquill::krkr::kStartupSourceLimit
+            || size > std::numeric_limits<std::size_t>::max()) return 20;
         if (stream->Seek(0, TJS_BS_SEEK_SET) != 0) return 41;
         std::string source(static_cast<std::size_t>(size), '\0');
         std::size_t offset = 0;
@@ -368,13 +368,7 @@ int run_tqsaf_startup(const char* tree_uri_utf8) {
             if (chunk == 0) return 41;
             offset += chunk;
         }
-        int script_result = 0;
-        try {
-            script_result = run_tjs_source(source);
-        } catch (const std::invalid_argument&) {
-            return 20;
-        }
-        return script_result == 0 ? 0 : 20;
+        return twinquill::krkr::run_tjs_source(source);
     } catch (const std::invalid_argument&) {
         return 10;
     } catch (const TJS::eTJS&) {

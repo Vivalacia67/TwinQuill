@@ -11,9 +11,11 @@ license = "LicenseRef-Kirikiri-composite"
 license_files = ["LICENSE"]
 patches = [
     "vendor/patches/kirikiroid2/0001-fix-tjs-vector-pop-back.patch",
+    "vendor/patches/kirikiroid2/0002-fix-tjs-free-null.patch",
 ]
 patch_sha256 = [
     "49dd651830e8a3ee2d8c3e776c1335435e9228b115d2f333338c84e70e71b4ae",
+    "8d20d7c6f913e61c9060d93ee81912a60b80a2b7e5e9dcde7c2404a644a989c8",
 ]
 
 [[sources]]

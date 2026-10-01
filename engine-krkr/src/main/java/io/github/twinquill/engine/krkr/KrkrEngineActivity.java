@@ -24,7 +24,7 @@ import java.util.Comparator;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** M0 Krkr source-build entry point hosted in the app-private {@code :krkr} process. */
+/** Krkr TJS startup broker hosted in the app-private {@code :krkr} process. */
 public final class KrkrEngineActivity extends Activity {
     public static final String EXTRA_GAME_ROOT =
         "io.github.twinquill.extra.KRKR_GAME_ROOT";
@@ -375,7 +375,7 @@ public final class KrkrEngineActivity extends Activity {
                 Log.i(LOG_TAG, runTarget.kindLabel()
                     + " startup completed with result " + nativeResult);
                 complete(nativeResult);
-            }, "TwinQuill-Krkr-M0");
+            }, "TwinQuill-Krkr-Startup");
             runner.start();
         }
 

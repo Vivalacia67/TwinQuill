@@ -40,48 +40,51 @@ include(krkr_dependencies.cmake)
 # into this module.
 find_package(native-vfs CONFIG REQUIRED)
 
-# Apply the recorded libc++ compatibility patch to a generated copy.
+# Apply the recorded TJS2 patches to a generated copy.
 # The source snapshot itself remains identical to the pinned upstream tree.
 set(KIRIKIROID2_BUILD_DIR "${CMAKE_BINARY_DIR}/generated/kirikiroid2")
 set(TJS2_BUILD_DIR "${KIRIKIROID2_BUILD_DIR}/src/core/tjs2")
-set(TJS2_PATCH
-    "${TWINQUILL_ROOT}/vendor/patches/kirikiroid2/0001-fix-tjs-vector-pop-back.patch")
+set(TJS2_PATCHES
+    "${TWINQUILL_ROOT}/vendor/patches/kirikiroid2/0001-fix-tjs-vector-pop-back.patch"
+    "${TWINQUILL_ROOT}/vendor/patches/kirikiroid2/0002-fix-tjs-free-null.patch"
+)
 file(REMOVE_RECURSE "${KIRIKIROID2_BUILD_DIR}")
 file(MAKE_DIRECTORY "${TJS2_BUILD_DIR}")
 file(COPY "${TJS2_DIR}/" DESTINATION "${TJS2_BUILD_DIR}")
 file(RELATIVE_PATH KIRIKIROID2_BUILD_RELATIVE_DIR
     "${TWINQUILL_ROOT}" "${KIRIKIROID2_BUILD_DIR}")
-if(NOT EXISTS "${TJS2_PATCH}")
-    message(FATAL_ERROR "Missing Kirikiroid2 TJS2 patch: ${TJS2_PATCH}")
-endif()
-set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-    "${TJS2_PATCH}")
-execute_process(
-    COMMAND "${GIT_EXECUTABLE}" -c core.fsmonitor=false apply --check
-        --directory=${KIRIKIROID2_BUILD_RELATIVE_DIR}
-        "${TJS2_PATCH}"
-    WORKING_DIRECTORY "${TWINQUILL_ROOT}"
-    RESULT_VARIABLE TJS2_PATCH_CHECK
-    OUTPUT_VARIABLE TJS2_PATCH_CHECK_STDOUT
-    ERROR_VARIABLE TJS2_PATCH_CHECK_STDERR
-)
-if(NOT TJS2_PATCH_CHECK EQUAL 0)
-    message(FATAL_ERROR
-        "Kirikiroid2 TJS2 patch check failed: ${TJS2_PATCH_CHECK_STDERR}")
-endif()
-execute_process(
-    COMMAND "${GIT_EXECUTABLE}" -c core.fsmonitor=false apply
-        --directory=${KIRIKIROID2_BUILD_RELATIVE_DIR}
-        "${TJS2_PATCH}"
-    WORKING_DIRECTORY "${TWINQUILL_ROOT}"
-    RESULT_VARIABLE TJS2_PATCH_APPLY
-    OUTPUT_VARIABLE TJS2_PATCH_APPLY_STDOUT
-    ERROR_VARIABLE TJS2_PATCH_APPLY_STDERR
-)
-if(NOT TJS2_PATCH_APPLY EQUAL 0)
-    message(FATAL_ERROR
-        "Kirikiroid2 TJS2 patch application failed: ${TJS2_PATCH_APPLY_STDERR}")
-endif()
+foreach(TJS2_PATCH IN LISTS TJS2_PATCHES)
+    if(NOT EXISTS "${TJS2_PATCH}")
+        message(FATAL_ERROR "Missing Kirikiroid2 TJS2 patch: ${TJS2_PATCH}")
+    endif()
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${TJS2_PATCH}")
+    execute_process(
+        COMMAND "${GIT_EXECUTABLE}" -c core.fsmonitor=false apply --check
+            --directory=${KIRIKIROID2_BUILD_RELATIVE_DIR}
+            "${TJS2_PATCH}"
+        WORKING_DIRECTORY "${TWINQUILL_ROOT}"
+        RESULT_VARIABLE TJS2_PATCH_CHECK
+        OUTPUT_VARIABLE TJS2_PATCH_CHECK_STDOUT
+        ERROR_VARIABLE TJS2_PATCH_CHECK_STDERR
+    )
+    if(NOT TJS2_PATCH_CHECK EQUAL 0)
+        message(FATAL_ERROR
+            "Kirikiroid2 TJS2 patch check failed: ${TJS2_PATCH_CHECK_STDERR}")
+    endif()
+    execute_process(
+        COMMAND "${GIT_EXECUTABLE}" -c core.fsmonitor=false apply
+            --directory=${KIRIKIROID2_BUILD_RELATIVE_DIR}
+            "${TJS2_PATCH}"
+        WORKING_DIRECTORY "${TWINQUILL_ROOT}"
+        RESULT_VARIABLE TJS2_PATCH_APPLY
+        OUTPUT_VARIABLE TJS2_PATCH_APPLY_STDOUT
+        ERROR_VARIABLE TJS2_PATCH_APPLY_STDERR
+    )
+    if(NOT TJS2_PATCH_APPLY EQUAL 0)
+        message(FATAL_ERROR
+            "Kirikiroid2 TJS2 patch application failed: ${TJS2_PATCH_APPLY_STDERR}")
+    endif()
+endforeach()
 
 set(TJS2_SOURCES
     "${TJS2_BUILD_DIR}/tjs.cpp"
@@ -145,7 +148,8 @@ target_link_libraries(twinquill_krkr_tjs2 PUBLIC onig)
 
 add_library(twinquill_engine_krkr SHARED
     krkr_jni.cpp
-    krkr_tjs_probe.cpp
+    krkr_tjs_entry.cpp
+    krkr_tjs_text.cpp
     krkr_xp3.cpp
     krkr_vfs_storage.cpp
 )
@@ -160,6 +164,16 @@ target_link_libraries(twinquill_engine_krkr PRIVATE
 target_link_options(twinquill_engine_krkr PRIVATE -Wl,-z,max-page-size=16384)
 
 include(krkr_cocos_core.cmake)
+
+# Exercise the production text decoder independently of the TJS/Android host.
+# This executable is a build output only and is never packaged in the APK.
+add_executable(twinquill_krkr_tjs_text_test EXCLUDE_FROM_ALL
+    "${TWINQUILL_ROOT}/tests/native/krkr_tjs_text_test.cpp"
+    krkr_tjs_text.cpp
+)
+target_include_directories(twinquill_krkr_tjs_text_test PRIVATE "${CMAKE_CURRENT_LIST_DIR}")
+target_compile_features(twinquill_krkr_tjs_text_test PRIVATE cxx_std_17)
+target_link_options(twinquill_krkr_tjs_text_test PRIVATE -Wl,-z,max-page-size=16384)
 
 # Every engine link runs the dynamic boundary checker against the exact
 # generated Ninja closure and final shared object.  The executable path and
@@ -180,3 +194,6 @@ add_dependencies(twinquill_engine_krkr
     twinquill_krkr_freetype
     twinquill_krkr_libjpeg
 )
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_dependencies(twinquill_engine_krkr twinquill_krkr_tjs_text_test)
+endif()

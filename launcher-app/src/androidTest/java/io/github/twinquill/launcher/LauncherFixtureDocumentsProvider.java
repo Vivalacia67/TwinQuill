@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.zip.Adler32;
 
 /** SAF fixture that lives only in the launcher instrumentation APK. */
 public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
@@ -37,6 +38,22 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
     static final String KRKR_MISSING_ROOT_ID = "krkr-missing";
     static final String KRKR_REVOKED_ROOT_ID = "krkr-revoked";
     static final String KRKR_AMBIGUOUS_ROOT_ID = "krkr-ambiguous";
+    static final String KRKR_UTF8_ROOT_ID = "krkr-utf8";
+    static final String KRKR_UTF8_BOM_ROOT_ID = "krkr-utf8-bom";
+    static final String KRKR_UTF16_LE_ROOT_ID = "krkr-utf16-le";
+    static final String KRKR_UTF16_BE_ROOT_ID = "krkr-utf16-be";
+    static final String KRKR_SCRIPT_ERROR_ROOT_ID = "krkr-script-error";
+    static final String KRKR_SYNTAX_ERROR_ROOT_ID = "krkr-syntax-error";
+    static final String KRKR_ENCODING_ERROR_ROOT_ID = "krkr-encoding-error";
+
+    // These scripts deliberately omit the M0 sentinel; their assertions prove
+    // actual execution of functions and decoded Unicode literals.
+    static final String KRKR_UNICODE_SCRIPT =
+        "var greeting = \"中文\";\n"
+            + "function add(a, b) { return a + b; }\n"
+            + "if (greeting != \"\\x4e2d\\x6587\" || add(2, 5) != 7) "
+            + "throw new Exception(\"Unicode execution failed\");\n"
+            + "global.twinQuillM1Value = add(2, 5);\n";
 
     private static final byte[] UTF8_SCRIPT = script(
         "UTF-8 中文測試",
@@ -371,7 +388,14 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             || KRKR_ROOT_ID.equals(documentId)
             || KRKR_MISSING_ROOT_ID.equals(documentId)
             || KRKR_REVOKED_ROOT_ID.equals(documentId)
-            || KRKR_AMBIGUOUS_ROOT_ID.equals(documentId);
+            || KRKR_AMBIGUOUS_ROOT_ID.equals(documentId)
+            || KRKR_UTF8_ROOT_ID.equals(documentId)
+            || KRKR_UTF8_BOM_ROOT_ID.equals(documentId)
+            || KRKR_UTF16_LE_ROOT_ID.equals(documentId)
+            || KRKR_UTF16_BE_ROOT_ID.equals(documentId)
+            || KRKR_SCRIPT_ERROR_ROOT_ID.equals(documentId)
+            || KRKR_SYNTAX_ERROR_ROOT_ID.equals(documentId)
+            || KRKR_ENCODING_ERROR_ROOT_ID.equals(documentId);
     }
 
     private static String scriptId(String rootId) {
@@ -429,7 +453,14 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             KRKR_ROOT_ID,
             KRKR_MISSING_ROOT_ID,
             KRKR_REVOKED_ROOT_ID,
-            KRKR_AMBIGUOUS_ROOT_ID
+            KRKR_AMBIGUOUS_ROOT_ID,
+            KRKR_UTF8_ROOT_ID,
+            KRKR_UTF8_BOM_ROOT_ID,
+            KRKR_UTF16_LE_ROOT_ID,
+            KRKR_UTF16_BE_ROOT_ID,
+            KRKR_SCRIPT_ERROR_ROOT_ID,
+            KRKR_SYNTAX_ERROR_ROOT_ID,
+            KRKR_ENCODING_ERROR_ROOT_ID
         }) {
             if (scriptId(rootId).equals(documentId)) {
                 return rootId;
@@ -492,7 +523,14 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         String scriptRoot = rootForScript(documentId);
         if (KRKR_ROOT_ID.equals(scriptRoot)
             || KRKR_REVOKED_ROOT_ID.equals(scriptRoot)
-            || KRKR_AMBIGUOUS_ROOT_ID.equals(scriptRoot)) {
+            || KRKR_AMBIGUOUS_ROOT_ID.equals(scriptRoot)
+            || KRKR_UTF8_ROOT_ID.equals(scriptRoot)
+            || KRKR_UTF8_BOM_ROOT_ID.equals(scriptRoot)
+            || KRKR_UTF16_LE_ROOT_ID.equals(scriptRoot)
+            || KRKR_UTF16_BE_ROOT_ID.equals(scriptRoot)
+            || KRKR_SCRIPT_ERROR_ROOT_ID.equals(scriptRoot)
+            || KRKR_SYNTAX_ERROR_ROOT_ID.equals(scriptRoot)
+            || KRKR_ENCODING_ERROR_ROOT_ID.equals(scriptRoot)) {
             return "startup.tjs";
         }
         if (scriptRoot != null) {
@@ -563,6 +601,20 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             case KRKR_REVOKED_ROOT_ID:
             case KRKR_AMBIGUOUS_ROOT_ID:
                 return KRKR_SCRIPT;
+            case KRKR_UTF8_ROOT_ID:
+                return KRKR_UNICODE_SCRIPT.getBytes(StandardCharsets.UTF_8);
+            case KRKR_UTF8_BOM_ROOT_ID:
+                return ("\ufeff" + KRKR_UNICODE_SCRIPT).getBytes(StandardCharsets.UTF_8);
+            case KRKR_UTF16_LE_ROOT_ID:
+                return ("\ufeff" + KRKR_UNICODE_SCRIPT).getBytes(StandardCharsets.UTF_16LE);
+            case KRKR_UTF16_BE_ROOT_ID:
+                return ("\ufeff" + KRKR_UNICODE_SCRIPT).getBytes(StandardCharsets.UTF_16BE);
+            case KRKR_SCRIPT_ERROR_ROOT_ID:
+                return "throw new Exception(\"脚本错误\");".getBytes(StandardCharsets.UTF_8);
+            case KRKR_SYNTAX_ERROR_ROOT_ID:
+                return "var value = ;".getBytes(StandardCharsets.US_ASCII);
+            case KRKR_ENCODING_ERROR_ROOT_ID:
+                return new byte[] {(byte) 0xe4, (byte) 0xb8};
             case ROOT_ID:
             case ONS_UTF8_ROOT_ID:
                 return UTF8_SCRIPT;
@@ -712,6 +764,57 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             output.write((int) Math.round(128.0 + 48.0 * Math.sin(phase)));
         }
         return output.toByteArray();
+    }
+
+    static byte[] rawKrkrXp3(byte[] script) {
+        byte[] name = "startup.tjs".getBytes(StandardCharsets.UTF_16LE);
+        ByteArrayOutputStream info = new ByteArrayOutputStream();
+        writeLittleEndianInt(info, 0);
+        writeLittleEndianLong(info, script.length);
+        writeLittleEndianLong(info, script.length);
+        writeLittleEndianShort(info, name.length / 2);
+        info.write(name, 0, name.length);
+
+        ByteArrayOutputStream segment = new ByteArrayOutputStream();
+        writeLittleEndianInt(segment, 0);
+        writeLittleEndianLong(segment, 19);
+        writeLittleEndianLong(segment, script.length);
+        writeLittleEndianLong(segment, script.length);
+
+        Adler32 checksum = new Adler32();
+        checksum.update(script);
+        ByteArrayOutputStream adler = new ByteArrayOutputStream();
+        writeLittleEndianInt(adler, (int) checksum.getValue());
+        ByteArrayOutputStream file = new ByteArrayOutputStream();
+        writeXp3Chunk(file, "info", info.toByteArray());
+        writeXp3Chunk(file, "segm", segment.toByteArray());
+        writeXp3Chunk(file, "adlr", adler.toByteArray());
+        ByteArrayOutputStream index = new ByteArrayOutputStream();
+        writeXp3Chunk(index, "File", file.toByteArray());
+
+        ByteArrayOutputStream archive = new ByteArrayOutputStream();
+        byte[] magic = {0x58, 0x50, 0x33, 0x0d, 0x0a, 0x20, 0x0a, 0x1a,
+            (byte) 0x8b, 0x67, 0x01};
+        archive.write(magic, 0, magic.length);
+        writeLittleEndianLong(archive, 19L + script.length);
+        archive.write(script, 0, script.length);
+        archive.write(0); // Raw, final index block.
+        writeLittleEndianLong(archive, index.size());
+        byte[] indexBytes = index.toByteArray();
+        archive.write(indexBytes, 0, indexBytes.length);
+        return archive.toByteArray();
+    }
+
+    private static void writeXp3Chunk(ByteArrayOutputStream output, String tag, byte[] data) {
+        writeAscii(output, tag);
+        writeLittleEndianLong(output, data.length);
+        output.write(data, 0, data.length);
+    }
+
+    private static void writeLittleEndianLong(ByteArrayOutputStream output, long value) {
+        for (int index = 0; index < 8; ++index) {
+            output.write((int) ((value >>> (index * 8)) & 0xff));
+        }
     }
 
     private static void writeAscii(ByteArrayOutputStream output, String value) {

@@ -6,18 +6,19 @@ TwinQuill is a GPL Android launcher and source-built runtime for standard ONS
 and Kirikiri/Kirikiri Z games. It does not promise support for proprietary
 plugins, unknown DRM, or runtime-loaded native libraries.
 
-M0 establishes a reproducible source and toolchain baseline. Its runtime code
-is intentionally narrow: the ONS probe runs a minimal script, while the Krkr
-probe executes self-authored ASCII TJS from a loose file, a raw, unprotected
-XP3 archive, or a read-only SAF tree via `tqsaf`/`native-vfs`. These probes
-prove the difficult native integration path; they are not the M2 or M3
-compatibility implementation.
+M0 established the source/toolchain baseline and was accepted on 2026-10-02.
+M1 task 3 begins by replacing the fixed-value Krkr script probe with a common
+TJS2 startup entry. It executes ordinary scripts from a loose file, a raw,
+unprotected XP3 archive, or a read-only SAF tree via `tqsaf`/`native-vfs`.
+The first increment accepts UTF-8 and BOM-marked UTF-16LE/BE, rejects malformed
+text and embedded NULs, and bounds startup source bytes to 8 MiB. The existing
+GLES test surface remains the runtime host; KAG/game rendering is later work.
 
 ## Module graph
 
-- `launcher-app` packages the application and will own the Compose/Room game
-  library in M1.
-- `engine-api` will define detection, launch requests, and structured results.
+- `launcher-app` packages the application and owns the Compose/Room game
+  library, directory grants, and engine routing.
+- `engine-api` defines detection, launch requests, and structured results.
 - `native-vfs` currently provides a read-only Krkr SAF probe via
   `tqsaf`/`native-vfs`; generic media registration and writable/save
   capabilities remain future work.
@@ -38,11 +39,15 @@ rendering and audio stacks, crash domains, and memory reclamation. Both
 activities are non-exported in release builds. A debug-only manifest override
 allows explicit ADB launches for legal M0 smoke fixtures.
 
-The current Krkr probe accepts explicit loose-file, raw XP3, and read-only SAF
-launch targets. `EngineLaunchRequest` currently routes content into those
-probe targets; it is not the future M1 shared request. Game content remains
-read-only. Writable Krkr save-media, save redirection, and broader KAG/Cocos
-rendering, media, and playable support remain future work.
+The Krkr broker validates `EngineLaunchRequest`, executes `startup.tjs` on a
+worker, and opens the private runtime host only on successful script completion.
+TJS2 instances are serialized because the imported core owns process-global
+caches. Each startup gets a fresh engine that is shut down after execution;
+script globals do not yet drive the rendering host. Script or encoding errors
+return `SCRIPT_ERROR` through the existing launch contract. Game content remains
+read-only. Writable Krkr save-media, save redirection, persistent script/host
+integration, broader KAG/Cocos rendering, media, and playable support remain
+future work. See `KRKR_M1_TJS_ENTRY.md` for the current increment and checks.
 
 ## Source and binary policy
 

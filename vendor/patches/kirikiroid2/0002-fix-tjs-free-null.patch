@@ -1,0 +1,18 @@
+From: TwinQuill contributors
+Subject: [PATCH] Preserve free(NULL) semantics in the TJS allocator
+
+A syntax error can destroy an engine before its variant-array stack has
+allocated storage. The stack destructor calls TJS_free(NULL), which previously
+subtracted the allocation header from NULL and passed an invalid pointer to
+free. Return before performing pointer arithmetic for a null allocation.
+
+Tested-by: tests/test_krkr_tjs2_source_admission.py focused git-apply unittest; forced Android CMake configure; mapsKrkrScriptAndEncodingErrorsAndRecovers Android instrumentation.
+
+--- a/src/core/tjs2/tjsConfig.cpp
++++ b/src/core/tjs2/tjsConfig.cpp
+@@ -723,4 +723,5 @@
+ void TJS_free(void *buf)
+ {
++	if (!buf) return;
+ 	free((char*)buf - sizeof(size_t));
+ }
