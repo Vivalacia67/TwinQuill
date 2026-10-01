@@ -34,6 +34,7 @@ import io.github.twinquill.engine.api.EngineType;
 import io.github.twinquill.engine.krkr.KrkrEngineActivity;
 import io.github.twinquill.engine.krkr.KrkrRuntimeActivity;
 import io.github.twinquill.engine.ons.OnsEngineActivity;
+import io.github.twinquill.engine.ons.OnsRuntimeActivity;
 
 import org.junit.After;
 import org.junit.Before;
@@ -41,11 +42,17 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.concurrent.TimeUnit;
 
 @RunWith(AndroidJUnit4.class)
 public final class EngineProcessProtocolInstrumentedTest {
+    // Functional smoke tests include cold starts, ARM translation and surface setup.
+    private static final long ENGINE_RESULT_TIMEOUT_SECONDS = 60;
+    private static final long CLEANUP_TIMEOUT_SECONDS = 15;
+
     private Instrumentation instrumentation;
     private Context context;
     private EngineProtocolTestHostActivity host;
@@ -59,15 +66,92 @@ public final class EngineProcessProtocolInstrumentedTest {
 
     private EngineProtocolTestHostActivity createHost() {
         Intent intent = new Intent(context, EngineProtocolTestHostActivity.class)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
         return (EngineProtocolTestHostActivity) instrumentation.startActivitySync(intent);
     }
 
     @After
-    public void finishHost() {
+    public void finishHost() throws InterruptedException {
         if (host != null) {
-            instrumentation.runOnMainSync(host::finish);
+            EngineProtocolTestHostActivity finishingHost = host;
+            instrumentation.runOnMainSync(finishingHost::finishAndRemoveTask);
+            assertTrue(
+                "Test host task did not finish during cleanup",
+                finishingHost.awaitDestroyed(CLEANUP_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            );
+            assertTrue(
+                "ONS runtime survived removal of its test task",
+                waitForProcessToDisappear(
+                    context.getPackageName() + ":ons_runtime",
+                    TimeUnit.SECONDS.toMillis(CLEANUP_TIMEOUT_SECONDS)
+                )
+            );
+            host = null;
         }
+    }
+
+    @Test
+    public void removesRunningEngineBeforeStartingNextHost() throws Exception {
+        File gameRoot = new File(
+            context.getCacheDir(),
+            "ons-cleanup-" + android.os.SystemClock.elapsedRealtime()
+        );
+        assertTrue(gameRoot.mkdirs());
+        File script = new File(gameRoot, "0.txt");
+        Files.write(
+            script.toPath(),
+            "*define\ngame\n*start\ndelay 60000\nend\n".getBytes(StandardCharsets.UTF_8)
+        );
+        try {
+            int taskId = host.getTaskId();
+            Intent launch = requestIntent(
+                OnsEngineActivity.class,
+                EngineType.ONS,
+                gameRoot.getName(),
+                Uri.fromFile(gameRoot),
+                Bundle.EMPTY
+            );
+            instrumentation.runOnMainSync(() -> host.launchEngine(launch));
+            assertTrue(
+                "ONS runtime did not start for the cleanup regression",
+                waitForTaskTopActivity(
+                    taskId,
+                    new ComponentName(context, OnsRuntimeActivity.class),
+                    context.getPackageName() + ":ons_runtime",
+                    TimeUnit.SECONDS.toMillis(ENGINE_RESULT_TIMEOUT_SECONDS)
+                )
+            );
+            assertFalse(host.awaitEngineResult(100, TimeUnit.MILLISECONDS));
+
+            finishHost();
+            assertFalse(
+                "Removed test task still contains the ONS runtime",
+                isTaskTopActivity(taskId, new ComponentName(context, OnsRuntimeActivity.class))
+            );
+            host = createHost();
+            assertNormalOnsExit(
+                requestIntent(
+                    OnsEngineActivity.class,
+                    EngineType.ONS,
+                    gameRoot.getName() + "-next",
+                    grantFixture(LauncherFixtureDocumentsProvider.ONS_UTF8_ROOT_ID),
+                    Bundle.EMPTY
+                )
+            );
+        } finally {
+            finishHost();
+            deleteFixture(gameRoot);
+        }
+    }
+
+    private void deleteFixture(File fixture) throws IOException {
+        File[] children = fixture.listFiles();
+        if (children != null) {
+            for (File child : children) {
+                deleteFixture(child);
+            }
+        }
+        Files.deleteIfExists(fixture.toPath());
     }
 
     @Test
@@ -388,13 +472,13 @@ public final class EngineProcessProtocolInstrumentedTest {
                     taskId,
                     runtimeComponent,
                     krkrProcessName,
-                    15_000
+                    TimeUnit.SECONDS.toMillis(ENGINE_RESULT_TIMEOUT_SECONDS)
                 )
             );
             int krkrPid = requireProcessPid(krkrProcessName);
             assertNotEquals(mainPid, krkrPid);
             assertTrue("Unable to inject Back into Krkr runtime", injectBackKey());
-            assertTrue(host.awaitEngineResult(15, TimeUnit.SECONDS));
+            assertTrue(host.awaitEngineResult(ENGINE_RESULT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
         } finally {
             dismissRuntimeIfVisible(taskId, runtimeComponent, krkrProcessName);
         }
@@ -602,21 +686,25 @@ public final class EngineProcessProtocolInstrumentedTest {
         int mainPid = android.os.Process.myPid();
         Intent crash = new Intent(context, EngineCrashTestActivity.class);
         instrumentation.runOnMainSync(() -> host.launchEngine(crash));
+        assertTrue(host.awaitEngineResult(ENGINE_RESULT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        assertEquals(Activity.RESULT_CANCELED, host.engineResultCode());
         assertTrue(
             waitForProcessToDisappear(context.getPackageName() + ":krkr", 10_000)
         );
         assertEquals(mainPid, android.os.Process.myPid());
 
-        Intent ons =
-            requestIntent(OnsEngineActivity.class, EngineType.ONS, "post-crash-ons")
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        context.startActivity(ons);
-        int onsPid = waitForProcessToAppear(
-            context.getPackageName() + ":ons",
-            10_000
+        // Complete a valid launch before the next test creates its host Activity.
+        assertNormalOnsExit(
+            requestIntent(
+                OnsEngineActivity.class,
+                EngineType.ONS,
+                "post-crash-ons-" + android.os.SystemClock.elapsedRealtime(),
+                grantFixture(LauncherFixtureDocumentsProvider.ONS_UTF8_ROOT_ID),
+                Bundle.EMPTY
+            )
         );
-        assertNotEquals(0, onsPid);
-        assertNotEquals(mainPid, onsPid);
+        assertNotEquals(mainPid, requireProcessPid(context.getPackageName() + ":ons"));
+        assertEquals(mainPid, android.os.Process.myPid());
     }
 
     private boolean waitForProcessToDisappear(String processName, long timeoutMillis)
@@ -629,19 +717,6 @@ public final class EngineProcessProtocolInstrumentedTest {
             Thread.sleep(50);
         }
         return findProcessPid(processName) == 0;
-    }
-
-    private int waitForProcessToAppear(String processName, long timeoutMillis)
-        throws InterruptedException {
-        long deadline = android.os.SystemClock.elapsedRealtime() + timeoutMillis;
-        while (android.os.SystemClock.elapsedRealtime() < deadline) {
-            int pid = findProcessPid(processName);
-            if (pid != 0) {
-                return pid;
-            }
-            Thread.sleep(50);
-        }
-        return findProcessPid(processName);
     }
 
     private Intent requestIntent(
@@ -680,7 +755,11 @@ public final class EngineProcessProtocolInstrumentedTest {
 
     private Intent launchAndAwait(Intent intent) throws Exception {
         instrumentation.runOnMainSync(() -> host.launchEngine(intent));
-        assertTrue(host.awaitEngineResult(15, TimeUnit.SECONDS));
+        assertTrue(
+            "Engine result timed out after " + ENGINE_RESULT_TIMEOUT_SECONDS
+                + " seconds: " + intent.getComponent(),
+            host.awaitEngineResult(ENGINE_RESULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        );
         Intent data = host.engineResultData();
         assertNotNull(data);
         return data;

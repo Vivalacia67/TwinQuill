@@ -13,6 +13,7 @@ AGENTS.md
 
 # Local Android and Gradle configuration
 /local.properties
+/.venv/
 /.gradle/
 /.kotlin/
 /.idea/
@@ -50,6 +51,8 @@ keystore.properties
 
 # Logs, editor state, and operating-system metadata
 *.log
+# Audited upstream source metadata, not a generated runtime log.
+!/vendor/deps/krkr/libjpeg-turbo-3.1.4.1/doc/change.log
 *.swp
 
 # Local script caches

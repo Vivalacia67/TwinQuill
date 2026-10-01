@@ -9,6 +9,7 @@
         <activity
             android:name=".KrkrRuntimeActivity"
             android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
+            android:enableOnBackInvokedCallback="true"
             android:exported="false"
             android:hardwareAccelerated="true"
             android:process=":krkr"

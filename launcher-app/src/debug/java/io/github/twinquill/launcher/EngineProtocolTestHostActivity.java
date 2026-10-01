@@ -16,6 +16,7 @@ public final class EngineProtocolTestHostActivity extends Activity {
     private static final int REQUEST_ENGINE = 1;
 
     private volatile CountDownLatch resultLatch = new CountDownLatch(1);
+    private final CountDownLatch destroyedLatch = new CountDownLatch(1);
     private volatile int engineResultCode = RESULT_CANCELED;
     private volatile Intent engineResultData;
 
@@ -33,6 +34,17 @@ public final class EngineProtocolTestHostActivity extends Activity {
     public boolean awaitEngineResult(long timeout, TimeUnit unit)
         throws InterruptedException {
         return resultLatch.await(timeout, unit);
+    }
+
+    public boolean awaitDestroyed(long timeout, TimeUnit unit)
+        throws InterruptedException {
+        return destroyedLatch.await(timeout, unit);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        destroyedLatch.countDown();
     }
 
     public int engineResultCode() {

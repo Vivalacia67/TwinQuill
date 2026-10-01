@@ -6,8 +6,11 @@ package io.github.twinquill.engine.krkr;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
+import android.window.OnBackInvokedCallback;
+import android.window.OnBackInvokedDispatcher;
 
 import io.github.twinquill.engine.api.EngineContract;
 import io.github.twinquill.engine.api.EngineResult;
@@ -25,6 +28,7 @@ public final class KrkrRuntimeActivity extends Activity
     private final AtomicBoolean finished = new AtomicBoolean();
     private KrkrGLSurfaceView surfaceView;
     private KrkrRuntimeRenderer renderer;
+    private OnBackInvokedCallback backCallback;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,6 +47,13 @@ public final class KrkrRuntimeActivity extends Activity
             );
             surfaceView = new KrkrGLSurfaceView(this, renderer);
             setContentView(surfaceView);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                backCallback = () -> finishRuntime(0);
+                getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+                    backCallback
+                );
+            }
         } catch (IllegalArgumentException | java.io.IOException exception) {
             Log.e(LOG_TAG, "Invalid Krkr runtime request", exception);
             finishRuntime(10);
@@ -95,6 +106,11 @@ public final class KrkrRuntimeActivity extends Activity
 
     @Override
     protected void onDestroy() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+            && backCallback != null) {
+            getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backCallback);
+            backCallback = null;
+        }
         if (renderer != null) {
             renderer.destroyAndWait();
         }

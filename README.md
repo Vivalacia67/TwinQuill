@@ -33,6 +33,10 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 - NDK 28.2.13676358 and CMake 3.22.1
 - `arm64-v8a` and `armeabi-v7a`
 
+Set `JAVA_HOME` to your JDK 17 installation. The daemon criteria in
+`gradle/gradle-daemon-jvm.properties` also require a local JDK 17, keeping
+Android Studio and command-line builds on the same Java version.
+
 Create an ignored `local.properties` that points at the Android SDK, then run:
 
 ```shell
@@ -52,6 +56,24 @@ python scripts/verify_source_snapshots.py
 python -m unittest discover -s tests -v
 python scripts/check_apk_native_libraries.py <debug.apk> <release.apk>
 ```
+
+## Windows emulator testing
+
+Run `gradlew.bat --no-daemon :launcher-app:connectedDebugAndroidTest` for the
+device smoke tests. Repeat with `-PtwinquillKrkrRuntimeInstrumentation=true`
+for the Krkr process tests. Functional launches allow 60 seconds for cold
+starts and ARM translation; each test removes its task and waits for the
+ONS runtime process to exit.
+
+If an AVD stalls in `HardwareRenderer` or reports graphics memory errors,
+use a cold boot with SwiftShader and Vulkan disabled (for example, `Medium_Phone`):
+
+```powershell
+& "$env:LOCALAPPDATA\Android\Sdk\emulator\emulator.exe" -avd Medium_Phone -gpu swiftshader -feature -Vulkan -no-snapshot-load
+```
+
+This keeps the GLES paths used by both engines enabled. See the Android
+[emulator troubleshooting guide](https://developer.android.com/studio/run/emulator-troubleshooting).
 
 ## License
 
