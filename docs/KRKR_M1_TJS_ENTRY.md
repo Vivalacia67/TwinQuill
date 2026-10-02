@@ -1,6 +1,6 @@
 # TwinQuill KRKR — M1 Task 3: TJS Entry
 
-Status as of 2026-10-02: M0 accepted and committed as `6bd353b`; M1 task 3 (formal TJS entry) is implemented and passes the engineering checks below on `refactor/krkr-direct-integration`. It includes persistent state, basic TVP bindings, and script-driven host callbacks. Device sign-off by the user remains pending; M0 sign-off does not imply M1 sign-off.
+Status as of 2026-10-02: M0 accepted and committed as `6bd353b`; M1 task 3 (formal TJS entry) is complete and accepted by the user on the configured simulator after the background-return correction below. It includes persistent state, basic TVP bindings, and script-driven host callbacks, and passes the engineering checks on `refactor/krkr-direct-integration`. This completes the M1 scope recorded in this handoff; the later-work limits remain explicit below.
 
 ## Startup baseline (`001ddc6`)
 
@@ -34,7 +34,7 @@ Storage names such as `辅助.tjs` or `scripts/helper.tjs` are relative to the g
 
 The production text decoder has an Android-native executable target, `twinquill_krkr_tjs_text_test`, covering Unicode round trips, supplementary characters, malformed UTF-8/UTF-16, NUL rejection, and the source-size boundary. Debug builds compile it for both supported ABIs; it is not packaged in the APK.
 
-Launcher instrumentation covers ASCII/Unicode encodings, SAF secondary-script execution/evaluation and reads from callbacks, loose/raw XP3 startup, startup and callback exit, error mapping, and recovery. Isolated-process tests check persistent globals/colors after real Activity recreation, pause/resume/low-memory callbacks, invalid recreated-request cleanup, traversal/symlink/recursion rejection, NUL in raw source and JNI names, stale handles, single-engine admission, and release behind a full callback queue. Fixtures are authored in test source and need no game assets.
+Launcher instrumentation covers ASCII/Unicode encodings, SAF secondary-script execution/evaluation and reads from callbacks, loose/raw XP3 startup, startup and callback exit, error mapping, and recovery. Isolated-process tests check persistent globals/colors after real Activity recreation and real Home/task return, pause/resume/low-memory callbacks, invalid recreated-request cleanup, traversal/symlink/recursion rejection, NUL in raw source and JNI names, stale handles, single-engine admission, and release behind a full callback queue. Fixtures are authored in test source and need no game assets.
 
 Run from the repository root:
 
@@ -49,7 +49,7 @@ python scripts/check_apk_native_libraries.py launcher-app/build/outputs/apk/debu
 .\gradlew.bat --no-daemon :launcher-app:connectedDebugAndroidTest -PtwinquillKrkrRuntimeInstrumentation=true
 ```
 
-Current local verification logs belong under ignored `.agent-work/m1-tjs-session/`; startup-baseline evidence remains under `.agent-work/m1-tjs-entry/`. Device results must identify API, ABI, and emulator/device configuration. The Cocos patch test sets a Git discovery ceiling so it also works when Python falls back to a temporary directory inside the checkout.
+Corrected-build verification logs belong under ignored `.agent-work/m1-background-error/`; persistent-session baseline evidence is under `.agent-work/m1-tjs-session/`, and startup-baseline evidence is under `.agent-work/m1-tjs-entry/`. Device results must identify API, ABI, and emulator/device configuration. The Cocos patch test sets a Git discovery ceiling so it also works when Python falls back to a temporary directory inside the checkout.
 
 For the standalone text test on this x86_64 emulator, compile the same production decoder with the pinned NDK and a static C++ runtime. This avoids the emulator's standalone ARM executable/library-loading restriction; app instrumentation still exercises the packaged ARM64 engine through translation.
 
@@ -82,7 +82,7 @@ Device instrumentation used `emulator-5554` / `Medium_Phone`, Android 16 / API 3
 
 Debug APK SHA-256: `9302c04aaab7baec6587ad78550be903a620df8eaef2f3e372cdceec7195a7b2`. Release APK SHA-256: `4431a2490c38b264b9b46268e8dfdb88d4b5543b063cecdd245d5567ca922b5a`. Local evidence includes `focused-3.txt`, `full-release.txt`, `full-results.xml`, `krkr-runtime-results.xml`, `python-tests-2.txt`, and `native-text-x86_64.txt` under `.agent-work/m1-tjs-entry/`; these files are ignored.
 
-## Persistent-session validation (2026-10-02)
+## Persistent-session baseline validation (`ed42b76`, 2026-10-02)
 
 | Check | Result |
 | --- | --- |
@@ -96,11 +96,33 @@ Debug APK SHA-256: `9302c04aaab7baec6587ad78550be903a620df8eaef2f3e372cdceec7195
 
 Device: `emulator-5554` / `Medium_Phone`, Android 16 / API 36, x86_64 with ARM64 translation, SwiftShader, Vulkan disabled. Both ARM ABIs build; this is not physical ARMv7 or API 26 execution evidence.
 
-Current Debug APK SHA-256: `7070f35a18eed724599a9ac32f026b3b2d98032eeacd50bc69971703b2302aa4`. Current unsigned Release APK SHA-256: `f7ac3a0f77223c1b99ae4ee325b8964ba29d8c7a3c1cdf73d0add52f3e52e5bf`.
+Baseline Debug APK SHA-256: `7070f35a18eed724599a9ac32f026b3b2d98032eeacd50bc69971703b2302aa4`. Baseline unsigned Release APK SHA-256: `f7ac3a0f77223c1b99ae4ee325b8964ba29d8c7a3c1cdf73d0add52f3e52e5bf`.
 
-Local evidence under ignored `.agent-work/m1-tjs-session/`: `final-validation.txt`, `full-results.xml`, `krkr-verified.txt`, `krkr-results.xml`, `python-final.txt`, and `apk-check.txt`. The current results supersede the startup-baseline APK hashes and test counts above. The standalone decoder result remains the baseline proof for the unchanged text decoder.
+Local evidence under ignored `.agent-work/m1-tjs-session/`: `final-validation.txt`, `full-results.xml`, `krkr-verified.txt`, `krkr-results.xml`, `python-final.txt`, and `apk-check.txt`. These baseline results supersede the startup-baseline APK hashes and test counts above. The standalone decoder result remains the baseline proof for the unchanged text decoder.
+
+## Background task return correction (2026-10-02)
+
+The user's simulator acceptance found that returning from Home through recent tasks exited with `SCRIPT_ERROR`. The new regression reproduced runtime diagnostic 12 (`kRuntimeSurfaceNotReady`). Earlier tests called pause/resume directly or recreated the Activity; they did not cover destruction of the window surface while EGL retained its context.
+
+`KrkrRuntimeRenderer` now stops drawing before native surface release and rebuilds released GL resources from `onSurfaceChanged` when a retained context receives a replacement window surface without `onSurfaceCreated`. The TJS session and variables stay alive. The runtime logs its final native diagnostic under `TwinQuill/KrkrRuntime`.
+
+`preservesScriptStateAcrossHomeAndTaskReturn` presses the real Home key, waits for native surface loss, and brings the existing task forward twice, as recent-task selection does. It checks yellow pixels, advancing frames, one startup, and a live session before a second touch exits and releases it. Pixel copying retries a temporarily invalid surface during task return. The test failed before the renderer correction and passed afterward; all 7 isolated Krkr tests and all 89 Python tests passed. Evidence belongs under ignored `.agent-work/m1-background-error/`.
+
+| Corrected-build check | Result |
+| --- | --- |
+| Default instrumentation | 21/21 passed. |
+| Isolated Krkr instrumentation | 7/7 passed, including real Home/task return. |
+| JVM tests | 9/9 passed across `engine-api` and `engine-ons`. |
+| Repository checks | Python 89/89; hygiene, all 7,218 source checksums, and diff whitespace passed. |
+| Build/APK/lint | Debug and Release for both ABIs; final APK checks passed; lint has 0 errors and 7 warnings. |
+
+Corrected Debug APK SHA-256: `9dcb08989f684d8158962aff5dc0961b66f74fc8c6855adcb907cd30199c79a0`. Corrected unsigned Release APK SHA-256: `c90c46a8ce94192a7fecdbb39b838ca8957d73653aea03400b9288631aaa5253`. These hashes and test counts supersede the persistent-session baseline. Logs include `home-test-before.txt`, `home-test-after.txt`, `krkr-full.txt`, `final-validation.txt`, `python-tests.txt`, `apk-check.txt`, and the copied `krkr-*.xml` / `default-*.xml` reports. The corrected Debug APK has been installed on `emulator-5554` for repeat acceptance.
+
+The user repeated the failed manual item with the corrected APK and confirmed it now passes. The simulator acceptance below closes M1 task 3.
 
 ## M1 device acceptance
+
+This acceptance run uses only `Medium_Phone`, Android 16 / API 36, x86_64 with ARM64 translation, SwiftShader, and Vulkan disabled. Sign-off is recorded as simulator acceptance.
 
 Create a new game directory with the following two UTF-8 files. Add that directory in TwinQuill and launch with Kirikiri.
 
@@ -131,7 +153,13 @@ TwinQuillHost.onTouch = function(action, id, x, y, time) {
 4. Launch and press Back: expect `NORMAL_EXIT`. Replace the callback body with `throw new Exception("回调错误");`: tapping should return `SCRIPT_ERROR` (diagnostic 20).
 5. Restore the valid scripts: another launch succeeds. Replacing startup with `Scripts.execStorage("../outside.tjs");` must return `SCRIPT_ERROR`.
 
-Record device model, API, ABI, and the tested APK hash. These manual results have not yet been supplied for M1.
+Record device model, API, ABI, and the tested APK hash for future acceptance runs.
+
+### User sign-off (2026-10-02)
+
+After installing the corrected Debug APK identified above and restoring the three SAF test directories, the user reported: “目前正常，其他全部验收ok，提交代码。” This confirms the repeated Home/recent-task return now preserves yellow and the remaining documented acceptance checks passed: startup/helper loading and Unicode output, touch-driven color and normal exit, Back and fresh-session restart, callback error and traversal rejection, and successful normal launch after either error. The user authorized committing the correction and acceptance record.
+
+M1 task 3 is accepted on this simulator. The acceptance does not expand the implementation beyond the scope below.
 
 ## Scope and later work
 

@@ -33,6 +33,7 @@ final class KrkrRuntimeRenderer implements GLSurfaceView.Renderer {
 
     private static final long LIFECYCLE_TIMEOUT_MILLIS = 750;
     private static final int INPUT_QUEUE_CAPACITY = 64;
+    private static final int SURFACE_NOT_READY = 12;
 
     private final long handle;
     private final KrkrScriptSession scriptSession;
@@ -44,6 +45,7 @@ final class KrkrRuntimeRenderer implements GLSurfaceView.Renderer {
     private volatile long observedInputGeneration;
     private final AtomicInteger acceptedUntilDraw = new AtomicInteger();
     private volatile KrkrGLSurfaceView view;
+    private volatile boolean surfaceReady;
 
     KrkrRuntimeRenderer(
         KrkrRuntimeRequest request,
@@ -76,6 +78,7 @@ final class KrkrRuntimeRenderer implements GLSurfaceView.Renderer {
         if (destroyRequested.get() || isDestroyed()) {
             return;
         }
+        surfaceReady = false;
         try {
             int result = nativeSurfaceCreated(handle);
             if (result != 0) {
@@ -94,9 +97,20 @@ final class KrkrRuntimeRenderer implements GLSurfaceView.Renderer {
         }
         try {
             int result = nativeSurfaceChanged(handle, width, height);
+            if (result == SURFACE_NOT_READY) {
+                // GLSurfaceView can retain the EGL context across Home while
+                // replacing its window surface. That path calls onSurfaceChanged
+                // without onSurfaceCreated, so rebuild the released GL resources
+                // here, with the retained context current on the GL thread.
+                result = nativeSurfaceCreated(handle);
+                if (result == 0) result = nativeSurfaceChanged(handle, width, height);
+            }
             if (result != 0) {
                 reportFailure(result);
-            } else scriptSession.event(KrkrScriptSession.EVENT_SURFACE_CHANGED, width, height);
+            } else {
+                surfaceReady = true;
+                scriptSession.event(KrkrScriptSession.EVENT_SURFACE_CHANGED, width, height);
+            }
         } catch (RuntimeException | LinkageError exception) {
             reportFailure(41);
         }
@@ -104,7 +118,7 @@ final class KrkrRuntimeRenderer implements GLSurfaceView.Renderer {
 
     @Override
     public void onDrawFrame(GL10 gl) {
-        if (destroyRequested.get() || isDestroyed()) {
+        if (!surfaceReady || destroyRequested.get() || isDestroyed()) {
             return;
         }
         try {
@@ -196,6 +210,9 @@ final class KrkrRuntimeRenderer implements GLSurfaceView.Renderer {
     }
 
     void surfaceLostAndWait() {
+        // Stop drawing before the queued native release. GLSurfaceView has not
+        // yet observed surfaceDestroyed and can otherwise request one last frame.
+        surfaceReady = false;
         queueLifecycle(() -> checkDiagnostic(nativeSurfaceLost(handle)), false);
     }
 
@@ -203,6 +220,7 @@ final class KrkrRuntimeRenderer implements GLSurfaceView.Renderer {
         if (!destroyRequested.compareAndSet(false, true)) {
             return;
         }
+        surfaceReady = false;
         queueLifecycle(() -> {
             if (!isDestroyed()) {
                 checkDiagnostic(nativeSurfaceLost(handle));

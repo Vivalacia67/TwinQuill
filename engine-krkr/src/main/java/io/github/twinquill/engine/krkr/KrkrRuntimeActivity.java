@@ -143,6 +143,7 @@ public final class KrkrRuntimeActivity extends Activity
             return;
         }
         int safeDiagnostic = diagnostic < 0 ? 41 : diagnostic;
+        Log.i(LOG_TAG, "Krkr runtime finished with diagnostic " + safeDiagnostic);
         Intent data = EngineContract.resultData(
             safeDiagnostic == 0 ? EngineResult.NORMAL_EXIT : EngineResult.NATIVE_CRASH
         );

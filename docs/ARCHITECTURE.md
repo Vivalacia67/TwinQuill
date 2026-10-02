@@ -7,8 +7,9 @@ and Kirikiri/Kirikiri Z games. It does not promise support for proprietary
 plugins, unknown DRM, or runtime-loaded native libraries.
 
 M0 established the source/toolchain baseline and was accepted on 2026-10-02.
-M1 task 3 begins by replacing the fixed-value Krkr script probe with a common
-TJS2 startup entry. It executes ordinary scripts from a loose file, a raw,
+M1 task 3 was accepted on the Android 16 / API 36 simulator on 2026-10-02.
+It replaces the fixed-value Krkr script probe with a common TJS2 startup
+entry. It executes ordinary scripts from a loose file, a raw,
 unprotected XP3 archive, or a read-only SAF tree via `tqsaf`/`native-vfs`.
 The entry accepts UTF-8 and BOM-marked UTF-16LE/BE, rejects malformed text and
 embedded NULs, and bounds each script to 8 MiB. A persistent session registers
@@ -46,8 +47,10 @@ The Krkr broker validates `EngineLaunchRequest`, executes `startup.tjs` on a
 worker, and opens the private runtime host only on successful script completion.
 One TJS2 session is admitted per `:krkr` process because the imported core owns
 process-global caches. The broker executes startup once and transfers a private
-opaque handle to the runtime. Globals and callbacks survive surface/context
-replacement and Activity recreation. Closing, failed startup, or invalid
+opaque handle to the runtime. Globals and callbacks survive Home/task return,
+surface/context replacement, and Activity recreation. A replaced window surface
+rebuilds its GL resources even when Android retains the EGL context. Closing,
+failed startup, or invalid
 recreated requests release the VM; process death invalidates the handle.
 
 Callbacks run on a separate worker with 64 pending slots. The UI and GL thread

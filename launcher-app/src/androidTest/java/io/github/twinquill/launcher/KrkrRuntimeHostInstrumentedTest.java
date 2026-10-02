@@ -10,6 +10,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import android.app.Activity;
+import android.app.ActivityManager;
 import android.app.Application;
 import android.app.Instrumentation;
 import android.content.Context;
@@ -19,6 +20,7 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.ParcelFileDescriptor;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.PixelCopy;
@@ -33,6 +35,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import java.io.File;
+import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -353,6 +356,52 @@ public final class KrkrRuntimeHostInstrumentedTest {
     }
 
     @Test
+    public void preservesScriptStateAcrossHomeAndTaskReturn() throws Exception {
+        File fixture = fixture("home-return");
+        String script = "var count = 0; TwinQuillHost.setColor(20,210,40);\n"
+            + "TwinQuillHost.onTouch = function(action,id,x,y,time) {\n"
+            + " if (action == 0) { count++; if (count == 1) TwinQuillHost.setColor(220,170,30);\n"
+            + " else { if (count != 2) throw new Exception(\"state lost\"); System.exit(); } } };";
+        long[] before = scriptStats();
+        KrkrScriptSession session = startRuntime(fixture, script);
+        waitForColor(surface, 20, 210, 40);
+        touchDown();
+        waitForColor(surface, 220, 170, 30);
+        int taskId = runtime.getTaskId();
+        for (int cycle = 0; cycle < 2; cycle++) {
+            long[] counters = renderer.counters();
+            try (InputStream output = new ParcelFileDescriptor.AutoCloseInputStream(
+                    instrumentation.getUiAutomation().executeShellCommand("input keyevent 3"))) {
+                while (output.read() != -1) { }
+            }
+            waitForCounter(KrkrRuntimeRenderer.COUNTER_SURFACE_LOSS_COUNT,
+                counters[KrkrRuntimeRenderer.COUNTER_SURFACE_LOSS_COUNT] + 1);
+            long backgroundFrames = renderer.counters()[KrkrRuntimeRenderer.COUNTER_FRAME_COUNT];
+            assertFalse("runtime finished while in the background", runtime.isFinishing());
+            assertFalse("runtime was destroyed while in the background", runtime.isDestroyed());
+            ActivityManager manager = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+            ActivityManager.AppTask matchingTask = null;
+            for (ActivityManager.AppTask task : manager.getAppTasks()) {
+                if (task.getTaskInfo().id == taskId) matchingTask = task;
+            }
+            assertNotNull("runtime task disappeared", matchingTask);
+            ActivityManager.AppTask task = matchingTask;
+            // Recent-task selection brings the existing task forward without a new launch intent.
+            instrumentation.runOnMainSync(task::moveToFront);
+            waitForCounter(KrkrRuntimeRenderer.COUNTER_FRAME_COUNT,
+                backgroundFrames + 1);
+            waitForColor(surface, 220, 170, 30);
+            assertFalse("runtime finished after task return", runtime.isFinishing());
+            assertEquals("startup executed again", before[1] + 1, scriptStats()[1]);
+            assertEquals(0, session.poll(0));
+        }
+        touchDown();
+        waitForScriptsReleased();
+        assertTrue(runtime.isFinishing() || runtime.isDestroyed());
+        assertEquals(before[2] + 1, scriptStats()[2]);
+    }
+
+    @Test
     public void rejectsUnsafeStorageAndRecursionThenRecoversFromCallbackError() throws Exception {
         File fixture = fixture("errors");
         File outside = fixture("outside");
@@ -512,6 +561,7 @@ public final class KrkrRuntimeHostInstrumentedTest {
     }
 
     private Integer centerPixel(KrkrGLSurfaceView sourceView) throws Exception {
+        if (!sourceView.getHolder().getSurface().isValid()) return null;
         Bitmap viewBitmap = Bitmap.createBitmap(
             Math.max(1, sourceView.getWidth()),
             Math.max(1, sourceView.getHeight()),
@@ -519,15 +569,21 @@ public final class KrkrRuntimeHostInstrumentedTest {
         );
         CountDownLatch copied = new CountDownLatch(1);
         int[] viewResult = {-1};
-        PixelCopy.request(
-            sourceView,
-            viewBitmap,
-            copyResult -> {
-                viewResult[0] = copyResult;
-                copied.countDown();
-            },
-            new Handler(Looper.getMainLooper())
-        );
+        try {
+            PixelCopy.request(
+                sourceView,
+                viewBitmap,
+                copyResult -> {
+                    viewResult[0] = copyResult;
+                    copied.countDown();
+                },
+                new Handler(Looper.getMainLooper())
+            );
+        } catch (IllegalArgumentException exception) {
+            // Task return can replace the Surface between the validity check and copy.
+            viewBitmap.recycle();
+            return null;
+        }
         assertTrue(copied.await(5, TimeUnit.SECONDS));
         try {
             // A recreated window can have a valid GL surface before its first
