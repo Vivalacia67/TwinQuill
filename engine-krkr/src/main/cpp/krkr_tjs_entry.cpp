@@ -14,6 +14,7 @@
 #include "tjs.h"
 #include "tjsError.h"
 #include "krkr_tjs_entry.h"
+#include "krkr_tjs_execution.h"
 #include "krkr_tjs_text.h"
 #include "krkr_tjs_session.h"
 #include "krkr_xp3.h"
@@ -58,6 +59,7 @@ class TjsSession final {
 public:
     TjsSession() : engine_(new TJS::tTJS()) {}
     ~TjsSession() noexcept {
+        twinquill::krkr::ExecutionScope cleanup(nullptr, std::chrono::seconds(2), true);
         try {
             engine_->Shutdown();
         } catch (...) {
@@ -86,12 +88,16 @@ int twinquill::krkr::run_tjs_source(std::string_view source) noexcept {
         session.engine()->SetConsoleOutput(&output);
         const std::basic_string<TJS::tjs_char> tjs_script(script.begin(), script.end());
         int script_result = 0;
+        twinquill::krkr::ExecutionScope execution(nullptr, std::chrono::seconds(5));
         try {
             session.engine()->ExecScript(
                 tjs_script.c_str(),
                 nullptr,
                 nullptr,
                 TJS_W("startup.tjs"));
+        } catch (const TJS::eTJSSilent&) {
+            output.ExceptionPrint(TJS_W("Script execution deadline exceeded"));
+            script_result = 20;
         } catch (const TJS::eTJS& exception) {
             // Script errors retain their script block and engine. Destroy the
             // exception before the session and while the engine lock is held.

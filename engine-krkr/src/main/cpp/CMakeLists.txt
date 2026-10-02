@@ -44,13 +44,35 @@ find_package(native-vfs CONFIG REQUIRED)
 # The source snapshot itself remains identical to the pinned upstream tree.
 set(KIRIKIROID2_BUILD_DIR "${CMAKE_BINARY_DIR}/generated/kirikiroid2")
 set(TJS2_BUILD_DIR "${KIRIKIROID2_BUILD_DIR}/src/core/tjs2")
+set(TVP_TIMER_BUILD_DIR "${KIRIKIROID2_BUILD_DIR}/src/core/utils")
+set(TVP_VISUAL_BUILD_DIR "${KIRIKIROID2_BUILD_DIR}/src/core/visual")
+set(TVP_EVENT_BUILD_DIR "${KIRIKIROID2_BUILD_DIR}/src/core/base")
 set(TJS2_PATCHES
     "${TWINQUILL_ROOT}/vendor/patches/kirikiroid2/0001-fix-tjs-vector-pop-back.patch"
     "${TWINQUILL_ROOT}/vendor/patches/kirikiroid2/0002-fix-tjs-free-null.patch"
+    "${TWINQUILL_ROOT}/vendor/patches/kirikiroid2/0003-tjs-execution-budget.patch"
+    "${TWINQUILL_ROOT}/vendor/patches/kirikiroid2/0004-tvp-timer-interval-bounds.patch"
+    "${TWINQUILL_ROOT}/vendor/patches/kirikiroid2/0005-tjs-shutdown-finalizer-cleanup.patch"
+    "${TWINQUILL_ROOT}/vendor/patches/kirikiroid2/0006-android-basic-visual-bindings.patch"
+    "${TWINQUILL_ROOT}/vendor/patches/kirikiroid2/0007-tvp-async-worker-admission.patch"
 )
 file(REMOVE_RECURSE "${KIRIKIROID2_BUILD_DIR}")
 file(MAKE_DIRECTORY "${TJS2_BUILD_DIR}")
 file(COPY "${TJS2_DIR}/" DESTINATION "${TJS2_BUILD_DIR}")
+file(MAKE_DIRECTORY "${TVP_TIMER_BUILD_DIR}")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${KRKR2_CORE}/utils/TimerIntf.cpp" "${KRKR2_CORE}/utils/TimerIntf.h")
+file(COPY "${KRKR2_CORE}/utils/TimerIntf.cpp" "${KRKR2_CORE}/utils/TimerIntf.h"
+    DESTINATION "${TVP_TIMER_BUILD_DIR}")
+file(MAKE_DIRECTORY "${TVP_VISUAL_BUILD_DIR}")
+foreach(TVP_VISUAL_FILE WindowIntf.cpp LayerIntf.cpp)
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+        "${KRKR2_CORE}/visual/${TVP_VISUAL_FILE}")
+    file(COPY "${KRKR2_CORE}/visual/${TVP_VISUAL_FILE}" DESTINATION "${TVP_VISUAL_BUILD_DIR}")
+endforeach()
+file(MAKE_DIRECTORY "${TVP_EVENT_BUILD_DIR}")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${KRKR2_CORE}/base/EventIntf.cpp")
+file(COPY "${KRKR2_CORE}/base/EventIntf.cpp" DESTINATION "${TVP_EVENT_BUILD_DIR}")
 file(RELATIVE_PATH KIRIKIROID2_BUILD_RELATIVE_DIR
     "${TWINQUILL_ROOT}" "${KIRIKIROID2_BUILD_DIR}")
 foreach(TJS2_PATCH IN LISTS TJS2_PATCHES)
@@ -146,16 +168,34 @@ target_include_directories(twinquill_krkr_tjs2 PUBLIC
 )
 target_link_libraries(twinquill_krkr_tjs2 PUBLIC onig)
 
+# Audited TVP host admission; expand deliberately with the M2 source audit.
+set(TVP_HOST_SOURCES
+    "${TVP_TIMER_BUILD_DIR}/TimerIntf.cpp"
+    "${TVP_VISUAL_BUILD_DIR}/WindowIntf.cpp"
+    "${TVP_VISUAL_BUILD_DIR}/LayerIntf.cpp"
+    "${TVP_EVENT_BUILD_DIR}/EventIntf.cpp"
+)
+
 add_library(twinquill_engine_krkr SHARED
     krkr_jni.cpp
     krkr_tjs_entry.cpp
+    krkr_tjs_execution.cpp
     krkr_tjs_session.cpp
     krkr_tjs_session_jni.cpp
     krkr_tjs_text.cpp
+    krkr_tvp_events.cpp
+    krkr_tvp_visual.cpp
+    ${TVP_HOST_SOURCES}
     krkr_xp3.cpp
     krkr_vfs_storage.cpp
 )
 target_compile_features(twinquill_engine_krkr PRIVATE cxx_std_17)
+target_compile_definitions(twinquill_engine_krkr PRIVATE TWINQUILL_ANDROID_BASIC_TVP=1)
+target_include_directories(twinquill_engine_krkr BEFORE PRIVATE
+    "${CMAKE_CURRENT_LIST_DIR}/tvp"
+    "${TVP_TIMER_BUILD_DIR}"
+    "${KRKR2_CORE}/visual"
+)
 target_compile_options(twinquill_engine_krkr PRIVATE -fvisibility=hidden)
 target_link_libraries(twinquill_engine_krkr PRIVATE
     twinquill_krkr_tjs2

@@ -28,6 +28,13 @@ The [Krkr integration roadmap](docs/ROADMAP.md) defines the remaining M2–M8
 work, dependencies, and acceptance gates through game execution and unified
 game/save management. ONS integration remains the existing regression baseline.
 
+M2 implements host-ready startup, the pinned Window/Layer/Font, Timer and
+AsyncTrigger bindings, and an Android backend for basic PNG/JPEG, text,
+composition and input. Script cancellation and lifecycle recovery are bounded.
+The pinned KAG3 framework remains an audit source until M4. M2 implementation
+was accepted on the simulator on 2026-10-03; supported members, limits and instructions
+are in the [M2 handoff](docs/KRKR_M2_HANDOFF.md).
+
 ## Modules
 
 - `launcher-app`: Android launcher application.

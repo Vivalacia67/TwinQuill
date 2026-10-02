@@ -45,6 +45,7 @@ public final class KrkrRuntimeActivity extends Activity
         try {
             KrkrRuntimeRequest request = KrkrRuntimeRequest.fromIntent(this, getIntent());
             System.loadLibrary("twinquill_engine_krkr");
+            KrkrScriptSession.nativeSetAssets(getApplicationContext().getAssets());
             KrkrScriptSession requestedSession = KrkrScriptSession.require(request);
             if (scriptSession != null && scriptSession != requestedSession) {
                 throw new IllegalArgumentException("Retained script session does not match request");

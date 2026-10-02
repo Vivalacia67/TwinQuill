@@ -6,6 +6,7 @@
 #define TWINQUILL_KRKR_COCOS_RUNTIME_H
 
 #include <cstdint>
+#include "krkr_display_frame.h"
 
 namespace twinquill::krkr_runtime {
 
@@ -36,6 +37,10 @@ class CocosRuntime final {
     bool ready() const noexcept { return program_ != 0U; }
 
  private:
+    int draw_display(const twinquill::krkr::DisplayFrame& frame);
+    unsigned int texture_program_ = 0U, texture_ = 0U;
+    int texture_position_ = -1, texture_coords_ = -1, texture_sampler_ = -1;
+    std::uint64_t texture_generation_ = 0;
     unsigned int program_ = 0U;
     int position_attribute_ = -1;
     int color_attribute_ = -1;

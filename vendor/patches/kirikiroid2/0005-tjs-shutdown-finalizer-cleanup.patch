@@ -1,0 +1,40 @@
+Subject: [PATCH] TJS2: finish native cleanup after shutdown finalizer errors
+
+A finalizer exception previously skipped native instance invalidation and
+member release, leaving the VM/cache and timer references alive. Only during
+host-owned shutdown, log and suppress a failing or budget-interrupted script
+finalizer so native invalidation and member release still execute. Explicit
+script invalidation outside shutdown preserves upstream exception behavior.
+
+Tested-by: tests/test_krkr_tjs2_source_admission.py focused git-apply unittest; forced Android CMake configure; Krkr throwing/infinite finalizer and timer recovery instrumentation
+
+--- a/src/core/tjs2/tjsObject.cpp
++++ b/src/core/tjs2/tjsObject.cpp
+@@ -20,6 +20,8 @@
+
+ namespace TJS
+ {
++extern bool TJSHostIsShuttingDown();
++extern void TJSHostReportFinalizerFailure();
+
+ //---------------------------------------------------------------------------
+ // utility functions
+@@ -455,8 +457,16 @@
+ 	// call this object's "finalize"
+ 	if(CallFinalize)
+ 	{
+-		FuncCall(0, finalize_name.c_str(), finalize_name.GetHint(), NULL, 0,
+-			NULL, this);
++		try
++		{
++			FuncCall(0, finalize_name.c_str(), finalize_name.GetHint(), NULL, 0,
++				NULL, this);
++		}
++		catch(...)
++		{
++			if(!TJSHostIsShuttingDown()) throw;
++			TJSHostReportFinalizerFailure();
++		}
+ 	}
+
+ 	for(tjs_int i=TJS_MAX_NATIVE_CLASS-1; i>=0; i--)

@@ -509,6 +509,22 @@ public final class EngineProcessProtocolInstrumentedTest {
     }
 
     @Test
+    public void runsStandardKrkrDisplayAndTimerFromReadOnlySafThenClosesNormally() throws Exception {
+        Uri counterProvider = Uri.parse("content://" + LauncherGrantBrokerProvider.AUTHORITY);
+        assertNotNull(context.getContentResolver().call(counterProvider,
+            LauncherGrantBrokerProvider.METHOD_RESET_VISUAL_OPEN_COUNT, null, null));
+        Intent result = launchAndAwait(requestIntent(KrkrEngineActivity.class, EngineType.KRKR,
+            "krkr-visual-saf", grantFixture(LauncherFixtureDocumentsProvider.KRKR_VISUAL_ROOT_ID), Bundle.EMPTY));
+        assertEquals(Activity.RESULT_OK, host.engineResultCode());
+        assertEquals(EngineResult.NORMAL_EXIT.code(), result.getIntExtra(EngineContract.EXTRA_RESULT, -1));
+        assertEquals(0, result.getIntExtra(KrkrEngineActivity.EXTRA_RESULT_CODE, -1));
+        Bundle counters = context.getContentResolver().call(counterProvider,
+            LauncherGrantBrokerProvider.METHOD_VISUAL_OPEN_COUNT, null, null);
+        assertNotNull(counters);
+        assertTrue("Both PNG and JPEG must actually be read through SAF", counters.getInt("count", 0) >= 2);
+    }
+
+    @Test
     public void executesUnicodeKrkrXp3Startup() throws Exception {
         File gameRoot = new File(context.getCacheDir(),
             "krkr-xp3-" + android.os.SystemClock.elapsedRealtime());

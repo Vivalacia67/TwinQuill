@@ -25,6 +25,11 @@ PATCH = ROOT / PATCH_RELATIVE
 PATCH_RELATIVES = (
     PATCH_RELATIVE,
     Path("vendor/patches/kirikiroid2/0002-fix-tjs-free-null.patch"),
+    Path("vendor/patches/kirikiroid2/0003-tjs-execution-budget.patch"),
+    Path("vendor/patches/kirikiroid2/0004-tvp-timer-interval-bounds.patch"),
+    Path("vendor/patches/kirikiroid2/0005-tjs-shutdown-finalizer-cleanup.patch"),
+    Path("vendor/patches/kirikiroid2/0006-android-basic-visual-bindings.patch"),
+    Path("vendor/patches/kirikiroid2/0007-tvp-async-worker-admission.patch"),
 )
 
 
@@ -88,7 +93,8 @@ class KrkrTjs2SourceAdmissionTests(unittest.TestCase):
 
     def test_numbered_tjs2_patch_records_focused_how_tested(self) -> None:
         for relative in PATCH_RELATIVES:
-            description = (ROOT / relative).read_text(encoding="utf-8").split("\n--- ", 1)[0]
+            # Patch bodies retain the upstream file's original encoding.
+            description = (ROOT / relative).read_bytes().split(b"\n--- ", 1)[0].decode("utf-8")
             with self.subTest(patch=relative):
                 self.assertRegex(
                     description,
@@ -106,6 +112,19 @@ class KrkrTjs2SourceAdmissionTests(unittest.TestCase):
             generated_tjs2.mkdir(parents=True)
             shutil.copy2(TJS2_DIR / "tjsUtils.h", generated_tjs2 / "tjsUtils.h")
             shutil.copy2(TJS2_DIR / "tjsConfig.cpp", generated_tjs2 / "tjsConfig.cpp")
+            shutil.copy2(TJS2_DIR / "tjsInterCodeExec.cpp", generated_tjs2 / "tjsInterCodeExec.cpp")
+            shutil.copy2(TJS2_DIR / "tjsLex.cpp", generated_tjs2 / "tjsLex.cpp")
+            shutil.copy2(TJS2_DIR / "tjsObject.cpp", generated_tjs2 / "tjsObject.cpp")
+            generated_utils = generated_root / "src" / "core" / "utils"
+            generated_utils.mkdir(parents=True)
+            shutil.copy2(TJS2_DIR.parent / "utils" / "TimerIntf.cpp", generated_utils / "TimerIntf.cpp")
+            generated_visual = generated_root / "src" / "core" / "visual"
+            generated_visual.mkdir(parents=True)
+            for name in ("WindowIntf.cpp", "LayerIntf.cpp"):
+                shutil.copy2(TJS2_DIR.parent / "visual" / name, generated_visual / name)
+            generated_base = generated_root / "src" / "core" / "base"
+            generated_base.mkdir(parents=True)
+            shutil.copy2(TJS2_DIR.parent / "base" / "EventIntf.cpp", generated_base / "EventIntf.cpp")
             subprocess.run(
                 [git, "init", "--quiet"],
                 cwd=generated_root,

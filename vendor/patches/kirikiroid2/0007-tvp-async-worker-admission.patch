@@ -1,0 +1,55 @@
+Subject: [PATCH] TVP: admit upstream AsyncTrigger on the Android worker queue
+
+Compile the original AsyncTrigger implementation and binding while the
+Android session owns event delivery. Track live trigger owners for bounded
+shutdown and break action cycles; validate the three supported event modes.
+The generated build copy is patched; the pinned source remains unchanged.
+
+Tested-by: tests/test_krkr_tjs2_source_admission.py focused git-apply unittest; forced Android CMake configure; cached/cancelled/reentrant trigger and shutdown instrumentation
+
+--- a/src/core/base/EventIntf.cpp
++++ b/src/core/base/EventIntf.cpp
+@@ -8,6 +8,11 @@
+ //---------------------------------------------------------------------------
+ // Script/Window Event Handling and Dispatching / System Idle Event Delivering
+ //---------------------------------------------------------------------------
++#ifdef TWINQUILL_ANDROID_BASIC_TVP
++#include "tjsCommHead.h"
++#include "EventIntf.h"
++#include "krkr_tvp_events.h"
++#else
+ #include "tjsCommHead.h"
+
+ #include <algorithm>
+@@ -1202,6 +1207,7 @@
+ //---------------------------------------------------------------------------
+ // tTJSNI_AsyncTrigger
+ //---------------------------------------------------------------------------
++#endif // Android worker owns event delivery
+ tTJSNI_AsyncTrigger::tTJSNI_AsyncTrigger()
+ {
+ 	Owner = NULL;
+@@ -1226,12 +1232,14 @@
+
+ 	ActionOwner = param[0]->AsObjectClosure();
+ 	Owner = tjs_obj;
++	TVPAndroidRegisterAsync(Owner);
+
+ 	return TJS_S_OK;
+ }
+ //---------------------------------------------------------------------------
+ void TJS_INTF_METHOD tTJSNI_AsyncTrigger::Invalidate()
+ {
++	TVPAndroidUnregisterAsync(Owner);
+ 	TVPCancelSourceEvents(Owner);
+ 	Owner = NULL;
+
+@@ -1281,6 +1289,8 @@
+ //---------------------------------------------------------------------------
+ void tTJSNI_AsyncTrigger::SetMode(tTVPAsyncTriggerMode m)
+ {
++	if(m != atmNormal && m != atmExclusive && m != atmAtIdle)
++		TJS_eTJSError(TJS_W("Invalid AsyncTrigger mode"));
+ 	if(Mode != m)
+ 	{
+ 		Mode = m;

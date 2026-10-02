@@ -1,0 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2026 TwinQuill contributors
+class FinalizerLoop extends Timer {
+    function FinalizerLoop() { super.Timer(function() {}, ""); }
+    function finalize() { while (true) {} }
+}
+var retained = new FinalizerLoop();
+TwinQuillHost.setColor(40, 180, 70);
+Debug.message("M2 finalizer fixture: Back must return normally with bounded cleanup");

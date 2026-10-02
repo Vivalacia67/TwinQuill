@@ -4,12 +4,16 @@
  */
 #include "krkr_tjs_session.h"
 #include "krkr_tjs_entry.h"
+#include "krkr_tjs_execution.h"
+#include "krkr_tvp_events.h"
+#include "krkr_tvp_visual.h"
 #include "krkr_tjs_text.h"
 #include "krkr_vfs_storage.h"
 #include "krkr_xp3.h"
 #include "tjs.h"
 #include "tjsError.h"
 #include "tjsNative.h"
+#include "TimerIntf.h"
 
 #include <android/log.h>
 #include <atomic>
@@ -97,24 +101,49 @@ public:
     ~Session() noexcept {
         if (host_ != nullptr) host_->Release();
         if (engine_ != nullptr) {
+            ExecutionScope cleanup(nullptr, std::chrono::seconds(2), true);
+            clear_tvp_events();
+            shutdown_tvp_timers();
+            shutdown_tvp_asyncs();
+            shutdown_visual_session();
             try { engine_->Shutdown(); } catch (...) { }
             engine_->Release();
+            end_visual_session();
             ++g_releases;
         }
     }
 
-    int start() {
+    int prepare() {
         std::string source;
         const int result = read("startup.tjs", &source, true);
         if (result != 0) return result;
         // Decode before constructing the engine so malformed source owns no VM resources.
-        const ttstr script = tjs_text(source);
+        script_ = tjs_text(source);
         engine_ = new tTJS();
         engine_->SetConsoleOutput(&console_);
-        return guarded([&] {
+        return 0;
+    }
+
+    int activate(int width, int height) {
+        if (width <= 0 || height <= 0) return 10;
+        width_ = width;
+        height_ = height;
+        if (cancelled.load()) return kNormalExit;
+        if (activated_) return status.load();
+        activated_ = true;
+        const int result = guarded([&] {
+            begin_visual_session([this](const ttstr& name) {
+                std::string bytes;
+                const int result = read(relative_name(name), &bytes);
+                if (result != 0) storage_failure(result);
+                return bytes;
+            }, [this] { status.store(kNormalExit); }, width, height);
             register_classes();
-            engine_->ExecScript(script, nullptr, nullptr, &startup_name_);
-        });
+            engine_->ExecScript(script_, nullptr, nullptr, &startup_name_);
+            script_.Clear();
+        }, std::chrono::seconds(5));
+        if (result == 0) ++g_startups;
+        return result;
     }
 
     int event(int event, const std::vector<double>& args) {
@@ -122,9 +151,27 @@ public:
             TJS_W("onTouch"), TJS_W("onKey"), TJS_W("onPause"),
             TJS_W("onResume"), TJS_W("onLowMemory"), TJS_W("onSurfaceChanged")
         };
-        if (event < 0 || event >= 6 || args.size() > 6) return 10;
+        if (event < 0 || event > 6 || args.size() > 6) return 10;
+        if (event == 5 && (args.size() != 2 || args[0] < 1 || args[1] < 1
+            || args[0] > std::numeric_limits<int>::max()
+            || args[1] > std::numeric_limits<int>::max())) return 10;
         if (status.load() != 0) return status.load();
+        if (!activated_) return 0;
         return guarded([&] {
+            if (event == 6) {
+                if (!paused_) pump_tvp_events();
+                return;
+            }
+            if (event == 2) paused_ = true;
+            if (event == 3) {
+                paused_ = false;
+                reset_tvp_timer_clocks();
+            }
+            if (event == 5 && args.size() == 2) {
+                width_ = static_cast<int>(args[0]);
+                height_ = static_cast<int>(args[1]);
+            }
+            visual_event(event, args);
             tTJSVariant callback;
             const tjs_error get = host_->PropGet(0, names[event], nullptr, &callback, host_);
             if (get == TJS_E_MEMBERNOTFOUND || callback.Type() == tvtVoid) return;
@@ -145,13 +192,22 @@ public:
     }
 
     std::atomic<int> status{0};
+    std::atomic<bool> cancelled{false};
     std::atomic<std::int64_t> color{-1}, events{0};
     const int kind_;
     const std::string source_;
 
 private:
-    template<class Call> int guarded(Call call) {
-        try { call(); }
+    template<class Call> int guarded(Call call,
+            std::chrono::milliseconds duration = std::chrono::seconds(2)) {
+        ExecutionScope execution(&cancelled, duration);
+        try { call(); publish_visual_frame(); }
+        catch (const eTJSSilent&) {
+            status.store(execution.cancelled() ? kNormalExit : 20);
+            if (!execution.cancelled()) {
+                console_.ExceptionPrint(TJS_W("Script execution deadline exceeded"));
+            }
+        }
         catch (const eTJS& error) {
             console_.ExceptionPrint(error.GetMessage().c_str());
             if (status.load() == 0 || status.load() == kNormalExit) status.store(20);
@@ -245,6 +301,36 @@ private:
     }
 
     void register_classes() {
+        for (const auto& item : {
+                std::make_pair(TJS_W("ltOpaque"), 1), std::make_pair(TJS_W("ltAlpha"), 2),
+                std::make_pair(TJS_W("ltTransparent"), 2), std::make_pair(TJS_W("dfAuto"), 128),
+                std::make_pair(TJS_W("dfOpaque"), 1), std::make_pair(TJS_W("dfAlpha"), 0),
+                std::make_pair(TJS_W("atmNormal"), 0), std::make_pair(TJS_W("atmExclusive"), 1),
+                std::make_pair(TJS_W("atmAtIdle"), 2), std::make_pair(TJS_W("mbLeft"), 0)}) {
+            tTJSVariant value(item.second);
+            if (TJS_FAILED(engine_->GetGlobalNoAddRef()->PropSet(TJS_MEMBERENSURE,
+                    item.first, nullptr, &value, engine_->GetGlobalNoAddRef())))
+                TJS_eTJSError(TJS_W("Unable to register TVP constant"));
+        }
+        for (const auto& item : {
+                std::make_pair(TJS_W("Font"), TVPCreateNativeClass_Font),
+                std::make_pair(TJS_W("AsyncTrigger"), TVPCreateNativeClass_AsyncTrigger),
+                std::make_pair(TJS_W("Window"), TVPCreateNativeClass_Window),
+                std::make_pair(TJS_W("Layer"), TVPCreateNativeClass_Layer)}) {
+            auto* object = item.second();
+            tTJSVariant value(object, nullptr);
+            object->Release();
+            if (TJS_FAILED(engine_->GetGlobalNoAddRef()->PropSet(TJS_MEMBERENSURE,
+                    item.first, nullptr, &value, engine_->GetGlobalNoAddRef())))
+                TJS_eTJSError(TJS_W("Unable to register TVP display class"));
+        }
+        auto* timer = TVPCreateNativeClass_Timer();
+        tTJSVariant timerValue(timer, nullptr);
+        timer->Release();
+        if (TJS_FAILED(engine_->GetGlobalNoAddRef()->PropSet(TJS_MEMBERENSURE,
+                TJS_W("Timer"), nullptr, &timerValue, engine_->GetGlobalNoAddRef()))) {
+            TJS_eTJSError(TJS_W("Unable to register TVP Timer"));
+        }
         auto* scripts = add_class(TJS_W("Scripts"));
         for (const auto& item : {std::make_pair(TJS_W("exec"), 0),
                 std::make_pair(TJS_W("eval"), 1), std::make_pair(TJS_W("execStorage"), 2),
@@ -303,12 +389,24 @@ private:
             color.store(packed);
             return TJS_S_OK;
         });
+        method(host_, TJS_W("getSurfaceWidth"), [this](auto* result, auto, auto**) {
+            if (result != nullptr) *result = width_;
+            return TJS_S_OK;
+        });
+        method(host_, TJS_W("getSurfaceHeight"), [this](auto* result, auto, auto**) {
+            if (result != nullptr) *result = height_;
+            return TJS_S_OK;
+        });
     }
 
     Console console_;
     tTJS* engine_ = nullptr;
     tTJSNativeClass* host_ = nullptr;
     ttstr startup_name_{TJS_W("startup.tjs")};
+    ttstr script_;
+    bool activated_ = false;
+    bool paused_ = false;
+    int width_ = 0, height_ = 0;
     int depth_ = 0;
 };
 
@@ -327,20 +425,20 @@ bool tjs_session_active() {
     return g_session != nullptr;
 }
 
-std::int64_t start_tjs_session(int source_kind, const std::string& source) {
+std::int64_t start_tjs_session(int source_kind, const std::string& source, bool deferred) {
     if (source_kind < 1 || source_kind > 3 || source.empty()
         || source.find('\0') != std::string::npos) return -10;
     std::lock_guard<std::mutex> engine_lock(tjs_engine_mutex());
     if (tjs_session_active()) return -10;
     try {
         auto session = std::make_unique<Session>(source_kind, source);
-        const int result = session->start();
+        int result = session->prepare();
+        if (result == 0 && !deferred) result = session->activate(1, 1);
         if (result != 0) return -result;
         std::lock_guard<std::mutex> lock(g_session_registry_mutex);
         if (g_next_session > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max())) return -21;
         g_session_handle = g_next_session++;
         g_session = std::move(session);
-        ++g_startups;
         return static_cast<std::int64_t>(g_session_handle);
     } catch (const eTJS& error) {
         Console output;
@@ -348,6 +446,20 @@ std::int64_t start_tjs_session(int source_kind, const std::string& source) {
         return -20;
     } catch (const std::invalid_argument&) { return -20; }
     catch (...) { return -21; }
+}
+
+int activate_tjs_session(std::uint64_t handle, int width, int height) {
+    std::lock_guard<std::mutex> engine_lock(tjs_engine_mutex());
+    const auto session = find_session(handle);
+    return session == nullptr ? 11 : session->activate(width, height);
+}
+
+void cancel_tjs_session(std::uint64_t handle) {
+    // Cancellation must never wait for the VM mutex held by an infinite script.
+    std::lock_guard<std::mutex> lock(g_session_registry_mutex);
+    if (handle != 0 && handle == g_session_handle && g_session != nullptr) {
+        g_session->cancelled.store(true);
+    }
 }
 
 int dispatch_tjs_event(std::uint64_t handle, int event, const std::vector<double>& args) {

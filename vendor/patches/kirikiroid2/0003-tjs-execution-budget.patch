@@ -1,0 +1,45 @@
+Subject: [PATCH] TJS2: bounded execution checkpoints for the Android host
+
+Check the VM opcode loop and lexer token entry through a host-owned budget.
+The host throws eTJSSilent on cancellation/deadline, which TJS propagates
+through script try/catch while preserving upstream frame cleanup. No snapshot
+bytes are changed; CMake applies this patch only to the generated copy.
+
+Tested-by: tests/test_krkr_tjs2_source_admission.py focused git-apply unittest; forced Android CMake configure; Krkr runtime instrumentation timeout/cancel recovery
+
+--- a/src/core/tjs2/tjsInterCodeExec.cpp
++++ b/src/core/tjs2/tjsInterCodeExec.cpp
+@@ -36,6 +36,7 @@
+
+ namespace TJS
+ {
++extern void TJSCheckExecutionBudget();
+ //---------------------------------------------------------------------------
+ // utility functions
+ //---------------------------------------------------------------------------
+@@ -1009,6 +1010,7 @@
+ #endif	// ENABLE_DEBUGGER
+ 		while(true)
+ 		{
++			TJSCheckExecutionBudget();
+ #ifdef ENABLE_DEBUGGER
+ 			if( is_enable_debugger ) {
+ 				tjs_int next_line_no = Block->SrcPosToLine( CodePosToSrcPos(code-CodeArea) );
+--- a/src/core/tjs2/tjsLex.cpp
++++ b/src/core/tjs2/tjsLex.cpp
+@@ -23,6 +23,7 @@
+
+ namespace TJS
+ {
++extern void TJSCheckExecutionBudget();
+
+
+ tjs_nchar tjsEnableDicFuncQuickHack_mark[] = " - 0 <- Put '1' to enable dicfunc quick-hack - ";
+@@ -1731,6 +1732,7 @@
+ tjs_int tTJSLexicalAnalyzer::GetNext(tjs_int &value)
+ {
+ 	TJS_F_TRACE("tTJSLexicalAnalyzer::GetNext");
++	TJSCheckExecutionBudget();
+
+ 	if(First)
+ 	{

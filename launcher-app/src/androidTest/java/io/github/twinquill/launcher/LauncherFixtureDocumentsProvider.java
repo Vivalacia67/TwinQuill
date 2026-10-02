@@ -39,6 +39,7 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
     static final String KRKR_REVOKED_ROOT_ID = "krkr-revoked";
     static final String KRKR_AMBIGUOUS_ROOT_ID = "krkr-ambiguous";
     static final String KRKR_UTF8_ROOT_ID = "krkr-utf8";
+    static final String KRKR_VISUAL_ROOT_ID = "krkr-visual";
     static final String KRKR_UTF8_BOM_ROOT_ID = "krkr-utf8-bom";
     static final String KRKR_UTF16_LE_ROOT_ID = "krkr-utf16-le";
     static final String KRKR_UTF16_BE_ROOT_ID = "krkr-utf16-be";
@@ -133,6 +134,7 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
     private static final AtomicInteger SAR_ARCHIVE_OPENS = new AtomicInteger();
     private static final AtomicInteger AUDIO_OPENS = new AtomicInteger();
     private static final AtomicInteger VIDEO_OPENS = new AtomicInteger();
+    private static final AtomicInteger VISUAL_IMAGE_OPENS = new AtomicInteger();
     private static volatile Context fixtureContext;
     private static final String[] DOCUMENT_PROJECTION = {
         DocumentsContract.Document.COLUMN_DOCUMENT_ID,
@@ -240,6 +242,10 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             addDocument(result, "krkr-helper");
             addDocument(result, "krkr-value");
         }
+        if (KRKR_VISUAL_ROOT_ID.equals(parentDocumentId)) {
+            addDocument(result, "krkr-visual-png");
+            addDocument(result, "krkr-visual-jpeg");
+        }
         return result;
     }
 
@@ -257,6 +263,7 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         return isKnownRoot(parentDocumentId)
             && (
                 (KRKR_UTF8_ROOT_ID.equals(parentDocumentId) && isKrkrHelper(documentId))
+                    || (KRKR_VISUAL_ROOT_ID.equals(parentDocumentId) && isVisualImage(documentId))
                     ||
                 scriptId(parentDocumentId).equals(documentId)
                     || (
@@ -302,6 +309,7 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         if (rootForVideo(documentId) != null) {
             VIDEO_OPENS.incrementAndGet();
         }
+        if (isVisualImage(documentId)) VISUAL_IMAGE_OPENS.incrementAndGet();
         try {
             ParcelFileDescriptor[] pipe = ParcelFileDescriptor.createPipe();
             Thread writer = new Thread(() -> {
@@ -376,7 +384,7 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             && rootForAudio(documentId) == null
             && rootForVideo(documentId) == null
             && rootForUpperScript(documentId) == null
-            && !isKrkrHelper(documentId)) {
+            && !isKrkrHelper(documentId) && !isVisualImage(documentId)) {
             throw new FileNotFoundException(documentId);
         }
     }
@@ -397,6 +405,7 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             || KRKR_REVOKED_ROOT_ID.equals(documentId)
             || KRKR_AMBIGUOUS_ROOT_ID.equals(documentId)
             || KRKR_UTF8_ROOT_ID.equals(documentId)
+            || KRKR_VISUAL_ROOT_ID.equals(documentId)
             || KRKR_UTF8_BOM_ROOT_ID.equals(documentId)
             || KRKR_UTF16_LE_ROOT_ID.equals(documentId)
             || KRKR_UTF16_BE_ROOT_ID.equals(documentId)
@@ -411,6 +420,26 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
 
     private static boolean isKrkrHelper(String id) {
         return "krkr-helper".equals(id) || "krkr-value".equals(id);
+    }
+    private static boolean isVisualImage(String id) {
+        return "krkr-visual-png".equals(id) || "krkr-visual-jpeg".equals(id);
+    }
+
+    static void resetVisualImageOpenCount() { VISUAL_IMAGE_OPENS.set(0); }
+    static int visualImageOpenCount() { return VISUAL_IMAGE_OPENS.get(); }
+
+    private static byte[] visualAsset(String name) throws FileNotFoundException {
+        try (java.io.InputStream source = fixtureContext.getAssets().open("visual/" + name)) {
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            byte[] buffer = new byte[4096];
+            int count;
+            while ((count = source.read(buffer)) != -1) bytes.write(buffer, 0, count);
+            return bytes.toByteArray();
+        } catch (IOException failure) {
+            FileNotFoundException wrapped = new FileNotFoundException("Missing visual fixture: " + name);
+            wrapped.initCause(failure);
+            throw wrapped;
+        }
     }
 
     private static String krkrUpperScriptId() {
@@ -466,6 +495,7 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             KRKR_REVOKED_ROOT_ID,
             KRKR_AMBIGUOUS_ROOT_ID,
             KRKR_UTF8_ROOT_ID,
+            KRKR_VISUAL_ROOT_ID,
             KRKR_UTF8_BOM_ROOT_ID,
             KRKR_UTF16_LE_ROOT_ID,
             KRKR_UTF16_BE_ROOT_ID,
@@ -514,6 +544,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         throws FileNotFoundException {
         if ("krkr-helper".equals(documentId)) return "辅助.tjs";
         if ("krkr-value".equals(documentId)) return "value.tjs";
+        if ("krkr-visual-png".equals(documentId)) return "checker.png";
+        if ("krkr-visual-jpeg".equals(documentId)) return "sample.jpg";
         String archiveRoot = rootForArchive(documentId);
         if (ONS_NSA_ROOT_ID.equals(archiveRoot)) {
             return "arc.nsa";
@@ -538,6 +570,7 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             || KRKR_REVOKED_ROOT_ID.equals(scriptRoot)
             || KRKR_AMBIGUOUS_ROOT_ID.equals(scriptRoot)
             || KRKR_UTF8_ROOT_ID.equals(scriptRoot)
+            || KRKR_VISUAL_ROOT_ID.equals(scriptRoot)
             || KRKR_UTF8_BOM_ROOT_ID.equals(scriptRoot)
             || KRKR_UTF16_LE_ROOT_ID.equals(scriptRoot)
             || KRKR_UTF16_BE_ROOT_ID.equals(scriptRoot)
@@ -556,6 +589,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         throws FileNotFoundException {
         if ("krkr-helper".equals(documentId)) return "global.fromSaf = \"中文\";".getBytes(StandardCharsets.UTF_8);
         if ("krkr-value".equals(documentId)) return "6*7".getBytes(StandardCharsets.UTF_8);
+        if ("krkr-visual-png".equals(documentId)) return visualAsset("checker.png");
+        if ("krkr-visual-jpeg".equals(documentId)) return visualAsset("sample.jpg");
         String archiveRoot = rootForArchive(documentId);
         if (ONS_NSA_ROOT_ID.equals(archiveRoot)) {
             return NSA_ARCHIVE;
@@ -596,6 +631,11 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             throw new FileNotFoundException(documentId);
         }
         switch (rootId) {
+            case KRKR_VISUAL_ROOT_ID:
+                return (new String(visualAsset("startup.tjs"), StandardCharsets.UTF_8)
+                    + "\nvar exitTicks=0; var exitTimer=new Timer(function(){"
+                    + "if(++exitTicks==4) window.close();},''); exitTimer.interval=300; exitTimer.enabled=true;\n")
+                    .getBytes(StandardCharsets.UTF_8);
             case ONS_GBK_ROOT_ID:
                 return GBK_SCRIPT;
             case ONS_SJIS_ROOT_ID:

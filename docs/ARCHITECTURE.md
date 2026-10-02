@@ -47,10 +47,12 @@ rendering and audio stacks, crash domains, and memory reclamation. Both
 activities are non-exported in release builds. A debug-only manifest override
 allows explicit ADB launches for legal M0 smoke fixtures.
 
-The Krkr broker validates `EngineLaunchRequest`, executes `startup.tjs` on a
-worker, and opens the private runtime host only on successful script completion.
+The Krkr broker validates `EngineLaunchRequest`, reads/decodes startup into a
+prepared session, and opens the private runtime host. M2 defers startup execution
+until the GLES surface is ready with real dimensions; activation runs once on
+the script worker before input callbacks and timer ticks.
 One TJS2 session is admitted per `:krkr` process because the imported core owns
-process-global caches. The broker executes startup once and transfers a private
+process-global caches. The broker transfers a private
 opaque handle to the runtime. Globals and callbacks survive Home/task return,
 surface/context replacement, and Activity recreation. A replaced window surface
 rebuilds its GL resources even when Android retains the EGL context. Closing,
@@ -59,12 +61,32 @@ recreated requests release the VM; process death invalidates the handle.
 
 Callbacks run on a separate worker with 64 pending slots. The UI and GL thread
 poll atomic status/color; they do not execute scripts. Teardown drops pending
-callbacks and releases the VM after the active callback returns. Script, syntax,
+callbacks, issues cancellation without taking the VM mutex, and unwinds the
+active script before releasing the VM. Startup has a five-second execution
+budget; callbacks have two seconds. VM/lexer checkpoints use the upstream
+silent exception so script catch blocks cannot absorb cancellation. Script, syntax,
 and text errors return `SCRIPT_ERROR`; SAF permission/VFS errors retain their
 existing result categories. Storage names are relative to the game root; traversal,
 absolute paths, NULs, and canonical paths escaping through symlinks are rejected.
 Writable Krkr save-media, broader KAG/Cocos rendering, media, and playable support
 remain future work. See `KRKR_M1_TJS_ENTRY.md` for the API subset and checks.
+
+M2 admits the pinned Window/Layer/Font TJS bindings and upstream Timer and
+AsyncTrigger bindings. An Android backend supplies a bounded layer tree,
+PNG/JPEG decoding through the audited Cocos image subset, FreeType glyphs using
+the bundled Noto font, composition, hit testing and window events. Unsupported
+desktop, transition and drawing operations report explicit script errors.
+The desktop Layer implementation and full RenderManager are outside this closure.
+
+The worker publishes immutable RGBA frames; GL uploads them into its own texture
+and fits the game dimensions centrally, retaining aspect ratio. Input uses the
+same mapping and excludes the letterbox. CPU images and VM state survive surface
+and Activity recreation; GL names belong to the current context and are rebuilt.
+Frame requests coalesce to one queued tick. Timer/AsyncTrigger events pause with
+the Activity; timers rebase on resume. Limits are 128 timers, 128 async triggers,
+256 native events and 64 layers. The official KAG3 3.32 stable rev. 2 snapshot
+is pinned for auditing; framework execution remains M4 work. See the
+[M2 interface audit](KRKR_M2_INTERFACE_AUDIT.md) and [M2 handoff](KRKR_M2_HANDOFF.md).
 
 ## Source and binary policy
 

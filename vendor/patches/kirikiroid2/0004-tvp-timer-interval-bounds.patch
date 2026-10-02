@@ -1,0 +1,19 @@
+Subject: [PATCH] TVP Timer: validate interval before integer conversion
+
+Reject negative, non-finite and over-one-day timer intervals before the
+floating-point to signed-integer cast. This is the audited bounded Android
+scheduler contract; it prevents undefined conversion in the upstream setter.
+
+Tested-by: tests/test_krkr_tjs2_source_admission.py focused git-apply unittest; forced Android CMake configure; Krkr Timer instrumentation
+
+--- a/src/core/utils/TimerIntf.cpp
++++ b/src/core/utils/TimerIntf.cpp
+@@ -201,6 +201,8 @@
+ 	{
+ 		TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Timer);
+ 		double interval = (double)*param * (1<<TVP_SUBMILLI_FRAC_BITS);
++		if(!(interval >= 0 && interval <= 86400000.0 * (1<<TVP_SUBMILLI_FRAC_BITS)))
++			return TJS_E_INVALIDPARAM;
+ 		_this->SetInterval((tjs_int64)(interval + 0.5));
+ 		return TJS_S_OK;
+ 	}

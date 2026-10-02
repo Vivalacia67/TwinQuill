@@ -30,6 +30,12 @@ android {
     buildFeatures {
         prefab = true
     }
+
+}
+
+androidComponents.onVariants { variant ->
+    // Only the source-policy audited fallback font and its license are bundled.
+    variant.sources.assets?.addStaticSourceDirectory(rootProject.file("third_party/fonts").absolutePath)
 }
 
 dependencies {

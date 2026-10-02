@@ -1,0 +1,28 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2026 TwinQuill contributors
+// M2 scheduler fixture; this uses the M1 proof surface, not Window/Layer.
+Debug.message("M2 host ready: " + TwinQuillHost.getSurfaceWidth()
+    + " x " + TwinQuillHost.getSurfaceHeight());
+var ticks = 0, pausedTicks = -1, touches = 0;
+var timer = new Timer(function(event) {
+    if (event.type != "onTimer" || event.target != timer)
+        throw new Exception("Invalid Timer event");
+    ticks++;
+    if (ticks % 2) TwinQuillHost.setColor(40, 100, 220);
+    else TwinQuillHost.setColor(220, 170, 40);
+}, "");
+timer.interval = 500;
+timer.enabled = true;
+TwinQuillHost.onPause = function() { pausedTicks = ticks; };
+TwinQuillHost.onResume = function() {
+    if (pausedTicks >= 0 && ticks != pausedTicks)
+        throw new Exception("Timer ran while paused");
+};
+TwinQuillHost.onTouch = function(action) {
+    if (action != 0) return;
+    touches++;
+    if (touches == 1) {
+        timer.enabled = false;
+        TwinQuillHost.setColor(40, 180, 70);
+    } else System.exit(0);
+};

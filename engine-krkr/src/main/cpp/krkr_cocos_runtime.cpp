@@ -9,6 +9,7 @@
 
 #include <cstddef>
 #include <string>
+#include <algorithm>
 
 namespace twinquill::krkr_runtime {
 namespace {
@@ -185,6 +186,8 @@ int CocosRuntime::draw_frame(bool alternate_color, std::int64_t override_color) 
         return kRuntimeSurfaceNotReady;
     }
 
+    if (const auto frame = twinquill::krkr::display_frame()) return draw_display(*frame);
+
     clear_gl_errors();
     glViewport(0, 0, width_, height_);
     if (!gl_ok()) {
@@ -263,6 +266,10 @@ int CocosRuntime::surface_lost() {
         return kRuntimeOk;
     }
     clear_gl_errors();
+    if (texture_ != 0U) glDeleteTextures(1, &texture_);
+    if (texture_program_ != 0U) glDeleteProgram(texture_program_);
+    texture_ = texture_program_ = 0U;
+    texture_generation_ = 0;
     GLuint program = static_cast<GLuint>(program_);
     release_program(&program, &position_attribute_, &color_attribute_,
                     &mvp_uniform_);
@@ -278,6 +285,9 @@ int CocosRuntime::abandon_context() noexcept {
     // This path is deliberately GL-free.  It is used by context replacement,
     // native destroy, and C++ teardown where no current context is guaranteed.
     program_ = 0U;
+    texture_ = texture_program_ = 0U;
+    texture_generation_ = 0;
+    texture_position_ = texture_coords_ = texture_sampler_ = -1;
     position_attribute_ = -1;
     color_attribute_ = -1;
     mvp_uniform_ = -1;
@@ -288,6 +298,67 @@ int CocosRuntime::abandon_context() noexcept {
 
 int CocosRuntime::destroy() {
     return abandon_context();
+}
+
+int CocosRuntime::draw_display(const twinquill::krkr::DisplayFrame& frame) {
+    if (frame.width <= 0 || frame.height <= 0
+        || frame.rgba.size() != std::size_t(frame.width) * frame.height * 4)
+        return kRuntimeInvalidArgument;
+    clear_gl_errors();
+    if (texture_program_ == 0U) {
+        const auto vertex = compile_shader(GL_VERTEX_SHADER,
+            "attribute vec2 a_position; attribute vec2 a_coords; varying vec2 v_coords;\n"
+            "void main(){gl_Position=vec4(a_position,0.0,1.0);v_coords=a_coords;}\n");
+        const auto fragment = compile_shader(GL_FRAGMENT_SHADER,
+            "precision mediump float; uniform sampler2D u_texture; varying vec2 v_coords;\n"
+            "void main(){gl_FragColor=texture2D(u_texture,v_coords);}\n");
+        if (!vertex || !fragment) {
+            if (vertex) glDeleteShader(vertex);
+            if (fragment) glDeleteShader(fragment);
+            return kRuntimeGraphicsError;
+        }
+        texture_program_ = glCreateProgram();
+        glAttachShader(texture_program_, vertex); glAttachShader(texture_program_, fragment);
+        glLinkProgram(texture_program_);
+        glDeleteShader(vertex); glDeleteShader(fragment);
+        GLint linked = GL_FALSE; glGetProgramiv(texture_program_, GL_LINK_STATUS, &linked);
+        if (linked != GL_TRUE || !gl_ok()) {
+            glDeleteProgram(texture_program_); texture_program_ = 0;
+            return kRuntimeGraphicsError;
+        }
+        texture_position_ = glGetAttribLocation(texture_program_, "a_position");
+        texture_coords_ = glGetAttribLocation(texture_program_, "a_coords");
+        texture_sampler_ = glGetUniformLocation(texture_program_, "u_texture");
+        if (texture_position_ < 0 || texture_coords_ < 0 || texture_sampler_ < 0)
+            return kRuntimeGraphicsError;
+        glGenTextures(1, &texture_);
+    }
+    glViewport(0, 0, width_, height_);
+    glClearColor(0, 0, 0, 1); glClear(GL_COLOR_BUFFER_BIT);
+    glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texture_);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    if (texture_generation_ != frame.generation) {
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, frame.width, frame.height, 0,
+            GL_RGBA, GL_UNSIGNED_BYTE, frame.rgba.data());
+        if (!gl_ok()) return kRuntimeGraphicsError;
+        texture_generation_ = frame.generation;
+    }
+    const auto scale = std::min(float(width_) / frame.width, float(height_) / frame.height);
+    const auto x = frame.width * scale / width_, y = frame.height * scale / height_;
+    const GLfloat vertices[] = {-x, -y, x, -y, -x, y, x, y};
+    const GLfloat coords[] = {0, 1, 1, 1, 0, 0, 1, 0};
+    glUseProgram(texture_program_); glUniform1i(texture_sampler_, 0);
+    glEnableVertexAttribArray(texture_position_); glEnableVertexAttribArray(texture_coords_);
+    glVertexAttribPointer(texture_position_, 2, GL_FLOAT, GL_FALSE, 0, vertices);
+    glVertexAttribPointer(texture_coords_, 2, GL_FLOAT, GL_FALSE, 0, coords);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glDisableVertexAttribArray(texture_position_); glDisableVertexAttribArray(texture_coords_);
+    glBindTexture(GL_TEXTURE_2D, 0); glUseProgram(0);
+    return gl_ok() ? kRuntimeOk : kRuntimeGraphicsError;
 }
 
 }  // namespace twinquill::krkr_runtime

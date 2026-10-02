@@ -8,6 +8,14 @@
 #include "krkr_tjs_session.h"
 #include "krkr_tjs_text.h"
 #include "krkr_runtime_state.h"
+#include "krkr_tvp_visual.h"
+#include <android/asset_manager_jni.h>
+
+extern "C" JNIEXPORT void JNICALL
+Java_io_github_twinquill_engine_krkr_KrkrScriptSession_nativeSetAssets(
+    JNIEnv* env, jclass, jobject assets) {
+    twinquill::krkr::set_visual_assets(AAssetManager_fromJava(env, assets));
+}
 
 namespace {
 std::string source_text(JNIEnv* env, jstring value) {
@@ -29,6 +37,27 @@ Java_io_github_twinquill_engine_krkr_KrkrScriptSession_nativeStart(
     try { return twinquill::krkr::start_tjs_session(kind, source_text(env, source)); }
     catch (const std::invalid_argument&) { return -10; }
     catch (...) { return -41; }
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_io_github_twinquill_engine_krkr_KrkrScriptSession_nativePrepare(
+    JNIEnv* env, jclass, jint kind, jstring source) {
+    try { return twinquill::krkr::start_tjs_session(kind, source_text(env, source), true); }
+    catch (const std::invalid_argument&) { return -10; }
+    catch (...) { return -41; }
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_io_github_twinquill_engine_krkr_KrkrScriptSession_nativeActivate(
+    JNIEnv*, jclass, jlong handle, jint width, jint height) {
+    try { return twinquill::krkr::activate_tjs_session(handle, width, height); }
+    catch (...) { return 21; }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_io_github_twinquill_engine_krkr_KrkrScriptSession_nativeCancel(
+    JNIEnv*, jclass, jlong handle) {
+    try { twinquill::krkr::cancel_tjs_session(handle); } catch (...) { }
 }
 
 extern "C" JNIEXPORT jint JNICALL

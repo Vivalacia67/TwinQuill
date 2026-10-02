@@ -10,7 +10,9 @@
 
 namespace twinquill::krkr {
 // Positive opaque handle on success; negative existing startup diagnostic on error.
-std::int64_t start_tjs_session(int source_kind, const std::string& source);
+std::int64_t start_tjs_session(int source_kind, const std::string& source, bool deferred = false);
+int activate_tjs_session(std::uint64_t handle, int width, int height);
+void cancel_tjs_session(std::uint64_t handle);
 int dispatch_tjs_event(std::uint64_t handle, int event, const std::vector<double>& args);
 int poll_tjs_session(std::uint64_t handle, std::int64_t* color);
 void close_tjs_session(std::uint64_t handle);

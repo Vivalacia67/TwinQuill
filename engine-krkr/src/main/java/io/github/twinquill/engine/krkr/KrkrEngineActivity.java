@@ -396,7 +396,7 @@ public final class KrkrEngineActivity extends Activity {
                     if (persistent) {
                         int kind = runTarget.saf ? KrkrRuntimeRequest.SOURCE_SAF
                             : runTarget.xp3 ? KrkrRuntimeRequest.SOURCE_XP3 : KrkrRuntimeRequest.SOURCE_LOOSE;
-                        created = KrkrScriptSession.start(kind,
+                        created = KrkrScriptSession.prepare(kind,
                             runTarget.saf ? runTarget.treeUri : runTarget.file.getAbsolutePath());
                         nativeResult = 0;
                     } else nativeResult = runTarget.runNative();

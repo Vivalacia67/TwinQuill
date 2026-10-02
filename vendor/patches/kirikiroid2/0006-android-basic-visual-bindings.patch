@@ -1,0 +1,3447 @@
+Subject: [PATCH] TVP: admit upstream basic visual bindings with Android platform instances
+
+Retain the pinned Window/Layer/Font TJS member definitions while selecting
+an Android platform backend for the M2 basic display contract. Desktop,
+transition, media and unsupported drawing members fail explicitly. The
+original implementation remains available without the build flag; only
+the generated copy is patched. The Android backend supplies real bitmaps,
+fonts, composition and input and does not create placeholder methods.
+
+Tested-by: tests/test_krkr_tjs2_source_admission.py focused git-apply unittest; forced Android CMake configure; standard visual pixel/input/lifecycle instrumentation
+
+--- a/src/core/visual/WindowIntf.cpp
++++ b/src/core/visual/WindowIntf.cpp
+@@ -9,6 +9,9 @@
+ // "Window" TJS Class implementation
+ //---------------------------------------------------------------------------
+
++#ifdef TWINQUILL_ANDROID_BASIC_TVP
++#include "krkr_tvp_visual.h"
++#else
+ #include "tjsCommHead.h"
+
+ #include <algorithm>
+@@ -742,6 +745,7 @@
+ //---------------------------------------------------------------------------
+ // tTJSNC_Window : TJS Window class
+ //---------------------------------------------------------------------------
++#endif // original platform implementation
+ tjs_uint32 tTJSNC_Window::ClassID = -1;
+ tTJSNC_Window::tTJSNC_Window() : tTJSNativeClass(TJS_W("Window"))
+ {
+@@ -771,6 +775,7 @@
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/close)
+ //----------------------------------------------------------------------
+ #ifdef USE_OBSOLETE_FUNCTIONS
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/beginMove)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Window);
+@@ -778,8 +783,17 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/beginMove)
+-#endif
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(beginMove)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: beginMove"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(beginMove)
++#endif
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/bringToFront)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Window);
+@@ -787,7 +801,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/bringToFront)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(bringToFront)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: bringToFront"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(bringToFront)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/update)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Window);
+@@ -798,7 +821,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/update)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(update)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: update"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(update)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/showModal)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Window);
+@@ -806,7 +838,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/showModal)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(showModal)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: showModal"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(showModal)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/setMaskRegion)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Window);
+@@ -817,7 +858,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/setMaskRegion)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(setMaskRegion)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: setMaskRegion"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(setMaskRegion)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/removeMaskRegion)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Window);
+@@ -825,7 +875,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/removeMaskRegion)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(removeMaskRegion)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: removeMaskRegion"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(removeMaskRegion)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/add)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Window);
+@@ -835,7 +894,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/add)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(add)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: add"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(add)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/remove)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Window);
+@@ -845,6 +913,14 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/remove)
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(remove)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: remove"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(remove)
++#endif
+ //----------------------------------------------------------------------
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/setSize)
+ {
+@@ -855,6 +931,7 @@
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/setSize)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/setMinSize)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Window);
+@@ -863,7 +940,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/setMinSize)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(setMinSize)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: setMinSize"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(setMinSize)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/setMaxSize)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Window);
+@@ -872,7 +958,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/setMaxSize)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(setMaxSize)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: setMaxSize"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(setMaxSize)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/setPos) // not setPosition
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Window);
+@@ -881,8 +976,17 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/setPos)
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(setPos)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: setPos"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(setPos)
++#endif
+ //----------------------------------------------------------------------
+ #ifdef USE_OBSOLETE_FUNCTIONS
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/setLayerPos) // not setLayerPosition
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Window);
+@@ -891,6 +995,14 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/setLayerPos)
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(setLayerPos)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: setLayerPos"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(setLayerPos)
++#endif
+ #endif
+ //----------------------------------------------------------------------
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/setInnerSize)
+@@ -902,6 +1014,7 @@
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/setInnerSize)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/setZoom)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Window);
+@@ -910,7 +1023,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/setZoom)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(setZoom)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: setZoom"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(setZoom)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/hideMouseCursor)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Window);
+@@ -918,7 +1040,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/hideMouseCursor)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(hideMouseCursor)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: hideMouseCursor"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(hideMouseCursor)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/postInputEvent)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Window);
+@@ -935,6 +1066,14 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/postInputEvent)
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(postInputEvent)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: postInputEvent"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(postInputEvent)
++#endif
+ //----------------------------------------------------------------------
+
+
+@@ -951,6 +1090,7 @@
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onResize)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onMouseEnter)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Window);
+@@ -961,7 +1101,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onMouseEnter)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(onMouseEnter)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: onMouseEnter"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(onMouseEnter)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onMouseLeave)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Window);
+@@ -972,6 +1121,14 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onMouseLeave)
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(onMouseLeave)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: onMouseLeave"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(onMouseLeave)
++#endif
+ //----------------------------------------------------------------------
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onClick)
+ {
+@@ -1043,6 +1200,7 @@
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onMouseMove)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onMouseWheel)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Window);
+@@ -1057,6 +1215,14 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onMouseWheel)
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(onMouseWheel)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: onMouseWheel"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(onMouseWheel)
++#endif
+ //----------------------------------------------------------------------
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onTouchDown)
+ {
+@@ -1106,6 +1272,7 @@
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onTouchMove)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onTouchScaling)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Window);
+@@ -1121,7 +1288,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onTouchScaling)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(onTouchScaling)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: onTouchScaling"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(onTouchScaling)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onTouchRotate)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Window);
+@@ -1138,7 +1314,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onTouchRotate)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(onTouchRotate)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: onTouchRotate"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(onTouchRotate)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onMultiTouch)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Window);
+@@ -1149,6 +1334,14 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onMultiTouch)
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(onMultiTouch)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: onMultiTouch"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(onMultiTouch)
++#endif
+
+ //----------------------------------------------------------------------
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onKeyDown)
+@@ -1189,6 +1382,7 @@
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onKeyPress)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onFileDrop)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Window);
+@@ -1200,6 +1394,14 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onFileDrop)
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(onFileDrop)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: onFileDrop"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(onFileDrop)
++#endif
+ //----------------------------------------------------------------------
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onCloseQuery)
+ {
+@@ -1216,6 +1418,7 @@
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onCloseQuery)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onPopupHide)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Window);
+@@ -1226,6 +1429,14 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onPopupHide)
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(onPopupHide)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: onPopupHide"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(onPopupHide)
++#endif
+ //----------------------------------------------------------------------
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onActivate)
+ {
+@@ -1249,6 +1460,7 @@
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onDeactivate)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onDisplayRotate)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Window);
+@@ -1264,6 +1476,14 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onDisplayRotate)
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(onDisplayRotate)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: onDisplayRotate"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(onDisplayRotate)
++#endif
+ //----------------------------------------------------------------------
+
+ //----------------------------------------------------------------------
+@@ -1349,6 +1569,7 @@
+ }
+ TJS_END_NATIVE_PROP_DECL(height)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(minWidth)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -1368,7 +1589,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(minWidth)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(minWidth)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: minWidth")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: minWidth")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(minWidth)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(minHeight)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -1388,7 +1622,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(minHeight)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(minHeight)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: minHeight")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: minHeight")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(minHeight)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(maxWidth)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -1408,7 +1655,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(maxWidth)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(maxWidth)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: maxWidth")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: maxWidth")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(maxWidth)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(maxHeight)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -1428,7 +1688,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(maxHeight)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(maxHeight)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: maxHeight")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: maxHeight")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(maxHeight)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(left)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -1448,7 +1721,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(left)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(left)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: left")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: left")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(left)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(top)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -1468,7 +1754,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(top)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(top)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: top")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: top")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(top)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(focusable)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -1488,8 +1787,21 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(focusable)
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(focusable)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: focusable")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: focusable")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(focusable)
++#endif
+ //----------------------------------------------------------------------
+ #ifdef USE_OBSOLETE_FUNCTIONS
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(layerLeft)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -1509,7 +1821,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(layerLeft)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(layerLeft)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: layerLeft")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: layerLeft")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(layerLeft)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(layerTop)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -1529,7 +1854,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(layerTop)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(layerTop)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: layerTop")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: layerTop")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(layerTop)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(innerSunken)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -1549,6 +1887,18 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(innerSunken)
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(innerSunken)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: innerSunken")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: innerSunken")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(innerSunken)
++#endif
+ #endif
+ //----------------------------------------------------------------------
+ TJS_BEGIN_NATIVE_PROP_DECL(innerWidth)
+@@ -1591,6 +1941,7 @@
+ }
+ TJS_END_NATIVE_PROP_DECL(innerHeight)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(zoomNumer)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -1610,7 +1961,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(zoomNumer)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(zoomNumer)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: zoomNumer")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: zoomNumer")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(zoomNumer)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(zoomDenom)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -1630,7 +1994,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(zoomDenom)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(zoomDenom)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: zoomDenom")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: zoomDenom")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(zoomDenom)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(borderStyle)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -1650,7 +2027,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(borderStyle)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(borderStyle)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: borderStyle")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: borderStyle")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(borderStyle)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(stayOnTop)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -1670,8 +2060,21 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(stayOnTop)
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(stayOnTop)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: stayOnTop")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: stayOnTop")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(stayOnTop)
++#endif
+ //----------------------------------------------------------------------
+ #ifdef USE_OBSOLETE_FUNCTIONS
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(showScrollBars)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -1691,8 +2094,21 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(showScrollBars)
+-#endif
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(showScrollBars)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: showScrollBars")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: showScrollBars")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(showScrollBars)
++#endif
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(useMouseKey)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -1712,7 +2128,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(useMouseKey)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(useMouseKey)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: useMouseKey")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: useMouseKey")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(useMouseKey)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(trapKey)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -1732,7 +2161,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(trapKey)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(trapKey)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: trapKey")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: trapKey")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(trapKey)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(imeMode) // not defaultImeMode
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -1752,7 +2194,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(imeMode)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(imeMode)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: imeMode")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: imeMode")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(imeMode)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(mouseCursorState)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -1772,7 +2227,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(mouseCursorState)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(mouseCursorState)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: mouseCursorState")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: mouseCursorState")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(mouseCursorState)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(fullScreen)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -1792,6 +2260,18 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(fullScreen)
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(fullScreen)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: fullScreen")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: fullScreen")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(fullScreen)
++#endif
+ //----------------------------------------------------------------------
+ TJS_BEGIN_NATIVE_PROP_DECL(mainWindow) /* static */
+ {
+@@ -1873,6 +2353,7 @@
+ }
+ TJS_END_NATIVE_PROP_DECL(primaryLayer)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(waitVSync)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -1892,7 +2373,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(waitVSync)
+-//---------------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(waitVSync)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: waitVSync")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: waitVSync")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(waitVSync)
++#endif
++//---------------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(layerTreeOwnerInterface)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -1906,6 +2400,18 @@
+ 	TJS_DENY_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(layerTreeOwnerInterface)
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(layerTreeOwnerInterface)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: layerTreeOwnerInterface")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: layerTreeOwnerInterface")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(layerTreeOwnerInterface)
++#endif
+ //----------------------------------------------------------------------
+
+ 	TJS_END_NATIVE_MEMBERS
+--- a/src/core/visual/LayerIntf.cpp
++++ b/src/core/visual/LayerIntf.cpp
+@@ -11,6 +11,9 @@
+ #ifndef _USE_MATH_DEFINES
+ #define _USE_MATH_DEFINES
+ #endif
++#ifdef TWINQUILL_ANDROID_BASIC_TVP
++#include "krkr_tvp_visual.h"
++#else
+ #include "tjsCommHead.h"
+
+ #include <math.h>
+@@ -7480,6 +7483,7 @@
+ //---------------------------------------------------------------------------
+ // tTJSNC_Layer : TJS Layer class
+ //---------------------------------------------------------------------------
++#endif // original platform implementation
+ tjs_uint32 tTJSNC_Layer::ClassID = -1;
+ tTJSNC_Layer::tTJSNC_Layer() : tTJSNativeClass(TJS_W("Layer"))
+ {
+@@ -7499,6 +7503,7 @@
+ //-- methods
+
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/moveBefore)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -7519,7 +7524,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/moveBefore)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(moveBefore)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: moveBefore"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(moveBefore)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/moveBehind)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -7540,6 +7554,14 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/moveBehind)
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(moveBehind)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: moveBehind"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(moveBehind)
++#endif
+ //----------------------------------------------------------------------
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/bringToBack)
+ {
+@@ -7561,6 +7583,7 @@
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/bringToFront)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/saveLayerImage)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -7573,6 +7596,14 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/saveLayerImage)
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(saveLayerImage)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: saveLayerImage"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(saveLayerImage)
++#endif
+ //----------------------------------------------------------------------
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/loadImages)
+ {
+@@ -7597,6 +7628,7 @@
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/loadImages)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/loadProvinceImage)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -7606,6 +7638,14 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/loadProvinceImage)
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(loadProvinceImage)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: loadProvinceImage"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(loadProvinceImage)
++#endif
+ //----------------------------------------------------------------------
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/getMainPixel)
+ {
+@@ -7625,6 +7665,7 @@
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/setMainPixel)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/getMaskPixel)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -7633,7 +7674,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/getMaskPixel)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(getMaskPixel)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: getMaskPixel"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(getMaskPixel)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/setMaskPixel)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -7642,7 +7692,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/setMaskPixel)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(setMaskPixel)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: setMaskPixel"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(setMaskPixel)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/getProvincePixel)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -7651,7 +7710,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/getProvincePixel)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(getProvincePixel)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: getProvincePixel"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(getProvincePixel)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/setProvincePixel)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -7660,7 +7728,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/setProvincePixel)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(setProvincePixel)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: setProvincePixel"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(setProvincePixel)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/getLayerAt)// not GetMostFrontChildAt
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -7687,6 +7764,14 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/getLayerAt)
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(getLayerAt)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: getLayerAt"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(getLayerAt)
++#endif
+ //----------------------------------------------------------------------
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/setPos) // not setPosition
+ {
+@@ -7698,8 +7783,12 @@
+ 		tTVPRect r;
+ 		r.left = *param[0];
+ 		r.top = *param[1];
++#ifdef TWINQUILL_ANDROID_BASIC_TVP
++		r = TVPAndroidRect(r.left, r.top, *param[2], *param[3]);
++#else
+ 		r.right = (tjs_int)*param[2] + r.left;
+ 		r.bottom = (tjs_int)*param[3] + r.top;
++#endif
+ 		_this->SetBounds(r);
+ 	}
+ 	else
+@@ -7746,6 +7835,7 @@
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/setImageSize)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/independMainImage)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -7756,7 +7846,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/independMainImage)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(independMainImage)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: independMainImage"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(independMainImage)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/independProvinceImage)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -7767,6 +7866,14 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/independProvinceImage)
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(independProvinceImage)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: independProvinceImage"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(independProvinceImage)
++#endif
+ //----------------------------------------------------------------------
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/setClip) // not setClipRect
+ {
+@@ -7801,12 +7908,17 @@
+ 	tjs_int x, y;
+ 	x = *param[0];
+ 	y = *param[1];
++#ifdef TWINQUILL_ANDROID_BASIC_TVP
++	_this->FillRect(TVPAndroidRect(x, y, *param[2], *param[3]),
++#else
+ 	_this->FillRect(tTVPRect(x, y, x+(tjs_int)*param[2], y+(tjs_int)*param[3]),
++#endif
+ 		static_cast<tjs_uint32>((tjs_int64)*param[4]));
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/fillRect)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/colorRect)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -7820,6 +7932,14 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/colorRect)
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(colorRect)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: colorRect"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(colorRect)
++#endif
+ //----------------------------------------------------------------------
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/drawText)
+ {
+@@ -7843,6 +7963,7 @@
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/drawText)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/drawGlyph)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -7865,7 +7986,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/drawGlyph)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(drawGlyph)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: drawGlyph"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(drawGlyph)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/piledCopy)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -7890,7 +8020,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/piledCopy)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(piledCopy)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: piledCopy"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(piledCopy)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/copyRect)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -7932,7 +8071,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/copyRect)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(copyRect)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: copyRect"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(copyRect)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/pileRect)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -7964,7 +8112,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/pileRect)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(pileRect)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: pileRect"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(pileRect)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/blendRect)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -7996,7 +8153,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/blendRect)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(blendRect)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: blendRect"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(blendRect)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/copy9Patch)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -8041,7 +8207,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/copy9Patch)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(copy9Patch)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: copy9Patch"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(copy9Patch)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/operateRect)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -8096,7 +8271,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/operateRect)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(operateRect)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: operateRect"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(operateRect)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/stretchCopy)
+ {
+ 	// dx, dy, dw, dh, src, sx, sy, sw, sh, type=0
+@@ -8149,7 +8333,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/stretchCopy)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(stretchCopy)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: stretchCopy"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(stretchCopy)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/stretchPile)
+ {
+ 	// dx, dy, dw, dh, src, sx, sy, sw, sh, opa=255, type=0
+@@ -8194,7 +8387,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/stretchPile)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(stretchPile)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: stretchPile"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(stretchPile)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/stretchBlend)
+ {
+ 	// dx, dy, dw, dh, src, sx, sy, sw, sh, opa=255, type=0
+@@ -8242,7 +8444,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/stretchBlend)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(stretchBlend)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: stretchBlend"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(stretchBlend)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/operateStretch)
+ {
+ 	// dx, dy, dw, dh, src, sx, sy, sw, sh, mode=omAuto, opa=255, type=0
+@@ -8310,7 +8521,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/operateStretch)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(operateStretch)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: operateStretch"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(operateStretch)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/affineCopy)
+ {
+ 	// src, sx, sy, sw, sh, affine, x0/a, y0/b, x1/c, y1/d, x2/tx, y2/ty, type=0
+@@ -8382,7 +8602,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/affineCopy)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(affineCopy)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: affineCopy"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(affineCopy)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/affinePile)
+ {
+ 	// src, sx, sy, sw, sh, affine, x0/a, y0/b, x1/c, y1/d, x2/tx, y2/ty, opa=255, type=0
+@@ -8444,7 +8673,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/affinePile)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(affinePile)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: affinePile"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(affinePile)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/affineBlend)
+ {
+ 	// src, sx, sy, sw, sh, affine, x0/a, y0/b, x1/c, y1/d, x2/tx, y2/ty, opa=255, type=0
+@@ -8506,7 +8744,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/affineBlend)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(affineBlend)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: affineBlend"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(affineBlend)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/operateAffine)
+ {
+ 	// src, sx, sy, sw, sh, affine, x0/a, y0/b, x1/c, y1/d, x2/tx, y2/ty,
+@@ -8592,7 +8839,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/operateAffine)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(operateAffine)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: operateAffine"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(operateAffine)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/doBoxBlur)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -8611,7 +8867,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/doBoxBlur)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(doBoxBlur)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: doBoxBlur"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(doBoxBlur)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/adjustGamma)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -8645,7 +8910,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/adjustGamma)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(adjustGamma)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: adjustGamma"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(adjustGamma)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/doGrayScale)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -8655,7 +8929,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/doGrayScale)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(doGrayScale)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: doGrayScale"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(doGrayScale)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/flipLR) // not LRFlip
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -8665,7 +8948,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/flipLR)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(flipLR)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: flipLR"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(flipLR)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/flipUD) // not UDFlip
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -8675,7 +8967,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/flipUD)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(flipUD)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: flipUD"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(flipUD)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/convertType)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -8689,6 +8990,14 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/convertType)
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(convertType)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: convertType"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(convertType)
++#endif
+ //----------------------------------------------------------------------
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/update)
+ {
+@@ -8710,13 +9019,18 @@
+ 		t = (tjs_int)*param[1];
+ 		w = (tjs_int)*param[2];
+ 		h = (tjs_int)*param[3];
++#ifdef TWINQUILL_ANDROID_BASIC_TVP
++		_this->UpdateByScript(TVPAndroidRect(l, t, w, h));
++#else
+ 		_this->UpdateByScript(tTVPRect(l, t, l+w, t+h));
++#endif
+ 	}
+
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/update)
+ //---------------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/setCursorPos)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -8728,7 +9042,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/setCursorPos)
+-//---------------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(setCursorPos)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: setCursorPos"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(setCursorPos)
++#endif
++//---------------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/releaseCapture)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -8738,7 +9061,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/releaseCapture)
+-//---------------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(releaseCapture)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: releaseCapture"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(releaseCapture)
++#endif
++//---------------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/releaseTouchCapture)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -8756,7 +9088,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/releaseTouchCapture)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(releaseTouchCapture)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: releaseTouchCapture"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(releaseTouchCapture)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/focus) // not setFocus
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -8771,7 +9112,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/focus)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(focus)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: focus"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(focus)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/focusPrev)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -8789,7 +9139,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/focusPrev)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(focusPrev)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: focusPrev"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(focusPrev)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/focusNext)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -8807,7 +9166,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/focusNext)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(focusNext)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: focusNext"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(focusNext)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/setMode)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -8817,7 +9185,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/setMode)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(setMode)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: setMode"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(setMode)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/removeMode)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -8827,7 +9204,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/removeMode)
+-//---------------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(removeMode)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: removeMode"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(removeMode)
++#endif
++//---------------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/setAttentionPos) // not setAttentionPoint
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -8839,7 +9225,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/setAttentionPos)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(setAttentionPos)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: setAttentionPos"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(setAttentionPos)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/beginTransition)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -8872,7 +9267,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/beginTransition)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(beginTransition)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: beginTransition"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(beginTransition)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/stopTransition)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -8882,7 +9286,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/stopTransition)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(stopTransition)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: stopTransition"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(stopTransition)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/assignImages)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -8904,7 +9317,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/assignImages)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(assignImages)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: assignImages"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(assignImages)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/dump)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -8912,7 +9334,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/dump)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(dump)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: dump"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(dump)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/copyToBitmapFromMainImage)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -8931,7 +9362,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/copyToBitmapFromMainImage)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(copyToBitmapFromMainImage)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: copyToBitmapFromMainImage"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(copyToBitmapFromMainImage)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/copyFromBitmapToMainImage)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -8950,11 +9390,20 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/copyFromBitmapToMainImage)
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(copyFromBitmapToMainImage)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: copyFromBitmapToMainImage"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(copyFromBitmapToMainImage)
++#endif
+ //----------------------------------------------------------------------
+
+ //-- events
+
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onHitTest)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -8979,6 +9428,14 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onHitTest)
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(onHitTest)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: onHitTest"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(onHitTest)
++#endif
+ //----------------------------------------------------------------------
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onClick)
+ {
+@@ -9070,6 +9527,7 @@
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onMouseMove)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onMouseEnter)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -9084,7 +9542,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onMouseEnter)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(onMouseEnter)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: onMouseEnter"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(onMouseEnter)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onMouseLeave)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -9099,6 +9566,14 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onMouseLeave)
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(onMouseLeave)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: onMouseLeave"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(onMouseLeave)
++#endif
+ //----------------------------------------------------------------------
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onTouchDown)
+ {
+@@ -9160,6 +9635,7 @@
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onTouchMove)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onTouchScaling)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -9179,7 +9655,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onTouchScaling)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(onTouchScaling)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: onTouchScaling"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(onTouchScaling)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onTouchRotate)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -9200,7 +9685,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onTouchRotate)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(onTouchRotate)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: onTouchRotate"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(onTouchRotate)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onMultiTouch)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -9215,7 +9709,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onMultiTouch)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(onMultiTouch)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: onMultiTouch"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(onMultiTouch)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onBlur)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -9231,7 +9734,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onBlur)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(onBlur)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: onBlur"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(onBlur)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onFocus)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -9248,7 +9760,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onFocus)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(onFocus)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: onFocus"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(onFocus)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onNodeEnabled)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -9263,7 +9784,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onNodeEnabled)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(onNodeEnabled)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: onNodeEnabled"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(onNodeEnabled)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onNodeDisabled)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -9278,6 +9808,14 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onNodeDisabled)
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(onNodeDisabled)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: onNodeDisabled"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(onNodeDisabled)
++#endif
+ //----------------------------------------------------------------------
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onKeyDown)
+ {
+@@ -9294,8 +9832,10 @@
+ 	}
+
+ 	// call default key down behavior handler
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ 	if(numparams < 3 || param[2]->operator bool())
+ 		_this->DefaultKeyDown((tjs_int)*param[0], (tjs_int)*param[1]);
++#endif
+
+ 	return TJS_S_OK;
+ }
+@@ -9316,8 +9856,10 @@
+ 	}
+
+ 	// call default key up behavior handler
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ 	if(numparams < 3 || param[2]->operator bool())
+ 		_this->DefaultKeyUp((tjs_int)*param[0], (tjs_int)*param[1]);
++#endif
+
+ 	return TJS_S_OK;
+ }
+@@ -9337,6 +9879,7 @@
+ 	}
+
+ 	// call default key down behavior handler
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ 	if(numparams < 2 || param[1]->operator bool())
+ 	{
+ 		ttstr p = *param[0];
+@@ -9344,11 +9887,13 @@
+ 		if(p.IsEmpty()) code = 0; else code = (tjs_char)*p.c_str();
+ 		_this->DefaultKeyPress(code);
+ 	}
++#endif
+
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onKeyPress)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onMouseWheel)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -9367,7 +9912,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onMouseWheel)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(onMouseWheel)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: onMouseWheel"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(onMouseWheel)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onSearchPrevFocusable)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -9409,7 +9963,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onSearchPrevFocusable)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(onSearchPrevFocusable)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: onSearchPrevFocusable"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(onSearchPrevFocusable)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onSearchNextFocusable)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -9451,7 +10014,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onSearchNextFocusable)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(onSearchNextFocusable)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: onSearchNextFocusable"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(onSearchNextFocusable)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onBeforeFocus)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -9495,6 +10067,14 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onBeforeFocus)
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(onBeforeFocus)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: onBeforeFocus"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(onBeforeFocus)
++#endif
+ //----------------------------------------------------------------------
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onPaint)
+ {
+@@ -9511,6 +10091,7 @@
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onPaint)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/onTransitionCompleted)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+@@ -9527,6 +10108,14 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/onTransitionCompleted)
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(onTransitionCompleted)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: onTransitionCompleted"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(onTransitionCompleted)
++#endif
+ //----------------------------------------------------------------------
+
+
+@@ -9556,7 +10145,7 @@
+ 	{
+ 		TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Layer);
+
+-		tTJSNI_BaseLayer *parent;
++		tTJSNI_BaseLayer *parent = NULL;
+ 		tTJSVariantClosure clo = param->AsObjectClosureNoAddRef();
+ 		if(clo.Object)
+ 		{
+@@ -9573,6 +10162,7 @@
+ }
+ TJS_END_NATIVE_PROP_DECL(parent)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(children)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -9587,6 +10177,18 @@
+ 	TJS_DENY_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(children)
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(children)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: children")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: children")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(children)
++#endif
+ //----------------------------------------------------------------------
+ TJS_BEGIN_NATIVE_PROP_DECL(order) // not orderIndex
+ {
+@@ -9608,6 +10210,7 @@
+ }
+ TJS_END_NATIVE_PROP_DECL(order)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(absolute) // not absoluteOrderIndex
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -9627,7 +10230,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(absolute)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(absolute)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: absolute")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: absolute")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(absolute)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(absoluteOrderMode) // not absoluteOrderIndexMode
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -9647,6 +10263,18 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(absoluteOrderMode)
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(absoluteOrderMode)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: absoluteOrderMode")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: absoluteOrderMode")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(absoluteOrderMode)
++#endif
+ //----------------------------------------------------------------------
+ TJS_BEGIN_NATIVE_PROP_DECL(visible)
+ {
+@@ -9668,6 +10296,7 @@
+ }
+ TJS_END_NATIVE_PROP_DECL(visible)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(cached)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -9687,6 +10316,18 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(cached)
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(cached)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: cached")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: cached")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(cached)
++#endif
+ //----------------------------------------------------------------------
+ TJS_BEGIN_NATIVE_PROP_DECL(nodeVisible)
+ {
+@@ -10059,6 +10700,7 @@
+ }
+ TJS_END_NATIVE_PROP_DECL(clipHeight)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(imageModified)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10078,7 +10720,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(imageModified)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(imageModified)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: imageModified")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: imageModified")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(imageModified)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(hitType)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10098,7 +10753,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(hitType)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(hitType)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: hitType")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: hitType")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(hitType)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(hitThreshold)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10118,7 +10786,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(hitThreshold)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(hitThreshold)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: hitThreshold")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: hitThreshold")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(hitThreshold)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(cursor)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10141,7 +10822,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(cursor)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(cursor)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: cursor")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: cursor")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(cursor)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(cursorX)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10161,7 +10855,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(cursorX)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(cursorX)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: cursorX")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: cursorX")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(cursorX)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(cursorY)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10181,7 +10888,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(cursorY)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(cursorY)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: cursorY")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: cursorY")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(cursorY)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(hint)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10201,7 +10921,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(hint)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(hint)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: hint")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: hint")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(hint)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(showParentHint)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10221,7 +10954,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(showParentHint)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(showParentHint)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: showParentHint")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: showParentHint")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(showParentHint)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(ignoreHintSensing)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10241,7 +10987,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(ignoreHintSensing)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(ignoreHintSensing)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: ignoreHintSensing")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: ignoreHintSensing")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(ignoreHintSensing)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(focusable)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10261,7 +11020,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(focusable)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(focusable)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: focusable")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: focusable")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(focusable)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(prevFocusable)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10284,7 +11056,20 @@
+ 	TJS_DENY_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(prevFocusable)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(prevFocusable)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: prevFocusable")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: prevFocusable")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(prevFocusable)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(nextFocusable)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10307,7 +11092,20 @@
+ 	TJS_DENY_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(nextFocusable)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(nextFocusable)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: nextFocusable")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: nextFocusable")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(nextFocusable)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(joinFocusChain)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10327,7 +11125,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(joinFocusChain)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(joinFocusChain)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: joinFocusChain")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: joinFocusChain")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(joinFocusChain)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(nodeFocusable)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10341,7 +11152,20 @@
+ 	TJS_DENY_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(nodeFocusable)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(nodeFocusable)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: nodeFocusable")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: nodeFocusable")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(nodeFocusable)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(focused)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10355,6 +11179,18 @@
+ 	TJS_DENY_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(focused)
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(focused)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: focused")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: focused")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(focused)
++#endif
+ //----------------------------------------------------------------------
+ TJS_BEGIN_NATIVE_PROP_DECL(enabled)
+ {
+@@ -10376,6 +11212,7 @@
+ }
+ TJS_END_NATIVE_PROP_DECL(enabled)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(nodeEnabled)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10389,7 +11226,20 @@
+ 	TJS_DENY_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(nodeEnabled)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(nodeEnabled)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: nodeEnabled")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: nodeEnabled")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(nodeEnabled)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(attentionLeft)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10409,7 +11259,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(attentionLeft)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(attentionLeft)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: attentionLeft")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: attentionLeft")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(attentionLeft)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(attentionTop)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10429,7 +11292,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(attentionTop)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(attentionTop)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: attentionTop")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: attentionTop")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(attentionTop)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(useAttention)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10449,7 +11325,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(useAttention)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(useAttention)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: useAttention")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: useAttention")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(useAttention)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(imeMode)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10469,7 +11358,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(imeMode)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(imeMode)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: imeMode")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: imeMode")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(imeMode)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(callOnPaint)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10489,6 +11391,18 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(callOnPaint)
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(callOnPaint)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: callOnPaint")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: callOnPaint")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(callOnPaint)
++#endif
+ //----------------------------------------------------------------------
+ TJS_BEGIN_NATIVE_PROP_DECL(font)
+ {
+@@ -10525,6 +11439,7 @@
+ }
+ TJS_END_NATIVE_PROP_DECL(name)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(neutralColor)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10544,7 +11459,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(neutralColor)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(neutralColor)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: neutralColor")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: neutralColor")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(neutralColor)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(hasImage)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10564,7 +11492,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(hasImage)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(hasImage)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: hasImage")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: hasImage")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(hasImage)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(mainImageBuffer)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10578,7 +11519,20 @@
+ 	TJS_DENY_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(mainImageBuffer)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(mainImageBuffer)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: mainImageBuffer")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: mainImageBuffer")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(mainImageBuffer)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(mainImageBufferForWrite)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10592,7 +11546,20 @@
+ 	TJS_DENY_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(mainImageBufferForWrite)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(mainImageBufferForWrite)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: mainImageBufferForWrite")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: mainImageBufferForWrite")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(mainImageBufferForWrite)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(mainImageBufferPitch)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10606,7 +11573,20 @@
+ 	TJS_DENY_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(mainImageBufferPitch)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(mainImageBufferPitch)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: mainImageBufferPitch")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: mainImageBufferPitch")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(mainImageBufferPitch)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(provinceImageBuffer)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10620,7 +11600,20 @@
+ 	TJS_DENY_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(provinceImageBuffer)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(provinceImageBuffer)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: provinceImageBuffer")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: provinceImageBuffer")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(provinceImageBuffer)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(provinceImageBufferForWrite)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10634,7 +11627,20 @@
+ 	TJS_DENY_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(provinceImageBufferForWrite)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(provinceImageBufferForWrite)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: provinceImageBufferForWrite")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: provinceImageBufferForWrite")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(provinceImageBufferForWrite)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(provinceImageBufferPitch)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -10648,6 +11654,18 @@
+ 	TJS_DENY_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(provinceImageBufferPitch)
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(provinceImageBufferPitch)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: provinceImageBufferPitch")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: provinceImageBufferPitch")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(provinceImageBufferPitch)
++#endif
+ //----------------------------------------------------------------------
+ 	TJS_END_NATIVE_MEMBERS
+
+@@ -10657,10 +11675,13 @@
+
+
+
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ extern FontSystem* TVPFontSystem;
++#endif
+ //---------------------------------------------------------------------------
+ // tTJSNI_Font : Font Native Object
+ //---------------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ tTJSNI_Font::tTJSNI_Font()
+ {
+ 	Layer = NULL;
+@@ -10952,6 +11973,7 @@
+ //---------------------------------------------------------------------------
+ // tTJSNC_Font : TJS Font class
+ //---------------------------------------------------------------------------
++#endif
+ tjs_uint32 tTJSNC_Font::ClassID = -1;
+ tTJSNC_Font::tTJSNC_Font() : tTJSNativeClass(TJS_W("Font"))
+ {
+@@ -10991,6 +12013,7 @@
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/getTextHeight)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/getEscWidthX)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Font);
+@@ -11001,7 +12024,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/getEscWidthX)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(getEscWidthX)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: getEscWidthX"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(getEscWidthX)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/getEscWidthY)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Font);
+@@ -11012,7 +12044,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/getEscWidthY)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(getEscWidthY)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: getEscWidthY"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(getEscWidthY)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/getEscHeightX)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Font);
+@@ -11023,7 +12064,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/getEscHeightX)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(getEscHeightX)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: getEscHeightX"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(getEscHeightX)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/getEscHeightY)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Font);
+@@ -11034,7 +12084,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/getEscHeightY)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(getEscHeightY)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: getEscHeightY"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(getEscHeightY)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/getGlyphDrawRect)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Font);
+@@ -11051,7 +12110,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/getGlyphDrawRect)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(getGlyphDrawRect)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: getGlyphDrawRect"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(getGlyphDrawRect)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/doUserSelect)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Font);
+@@ -11076,7 +12144,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/doUserSelect)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(doUserSelect)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: doUserSelect"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(doUserSelect)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/getList)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Font);
+@@ -11106,7 +12183,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/getList)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(getList)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: getList"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(getList)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/mapPrerenderedFont)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Font);
+@@ -11117,7 +12203,16 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/mapPrerenderedFont)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(mapPrerenderedFont)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: mapPrerenderedFont"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(mapPrerenderedFont)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_METHOD_DECL(/*func. name*/unmapPrerenderedFont)
+ {
+ 	TJS_GET_NATIVE_INSTANCE(/*var. name*/_this, /*var. type*/tTJSNI_Font);
+@@ -11128,6 +12223,14 @@
+ 	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(/*func. name*/unmapPrerenderedFont)
++#else
++TJS_BEGIN_NATIVE_METHOD_DECL(unmapPrerenderedFont)
++{
++	TJS_eTJSError(TJS_W("Unsupported M2 method: unmapPrerenderedFont"));
++	return TJS_E_NOTIMPL;
++}
++TJS_END_NATIVE_METHOD_DECL(unmapPrerenderedFont)
++#endif
+ //----------------------------------------------------------------------
+
+ //-- properties
+@@ -11173,6 +12276,7 @@
+ }
+ TJS_END_NATIVE_PROP_DECL(height)
+ //----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(bold)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -11192,7 +12296,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(bold)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(bold)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: bold")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: bold")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(bold)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(italic)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -11212,7 +12329,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(italic)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(italic)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: italic")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: italic")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(italic)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(strikeout)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -11232,7 +12362,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(strikeout)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(strikeout)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: strikeout")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: strikeout")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(strikeout)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(underline)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -11252,7 +12395,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(underline)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(underline)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: underline")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: underline")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(underline)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(angle)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -11272,7 +12428,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(angle)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(angle)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: angle")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: angle")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(angle)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(faceIsFileName)
+ {
+ 	// Face名をファイル名として開く、FreeTypeでのみ有効。ただし、そのレイヤーでIMEを有効した場合動作は不定
+@@ -11293,7 +12462,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(faceIsFileName)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(faceIsFileName)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: faceIsFileName")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: faceIsFileName")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(faceIsFileName)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(rasterizer)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -11311,7 +12493,20 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_STATIC_PROP_DECL(rasterizer)
+-//----------------------------------------------------------------------
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(rasterizer)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: rasterizer")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: rasterizer")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(rasterizer)
++#endif
++//----------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ TJS_BEGIN_NATIVE_PROP_DECL(defaultFaceName)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+@@ -11332,6 +12527,18 @@
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_STATIC_PROP_DECL(defaultFaceName)
++#else
++TJS_BEGIN_NATIVE_PROP_DECL(defaultFaceName)
++{
++	TJS_BEGIN_NATIVE_PROP_GETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: defaultFaceName")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_eTJSError(TJS_W("Unsupported M2 property: defaultFaceName")); return TJS_E_NOTIMPL; }
++	TJS_END_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(defaultFaceName)
++#endif
+ //----------------------------------------------------------------------
+
+ 	TJS_END_NATIVE_MEMBERS
+@@ -11340,6 +12547,7 @@
+ //---------------------------------------------------------------------------
+ // TVPCreateNativeClass_Font
+ //---------------------------------------------------------------------------
++#ifndef TWINQUILL_ANDROID_BASIC_TVP
+ struct tFontClassHolder {
+ 	tTJSNativeClass * Obj;
+ 	tFontClassHolder() : Obj(NULL) {}
+@@ -11391,3 +12599,5 @@
+ }
+ //---------------------------------------------------------------------------
+
++
++#endif

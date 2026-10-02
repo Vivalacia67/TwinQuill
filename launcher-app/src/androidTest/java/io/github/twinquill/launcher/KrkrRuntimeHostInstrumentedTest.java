@@ -464,6 +464,210 @@ public final class KrkrRuntimeHostInstrumentedTest {
     }
 
     @Test
+    public void defersStartupUntilSurfaceReadyAndExecutesItOnce() throws Exception {
+        File fixture = fixture("deferred");
+        File startup = new File(fixture, "startup.tjs");
+        Files.write(startup.toPath(), ("if (TwinQuillHost.getSurfaceWidth() <= 1 "
+            + "|| TwinQuillHost.getSurfaceHeight() <= 1) throw new Exception(\"host not ready\");"
+            + "var starts = 1; TwinQuillHost.setColor(20,180,70);"
+            + "TwinQuillHost.onSurfaceChanged = function() { "
+            + "if (starts != 1) throw new Exception(\"startup repeated\"); };")
+            .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        long startups = scriptStats()[1];
+        KrkrScriptSession session = KrkrScriptSession.prepare(KrkrRuntimeRequest.SOURCE_LOOSE,
+            startup.getCanonicalPath());
+        assertEquals("prepare executed startup without a host", startups, scriptStats()[1]);
+        assertEquals(0, session.poll(0));
+        launchPreparedRuntime(fixture, session);
+        waitForColor(surface, 20, 180, 70);
+        assertEquals(startups + 1, scriptStats()[1]);
+        session.hostReady(surface.getWidth(), surface.getHeight());
+        session.hostReady(surface.getWidth(), surface.getHeight());
+        Thread.sleep(100);
+        assertEquals(startups + 1, scriptStats()[1]);
+    }
+
+    @Test
+    public void timesOutUncatchableStartupLoopAndCanStartAgain() throws Exception {
+        File fixture = fixture("startup-deadline");
+        File startup = new File(fixture, "startup.tjs");
+        Files.write(startup.toPath(), "while (true) { try { while (true) {} } catch (e) {} }"
+            .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        long start = android.os.SystemClock.elapsedRealtime();
+        try {
+            KrkrScriptSession.start(KrkrRuntimeRequest.SOURCE_LOOSE, startup.getCanonicalPath());
+            throw new AssertionError("infinite startup returned successfully");
+        } catch (KrkrScriptSession.StartupException expected) {
+            assertEquals(20, expected.diagnostic);
+        }
+        assertTrue("startup did not respect its deadline",
+            android.os.SystemClock.elapsedRealtime() - start < 9_000);
+        waitForScriptsReleased();
+        startRuntime(fixture, "TwinQuillHost.setColor(70,90,210);");
+        waitForColor(surface, 70, 90, 210);
+    }
+
+    @Test
+    public void cancelsRunningCallbackWithoutBlockingUiOrLeakingVm() throws Exception {
+        File fixture = fixture("cancel-running");
+        KrkrScriptSession session = startRuntime(fixture,
+            "TwinQuillHost.onTouch = function() { TwinQuillHost.setColor(200,50,80);"
+            + "while (true) { try { while (true) {} } catch (e) {} } };" );
+        touchDown();
+        waitForColor(surface, 200, 50, 80);
+        long start = android.os.SystemClock.elapsedRealtime();
+        instrumentation.runOnMainSync(runtime::onBackPressed);
+        assertTrue("UI exit blocked on the script worker",
+            android.os.SystemClock.elapsedRealtime() - start < 1_500);
+        session.close();
+        waitForScriptsReleased();
+        assertTrue("cancel did not unwind the running callback",
+            android.os.SystemClock.elapsedRealtime() - start < 3_000);
+        startRuntime(fixture, "TwinQuillHost.setColor(100,220,100);");
+        waitForColor(surface, 100, 220, 100);
+    }
+
+    @Test
+    public void timesOutRunningCallbackAndReleasesVm() throws Exception {
+        File fixture = fixture("callback-deadline");
+        KrkrScriptSession session = startRuntime(fixture,
+            "TwinQuillHost.onTouch = function() { TwinQuillHost.setColor(200,50,80);"
+            + "while (true) { try { while (true) {} } catch (e) {} } };" );
+        touchDown();
+        waitForColor(surface, 200, 50, 80);
+        long deadline = android.os.SystemClock.elapsedRealtime() + 6_000;
+        while (!runtime.isFinishing() && !runtime.isDestroyed()
+            && android.os.SystemClock.elapsedRealtime() < deadline) Thread.sleep(25);
+        assertTrue("callback timeout did not finish the runtime",
+            runtime.isFinishing() || runtime.isDestroyed());
+        waitForScriptsReleased();
+        assertEquals(11, session.poll(0));
+    }
+
+    @Test
+    public void dispatchesUpstreamTimerAndPreservesPauseState() throws Exception {
+        File fixture = fixture("tvp-timer");
+        KrkrScriptSession session = startRuntime(fixture,
+            "var ticks = 0, pausedTicks = -1;"
+            + "var timer = new Timer(function(e) {"
+            + "if (e.type != 'onTimer' || e.target != timer) throw new Exception('bad event');"
+            + "ticks++; TwinQuillHost.setColor(210,160,40); }, '');"
+            + "timer.interval = 30; timer.enabled = true;"
+            + "TwinQuillHost.onPause = function() { pausedTicks = ticks; };"
+            + "TwinQuillHost.onResume = function() { if (pausedTicks < 0) return;"
+            + "if (ticks != pausedTicks) throw new Exception('timer ran while paused');"
+            + "timer.enabled = false; TwinQuillHost.setColor(40,180,70); };" );
+        waitForColor(surface, 210, 160, 40);
+        instrumentation.runOnMainSync(() -> instrumentation.callActivityOnPause(runtime));
+        Thread.sleep(400);
+        instrumentation.runOnMainSync(() -> instrumentation.callActivityOnResume(runtime));
+        waitForColor(surface, 40, 180, 70);
+        assertEquals(0, session.poll(0));
+        Thread.sleep(100);
+        waitForColor(surface, 40, 180, 70);
+    }
+
+    @Test
+    public void reportsTimerErrorsAndReleasesItsActionReferences() throws Exception {
+        File fixture = fixture("tvp-timer-error");
+        startRuntime(fixture,
+            "var timer = new Timer(function() { throw new Exception('timer error'); }, '');"
+            + "timer.interval = 100;"
+            + "TwinQuillHost.onTouch = function() { timer.enabled = true; };" );
+        touchDown();
+        long deadline = android.os.SystemClock.elapsedRealtime() + 6_000;
+        while (!runtime.isFinishing() && !runtime.isDestroyed()
+            && android.os.SystemClock.elapsedRealtime() < deadline) Thread.sleep(25);
+        assertTrue("timer failure did not finish the runtime",
+            runtime.isFinishing() || runtime.isDestroyed());
+        waitForScriptsReleased();
+        startRuntime(fixture, "TwinQuillHost.setColor(80,90,200);");
+        waitForColor(surface, 80, 90, 200);
+    }
+
+    @Test
+    public void rejectsInvalidTimerIntervalsAndExcessTimers() throws Exception {
+        File fixture = fixture("tvp-timer-limits");
+        File startup = new File(fixture, "startup.tjs");
+        for (String script : new String[] {
+            "var timer = new Timer(function(){}, ''); timer.interval = -1;",
+            "var timer = new Timer(function(){}, ''); timer.interval = 1.0 / 0.0;",
+            "var timer = new Timer(function(){}, ''); timer.interval = 86400001;",
+            "var timers = []; for (var i=0; i<129; ++i) timers.add(new Timer(function(){}, ''));"
+        }) {
+            Files.write(startup.toPath(), script.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            try {
+                KrkrScriptSession.start(KrkrRuntimeRequest.SOURCE_LOOSE, startup.getCanonicalPath());
+                throw new AssertionError("invalid Timer was accepted");
+            } catch (KrkrScriptSession.StartupException expected) { assertEquals(20, expected.diagnostic); }
+            waitForScriptsReleased();
+        }
+        startRuntime(fixture, "TwinQuillHost.setColor(80,200,90);");
+        waitForColor(surface, 80, 200, 90);
+    }
+
+    @Test
+    public void releasesThrowingAndInfiniteFinalizersIncludingTimerCycles() throws Exception {
+        File fixture = fixture("finalizer-cleanup");
+        for (String finalizeBody : new String[] {
+            "throw new Exception('finalizer error');", "while (true) {}"
+        }) {
+            startRuntime(fixture,
+                "class BrokenTimer extends Timer { function BrokenTimer() {"
+                + "super.Timer(function(){}, ''); } function finalize() { "
+                + finalizeBody + " } } var timers=[];"
+                + "for (var i=0; i<4; ++i) timers.add(new BrokenTimer());");
+            long start = android.os.SystemClock.elapsedRealtime();
+            instrumentation.runOnMainSync(runtime::onBackPressed);
+            waitForScriptsReleased();
+            assertTrue("finalizer blocked shutdown",
+                android.os.SystemClock.elapsedRealtime() - start < 5_000);
+            // Fill the entire admitted timer budget. Old native instances or
+            // self-retaining actions would exhaust it or poison the new VM.
+            startRuntime(fixture,
+                "var timers=[]; for (var i=0; i<128; ++i) timers.add(new Timer(function(){}, ''));"
+                + "timers[0].onTimer = function(){ TwinQuillHost.setColor(50,180,90);"
+                + "timers[0].enabled=false; }; timers[0].interval=30; timers[0].enabled=true;");
+            waitForColor(surface, 50, 180, 90);
+            instrumentation.runOnMainSync(runtime::onBackPressed);
+            waitForScriptsReleased();
+        }
+        File startup = new File(fixture, "startup.tjs");
+        Files.write(startup.toPath(), ("class Broken {function Broken(){}"
+            + "function finalize(){throw new Exception('explicit invalidation error');}}"
+            + "var broken=new Broken(); invalidate broken;")
+            .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        try {
+            KrkrScriptSession.start(KrkrRuntimeRequest.SOURCE_LOOSE, startup.getCanonicalPath());
+            throw new AssertionError("explicit finalizer failure was suppressed outside shutdown");
+        } catch (KrkrScriptSession.StartupException expected) { assertEquals(20, expected.diagnostic); }
+        waitForScriptsReleased();
+    }
+
+    @Test
+    public void waitsForBoundedFinalizerCleanupWhenImmediatelyStartingAgain() throws Exception {
+        File fixture = fixture("immediate-relaunch");
+        File startup = new File(fixture, "startup.tjs");
+        Files.write(startup.toPath(), ("class SlowTimer extends Timer { function SlowTimer() {"
+            + "super.Timer(function(){}, ''); } function finalize() { while(true){} } }"
+            + "var slow=new SlowTimer();").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        KrkrScriptSession previous = KrkrScriptSession.start(KrkrRuntimeRequest.SOURCE_LOOSE,
+            startup.getCanonicalPath());
+        previous.close();
+        Files.write(startup.toPath(), "// new session\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        long start = android.os.SystemClock.elapsedRealtime();
+        KrkrScriptSession next = KrkrScriptSession.prepare(KrkrRuntimeRequest.SOURCE_LOOSE,
+            startup.getCanonicalPath());
+        try {
+            assertTrue(previous.handle() != next.handle());
+            assertEquals(0, next.poll(0));
+            assertTrue("relaunch exceeded its release wait",
+                android.os.SystemClock.elapsedRealtime() - start < 6_000);
+        } finally { next.close(); }
+        waitForScriptsReleased();
+    }
+
+    @Test
     public void boundsPendingScriptEventsAndAlwaysReleasesOnClose() throws Exception {
         File fixture = fixture("queue");
         File startup = new File(fixture, "startup.tjs");
@@ -504,8 +708,14 @@ public final class KrkrRuntimeHostInstrumentedTest {
     private KrkrScriptSession startRuntime(File fixture, String source) throws Exception {
         File startup = new File(fixture, "startup.tjs");
         Files.write(startup.toPath(), source.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        KrkrScriptSession session = KrkrScriptSession.start(KrkrRuntimeRequest.SOURCE_LOOSE,
+        KrkrScriptSession session = KrkrScriptSession.prepare(KrkrRuntimeRequest.SOURCE_LOOSE,
             startup.getCanonicalPath());
+        launchPreparedRuntime(fixture, session);
+        return session;
+    }
+
+    private void launchPreparedRuntime(File fixture, KrkrScriptSession session) throws Exception {
+        File startup = new File(fixture, "startup.tjs");
         String gameId = fixture.getName();
         KrkrRuntimeRequest request = KrkrRuntimeRequest.fromBroker(context,
             KrkrRuntimeRequest.SOURCE_LOOSE, startup.getCanonicalPath(),
@@ -516,7 +726,310 @@ public final class KrkrRuntimeHostInstrumentedTest {
         renderer = renderer(runtime);
         surface = surface(runtime);
         waitForCounter(KrkrRuntimeRenderer.COUNTER_FRAME_COUNT, 1);
-        return session;
+    }
+
+    @Test
+    public void rendersStandardImagesTextAlphaAndTimerWithoutProofHost() throws Exception {
+        File fixture = standardVisualFixture();
+        String script = new String(Files.readAllBytes(new File(fixture, "startup.tjs").toPath()),
+            java.nio.charset.StandardCharsets.UTF_8);
+        assertFalse(script.contains("TwinQuillHost."));
+        KrkrScriptSession session = startRuntime(fixture, script);
+        waitForGameColor(160, 100, 108, 34, 56);
+        waitForGameColor(16, 16, 50, 90, 220);
+        waitForGameColor(96, 24, 20, 180, 80);
+        try (BitmapCloser snapshot = new BitmapCloser(captureSurface())) {
+            int textPixels = 0;
+            for (int y = 142; y < 184; y++) {
+                for (int x = 8; x < 300; x++) {
+                    int pixel = gamePixel(snapshot.bitmap, x, y);
+                    if (Color.red(pixel) > 180 && Color.green(pixel) > 100
+                        && Color.blue(pixel) < 110) textPixels++;
+                }
+            }
+            assertTrue("FreeType text was not rendered", textPixels > 200);
+        }
+        waitForGameColor(280, 96, 50, 100, 220);
+        waitForGameColor(280, 96, 220, 160, 40);
+        touchGame(160, 100);
+        waitForGameColor(160, 100, 32, 180, 80);
+        assertEquals(0, session.poll(0));
+    }
+
+    @Test
+    public void preservesStandardLayersAcrossHomeAndActivityRecreation() throws Exception {
+        File fixture = standardVisualFixture();
+        long startups = scriptStats()[1];
+        KrkrScriptSession session = startRuntime(fixture,
+            new String(Files.readAllBytes(new File(fixture, "startup.tjs").toPath()),
+                java.nio.charset.StandardCharsets.UTF_8));
+        waitForGameColor(160, 100, 108, 34, 56);
+        touchGame(160, 100);
+        waitForGameColor(160, 100, 32, 180, 80);
+        long lost = renderer.counters()[KrkrRuntimeRenderer.COUNTER_SURFACE_LOSS_COUNT];
+        try (InputStream output = new ParcelFileDescriptor.AutoCloseInputStream(
+                instrumentation.getUiAutomation().executeShellCommand("input keyevent 3"))) {
+            while (output.read() != -1) { }
+        }
+        waitForCounter(KrkrRuntimeRenderer.COUNTER_SURFACE_LOSS_COUNT, lost + 1);
+        ActivityManager manager = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+        ActivityManager.AppTask matching = null;
+        for (ActivityManager.AppTask task : manager.getAppTasks()) {
+            if (task.getTaskInfo().id == runtime.getTaskId()) matching = task;
+        }
+        assertNotNull(matching);
+        ActivityManager.AppTask task = matching;
+        instrumentation.runOnMainSync(task::moveToFront);
+        waitForGameColor(160, 100, 32, 180, 80);
+        recreateRuntime();
+        waitForGameColor(160, 100, 32, 180, 80);
+        waitForGameColor(16, 16, 50, 90, 220);
+        assertEquals("standard scene startup repeated", startups + 1, scriptStats()[1]);
+        assertEquals(0, session.poll(0));
+        pressKey(KeyEvent.KEYCODE_ENTER, 0);
+        waitForScriptsReleased();
+        assertTrue(runtime.isFinishing() || runtime.isDestroyed());
+    }
+
+    @Test
+    public void rejectsUnsupportedVisualOperationsUnsafeImagesAndInvalidTrees() throws Exception {
+        File fixture = fixture("visual-errors");
+        Files.write(new File(fixture, "broken.png").toPath(), new byte[] {1,2,3});
+        Bitmap oversized = Bitmap.createBitmap(4096, 1, Bitmap.Config.ARGB_8888);
+        try (java.io.OutputStream output = Files.newOutputStream(new File(fixture, "oversized.png").toPath())) {
+            assertTrue(oversized.compress(Bitmap.CompressFormat.PNG, 100, output));
+        } finally { oversized.recycle(); }
+        for (String operation : new String[] {
+            "w.showModal();", "w.setInnerSize(4096,200);", "var duplicate=new Window();",
+            "l.opacity=256;", "l.type=3;", "l.font.height=0;", "l.font.face='unreviewed font';",
+            "l.loadImages('../outside.png');", "l.loadImages('broken.png');", "l.loadImages('oversized.png');",
+            "var child=new Layer(w,l); child.parent=child;",
+            "l.setPos(2147483647,0,2147483647,10);",
+            "l.fillRect(2147483647,0,2147483647,10,0xffffffff);",
+            "l.update(2147483647,0,2147483647,10);",
+            "var f=new Font(l); invalidate l; var bad=f.height;",
+            "var branch=new Layer(w,l); var leaf=new Layer(w,branch);"
+                + "var parent=l; for(var i=0;i<30;++i) parent=new Layer(w,parent); branch.parent=parent;",
+            "var parent=l; for(var i=0;i<33;++i) parent=new Layer(w,parent);",
+            "for(var i=0;i<64;++i) new Layer(w,l);"
+        }) {
+            File startup = new File(fixture, "startup.tjs");
+            Files.write(startup.toPath(), ("var w=new Window(); var l=new Layer(w,null); " + operation)
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            KrkrScriptSession unexpected = null;
+            try {
+                unexpected = KrkrScriptSession.start(KrkrRuntimeRequest.SOURCE_LOOSE, startup.getCanonicalPath());
+                throw new AssertionError("invalid visual operation accepted: " + operation);
+            } catch (KrkrScriptSession.StartupException expected) {
+                assertEquals(operation, 20, expected.diagnostic);
+            } finally {
+                if (unexpected != null) unexpected.close();
+                waitForScriptsReleased();
+            }
+        }
+        startRuntime(fixture, "var w=new Window(); w.setInnerSize(320,200);"
+            + "var l=new Layer(w,null); l.setSize(320,200); l.setImageSize(320,200);"
+            + "l.fillRect(0,0,320,200,0xff3040c0); l.visible=true; w.visible=true;");
+        waitForGameColor(160, 100, 48, 64, 192);
+    }
+
+    @Test
+    public void antialiasesOpaqueTextAndClearsInvalidatedWindowWithoutProofFallback() throws Exception {
+        File fixture = fixture("opaque-text");
+        KrkrScriptSession session = startRuntime(fixture,
+            "var w=new Window(); w.setInnerSize(320,200); var l=new Layer(w,null);"
+            + "l.setSize(320,200); l.setImageSize(320,200); l.fillRect(0,0,320,200,0x00182430);"
+            + "l.font.height=24; l.drawText(8,8,'TwinQuill',0xffffff);"
+            + "var edges=0; for(var y=8;y<48;++y) for(var x=8;x<150;++x) {"
+            + "var p=l.getMainPixel(x,y); if(p!=0x182430 && p!=0xffffff) edges++; }"
+            + "if(edges<20) throw new Exception('Opaque text lost antialiasing');"
+            + "l.visible=true; w.visible=true; w.onKeyDown=function(key){if(key==13) invalidate w;};");
+        waitForGameColor(300, 180, 24, 36, 48);
+        pressKey(KeyEvent.KEYCODE_ENTER, 0);
+        waitForGameColor(160, 100, 0, 0, 0);
+        assertEquals("Explicit invalidation must keep the VM usable", 0, session.poll(0));
+    }
+
+    @Test
+    public void mapsKeysAndHonorsStandardWindowCloseQuery() throws Exception {
+        File fixture = fixture("window-close");
+        KrkrScriptSession session = startRuntime(fixture,
+            "var allowClose=false; var w=new Window(); w.setInnerSize(320,200);"
+            + "var l=new Layer(w,null); l.setSize(320,200); l.setImageSize(320,200);"
+            + "l.fillRect(0,0,320,200,0xff3040c0); l.visible=true; w.visible=true;"
+            + "w.onCloseQuery=function(){return allowClose;};"
+            + "w.onMouseDown=function(x,y){if(x<0||y<0||x>=320||y>=200) throw new Exception('letterbox'); allowClose=true;};"
+            + "w.onKeyDown=function(key,shift){if(key==65){if(shift!=7) throw new Exception('shift flags');"
+            + "l.fillRect(0,0,320,200,0xff20b450);} else if(key==13) w.close();};");
+        waitForGameColor(160, 100, 48, 64, 192);
+        pressKey(KeyEvent.KEYCODE_A, KeyEvent.META_SHIFT_ON | KeyEvent.META_ALT_ON | KeyEvent.META_CTRL_ON);
+        waitForGameColor(160, 100, 32, 180, 80);
+        pressKey(KeyEvent.KEYCODE_ENTER, 0);
+        Thread.sleep(250);
+        assertEquals("close query veto was ignored", 0, session.poll(0));
+        assertFalse(runtime.isFinishing());
+        touchDown(); // Black letterbox, ignored by standard Window input.
+        Thread.sleep(100);
+        assertEquals(0, session.poll(0));
+        touchGame(160, 100);
+        pressKey(KeyEvent.KEYCODE_ENTER, 0);
+        waitForScriptsReleased();
+        assertTrue(runtime.isFinishing() || runtime.isDestroyed());
+    }
+
+    private File standardVisualFixture() throws Exception {
+        File directory = fixture("standard-visual");
+        for (String name : new String[] {"startup.tjs", "checker.png", "sample.jpg"}) {
+            try (InputStream source = instrumentation.getContext().getAssets().open("visual/" + name)) {
+                Files.copy(source, new File(directory, name).toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+        }
+        return directory;
+    }
+
+    @Test
+    public void dispatchesCachedCancelledAndReentrantUpstreamAsyncTriggers() throws Exception {
+        File fixture = fixture("async-trigger");
+        KrkrScriptSession session = startRuntime(fixture,
+            "var count=0,phase=0; var trigger=new AsyncTrigger(function(e){"
+            + "if(e.type!='onFire'||e.target!=trigger) throw new Exception('async event');"
+            + "count++; if(phase==1){trigger.trigger();phase=2;}"
+            + "else if(phase==2){if(count!=3) throw new Exception('reentry');"
+            + "trigger.cancel();TwinQuillHost.setColor(32,180,80);}},'');"
+            + "trigger.trigger();trigger.trigger();"
+            + "var cancelled=new AsyncTrigger(function(){throw new Exception('cancelled fired');},'');"
+            + "cancelled.trigger();cancelled.cancel();cancelled.trigger();cancelled.mode=atmExclusive;"
+            + "var control=new Timer(function(){if(count!=1) throw new Exception('cached');"
+            + "phase=1;trigger.trigger();control.enabled=false;},'');control.interval=150;control.enabled=true;");
+        waitForColor(surface, 32, 180, 80);
+        assertEquals(0, session.poll(0));
+    }
+
+    @Test
+    public void preservesAsyncPriorityUncachedEventsAndRecoversAfterLimits() throws Exception {
+        File fixture = fixture("async-priority");
+        KrkrScriptSession session = startRuntime(fixture,
+            "var order='',count=0;"
+            + "var normal=new AsyncTrigger(function(){order+='N';},'');"
+            + "var idle=new AsyncTrigger(function(){order+='I';},'');idle.mode=atmAtIdle;"
+            + "var exclusive=new AsyncTrigger(function(){order+='X';},'');exclusive.mode=atmExclusive;"
+            + "normal.trigger();idle.trigger();exclusive.trigger();"
+            + "var uncached=new AsyncTrigger(function(){count++;},'');uncached.cached=false;"
+            + "uncached.trigger();uncached.trigger();uncached.trigger();"
+            + "var control=new Timer(function(){if(order!='XNI'||count!=3) throw new Exception('async ordering');"
+            + "control.enabled=false;TwinQuillHost.setColor(32,180,80);},'');"
+            + "control.interval=150;control.enabled=true;");
+        waitForColor(surface, 32, 180, 80);
+        session.close(); waitForScriptsReleased();
+        File startup = new File(fixture, "startup.tjs");
+        for (String invalid : new String[] {
+            "var a=new AsyncTrigger(function(){},'');a.mode=3;",
+            "var items=[];for(var i=0;i<129;i++)items.add(new AsyncTrigger(function(){},''));"
+        }) {
+            Files.write(startup.toPath(), invalid.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            KrkrScriptSession unexpected = null;
+            try {
+                unexpected = KrkrScriptSession.start(KrkrRuntimeRequest.SOURCE_LOOSE, startup.getCanonicalPath());
+                throw new AssertionError("invalid AsyncTrigger accepted");
+            } catch (KrkrScriptSession.StartupException expected) { assertEquals(20, expected.diagnostic); }
+            finally { if (unexpected != null) unexpected.close(); waitForScriptsReleased(); }
+        }
+        KrkrScriptSession recovered = startRuntime(fixture,
+            "var items=[];for(var i=0;i<128;i++)items.add(new AsyncTrigger(function(){},''));"
+            + "items[0].onFire=function(){TwinQuillHost.setColor(50,100,220);};items[0].trigger();");
+        waitForColor(surface, 50, 100, 220);
+        assertEquals(0, recovered.poll(0));
+    }
+
+    private void pressKey(int code, int meta) {
+        long now = android.os.SystemClock.uptimeMillis();
+        KeyEvent event = new KeyEvent(now, now, KeyEvent.ACTION_DOWN, code, 0, meta);
+        instrumentation.runOnMainSync(() -> surface.onKeyDown(code, event));
+    }
+
+    private void touchGame(int gameX, int gameY) {
+        float scale = Math.min(surface.getWidth() / 320f, surface.getHeight() / 200f);
+        float x = (surface.getWidth() - 320 * scale) / 2 + (gameX + 0.5f) * scale;
+        float y = (surface.getHeight() - 200 * scale) / 2 + (gameY + 0.5f) * scale;
+        long now = android.os.SystemClock.uptimeMillis();
+        for (int action : new int[] {MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP}) {
+            MotionEvent event = MotionEvent.obtain(now, now + 20, action, x, y, 0);
+            try { instrumentation.runOnMainSync(() -> surface.onTouchEvent(event)); }
+            finally { event.recycle(); }
+        }
+    }
+
+    private void recreateRuntime() throws Exception {
+        Activity previous = runtime;
+        AtomicReference<Activity> replacement = new AtomicReference<>();
+        Application app = (Application) context.getApplicationContext();
+        Application.ActivityLifecycleCallbacks callbacks = new Application.ActivityLifecycleCallbacks() {
+            @Override public void onActivityResumed(Activity activity) {
+                if (activity instanceof KrkrRuntimeActivity && activity != previous) replacement.set(activity);
+            }
+            @Override public void onActivityCreated(Activity activity, Bundle state) { }
+            @Override public void onActivityStarted(Activity activity) { }
+            @Override public void onActivityPaused(Activity activity) { }
+            @Override public void onActivityStopped(Activity activity) { }
+            @Override public void onActivitySaveInstanceState(Activity activity, Bundle state) { }
+            @Override public void onActivityDestroyed(Activity activity) { }
+        };
+        app.registerActivityLifecycleCallbacks(callbacks);
+        try {
+            instrumentation.runOnMainSync(previous::recreate);
+            long deadline = android.os.SystemClock.uptimeMillis() + 10_000;
+            while (replacement.get() == null && android.os.SystemClock.uptimeMillis() < deadline) Thread.sleep(25);
+            assertNotNull(replacement.get());
+            runtime = replacement.get(); renderer = renderer(runtime); surface = surface(runtime);
+            waitForCounter(KrkrRuntimeRenderer.COUNTER_FRAME_COUNT, 1);
+        } finally { app.unregisterActivityLifecycleCallbacks(callbacks); }
+    }
+
+    private static final class BitmapCloser implements AutoCloseable {
+        final Bitmap bitmap;
+        BitmapCloser(Bitmap bitmap) { this.bitmap = bitmap; }
+        @Override public void close() { bitmap.recycle(); }
+    }
+
+    private Bitmap captureSurface() throws Exception {
+        long deadline = android.os.SystemClock.uptimeMillis() + 5_000;
+        while (android.os.SystemClock.uptimeMillis() < deadline) {
+            if (!surface.getHolder().getSurface().isValid()) { Thread.sleep(25); continue; }
+            Bitmap bitmap = Bitmap.createBitmap(surface.getWidth(), surface.getHeight(), Bitmap.Config.ARGB_8888);
+            CountDownLatch copied = new CountDownLatch(1);
+            int[] result = {-1};
+            try {
+                PixelCopy.request(surface, bitmap, code -> { result[0] = code; copied.countDown(); },
+                    new Handler(Looper.getMainLooper()));
+                assertTrue(copied.await(5, TimeUnit.SECONDS));
+                if (result[0] == PixelCopy.SUCCESS) return bitmap;
+            } catch (IllegalArgumentException ignored) { }
+            bitmap.recycle(); Thread.sleep(25);
+        }
+        throw new AssertionError("display surface could not be copied");
+    }
+
+    private static int gamePixel(Bitmap bitmap, int x, int y) {
+        float scale = Math.min(bitmap.getWidth() / 320f, bitmap.getHeight() / 200f);
+        int px = (int) ((bitmap.getWidth() - 320 * scale) / 2 + (x + 0.5f) * scale);
+        int py = (int) ((bitmap.getHeight() - 200 * scale) / 2 + (y + 0.5f) * scale);
+        return bitmap.getPixel(px, py);
+    }
+
+    private void waitForGameColor(int x, int y, int red, int green, int blue) throws Exception {
+        long deadline = android.os.SystemClock.uptimeMillis() + 8_000;
+        int last = 0;
+        while (android.os.SystemClock.uptimeMillis() < deadline) {
+            try (BitmapCloser snapshot = new BitmapCloser(captureSurface())) {
+                last = gamePixel(snapshot.bitmap, x, y);
+                if (Math.abs(Color.red(last) - red) <= PIXEL_TOLERANCE
+                    && Math.abs(Color.green(last) - green) <= PIXEL_TOLERANCE
+                    && Math.abs(Color.blue(last) - blue) <= PIXEL_TOLERANCE) return;
+            }
+            Thread.sleep(25);
+        }
+        throw new AssertionError("game pixel " + x + "," + y + " expected " + red + "," + green + "," + blue
+            + " actual=" + Integer.toHexString(last));
     }
 
     private void touchDown() {

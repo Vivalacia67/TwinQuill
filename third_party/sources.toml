@@ -12,10 +12,20 @@ license_files = ["LICENSE"]
 patches = [
     "vendor/patches/kirikiroid2/0001-fix-tjs-vector-pop-back.patch",
     "vendor/patches/kirikiroid2/0002-fix-tjs-free-null.patch",
+    "vendor/patches/kirikiroid2/0003-tjs-execution-budget.patch",
+    "vendor/patches/kirikiroid2/0004-tvp-timer-interval-bounds.patch",
+    "vendor/patches/kirikiroid2/0005-tjs-shutdown-finalizer-cleanup.patch",
+    "vendor/patches/kirikiroid2/0006-android-basic-visual-bindings.patch",
+    "vendor/patches/kirikiroid2/0007-tvp-async-worker-admission.patch",
 ]
 patch_sha256 = [
     "49dd651830e8a3ee2d8c3e776c1335435e9228b115d2f333338c84e70e71b4ae",
     "8d20d7c6f913e61c9060d93ee81912a60b80a2b7e5e9dcde7c2404a644a989c8",
+    "b3f60338faf631e9979c8a454ddaa0e13b22834faa10ad6ad65842f270e5925f",
+    "62179a17e4e262112620f8e928aa09088922f5fa90edf48dfda928df2df4804b",
+    "b49cf0130e834c2410b1dc16fb3cc36e9a252d564a666b9c9b311c2dfdca43ee",
+    "0b379abffc7abc917e90fb030db83927999bdc53a8e4b4f8f788a1dfdfe050fe",
+    "236cb2f05da0fb4fb6e345237701edeec6d76f6c589057cea8a16075bc89af2b",
 ]
 
 [[sources]]
@@ -525,3 +535,17 @@ patch_sha256 = [
     "638f3344a86d18d61a7000a9935bc357d4609c6c70ccbf22d03c948de343107e",
     "141a9477fc9db954b8eb7579dcc8ce3bb4a7c3aca277652471eb042bcbe9344a",
 ]
+
+[[sources]]
+id = "kag3-1f3ab309"
+source_type = "git-archive"
+destination = "vendor/kag3-1f3ab309"
+url = "https://github.com/krkrz/kag3.git"
+commit = "1f3ab309106d210e3169bbbe0fb4e066ae463b42"
+tree = "8b310028c0b481e44631771424a1ebd9fb769d38"
+archive_sha256 = "797c21a16240f0518989d19a673036605d164831a20be00cfc1761db1a394a66"
+version = "KAG3 3.32 stable rev. 2 (KrkrZ UTF-8 distribution)"
+license = "LicenseRef-KAG3-free-modification-and-distribution"
+license_files = ["README.md", "data/startup.tjs", "data/system/Initialize.tjs"]
+file_count = 39
+purpose = "M2 interface audit; framework execution is scheduled for M4"

@@ -1,0 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2026 TwinQuill contributors
+Debug.message("M2 startup deadline fixture: expect SCRIPT_ERROR after about 5 seconds");
+while (true) {
+    try { while (true) {} } catch (error) {}
+}

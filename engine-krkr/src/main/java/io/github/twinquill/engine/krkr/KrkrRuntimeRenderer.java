@@ -109,6 +109,7 @@ final class KrkrRuntimeRenderer implements GLSurfaceView.Renderer {
                 reportFailure(result);
             } else {
                 surfaceReady = true;
+                scriptSession.hostReady(width, height);
                 scriptSession.event(KrkrScriptSession.EVENT_SURFACE_CHANGED, width, height);
             }
         } catch (RuntimeException | LinkageError exception) {
@@ -129,6 +130,7 @@ final class KrkrRuntimeRenderer implements GLSurfaceView.Renderer {
                     scriptStatus == KrkrScriptSession.NORMAL_EXIT_REQUESTED ? 0 : scriptStatus);
                 return;
             }
+            scriptSession.tick();
             int diagnostic = nativeDrawFrame(handle);
             releaseDrainedInputs();
             checkDiagnostic(diagnostic);

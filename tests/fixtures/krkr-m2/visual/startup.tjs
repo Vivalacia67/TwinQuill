@@ -1,0 +1,72 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2026 TwinQuill contributors
+// Standard TVP display fixture: no TwinQuillHost drawing calls.
+var window = new Window();
+window.caption = "TwinQuill M2";
+window.setInnerSize(320, 200);
+var root = new Layer(window, null);
+root.setSize(320, 200);
+root.setImageSize(320, 200);
+root.fillRect(0, 0, 320, 200, 0xff182430);
+root.visible = true;
+
+var png = new Layer(window, root);
+png.loadImages("checker.png");
+png.setSizeToImageSize();
+png.setPos(8, 8);
+png.visible = true;
+var jpeg = new Layer(window, root);
+jpeg.loadImages("sample.jpg");
+jpeg.setSizeToImageSize();
+jpeg.setPos(80, 8);
+jpeg.visible = true;
+
+var text = new Layer(window, root);
+text.setSize(304, 44);
+text.setImageSize(304, 44);
+text.setPos(8, 142);
+text.font.height = 24;
+if (text.font.getTextWidth("TwinQuill 中文") <= 0)
+    throw new Exception("Font metrics unavailable");
+text.drawText(0, 0, "TwinQuill 中文", 0xffd050);
+text.visible = true;
+
+var square = new Layer(window, root);
+square.setSize(64, 48);
+square.setImageSize(64, 48);
+square.setPos(120, 70);
+square.fillRect(0, 0, 64, 48, 0xffc02040);
+square.opacity = 128;
+square.visible = true;
+var clicks = 0;
+square.onMouseDown = function(x, y, button, shift) {
+    if (button != mbLeft || x < 0 || x >= 64 || y < 0 || y >= 48)
+        throw new Exception("Incorrect Layer input coordinates");
+    clicks++;
+    square.opacity = 255;
+    square.fillRect(0, 0, 64, 48, 0xff20b450);
+};
+window.onMouseDown = function(x, y) {
+    if (x < 0 || x >= 320 || y < 0 || y >= 200)
+        throw new Exception("Letterbox input reached Window");
+};
+
+var badge = new Layer(window, root);
+badge.setSize(40, 32);
+badge.setImageSize(40, 32);
+badge.setPos(260, 80);
+badge.visible = true;
+var ticks = 0, pausedTicks = -1;
+var timer = new Timer(function() {
+    ticks++;
+    badge.fillRect(0, 0, 40, 32, ticks % 2 ? 0xff3264dc : 0xffdca028);
+}, "");
+timer.interval = 500;
+timer.enabled = true;
+window.onDeactivate = function() { pausedTicks = ticks; };
+window.onActivate = function() {
+    if (pausedTicks >= 0 && ticks != pausedTicks)
+        throw new Exception("Timer advanced while paused");
+};
+window.onKeyDown = function(key) { if (key == 13) window.close(); };
+window.visible = true;

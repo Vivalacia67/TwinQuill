@@ -82,3 +82,9 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
 }
+
+androidComponents.onVariants { variant ->
+    variant.androidTest?.sources?.assets?.addStaticSourceDirectory(
+        rootProject.file("tests/fixtures/krkr-m2").absolutePath
+    )
+}
