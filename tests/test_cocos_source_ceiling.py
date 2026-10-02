@@ -8,6 +8,7 @@ from __future__ import annotations
 import subprocess
 import shutil
 import hashlib
+import os
 import re
 import tempfile
 import tomllib
@@ -251,6 +252,10 @@ class CocosSourceCeilingTests(unittest.TestCase):
                         str(patch_dir / name),
                     ],
                     cwd=applied,
+                    # Python can fall back to the repository when the system
+                    # temp directory is unwritable. Keep Git from discovering
+                    # the parent checkout and silently skipping relative paths.
+                    env={**os.environ, "GIT_CEILING_DIRECTORIES": str(applied.parent)},
                     capture_output=True,
                     text=True,
                     check=False,

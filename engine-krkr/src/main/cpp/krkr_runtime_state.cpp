@@ -125,11 +125,18 @@ class RuntimeState final {
         }
         counters_.queued_input_count = queue_size_;
 
-        const int result = renderer_.draw_frame(alternate_color_);
+        const int result = renderer_.draw_frame(alternate_color_, override_color_);
         if (result == kRuntimeOk) {
             ++counters_.frame_count;
         }
         return result;
+    }
+
+    int set_color(std::int64_t color) {
+        if (color < -1 || color > 0xffffff) return kRuntimeInvalidArgument;
+        std::lock_guard<std::mutex> lock(mutex_);
+        override_color_ = color;
+        return kRuntimeOk;
     }
 
     int pause() {
@@ -250,6 +257,7 @@ class RuntimeState final {
     bool surface_active_ = false;
     bool paused_ = false;
     bool alternate_color_ = false;
+    std::int64_t override_color_ = -1;
     std::array<InputEvent, kInputQueueCapacity> queue_{};
     std::size_t queue_head_ = 0U;
     std::size_t queue_size_ = 0U;
@@ -337,6 +345,10 @@ int surface_changed(RuntimeHandle handle, int width, int height) {
 
 int draw_frame(RuntimeHandle handle) {
     return call_state(handle, [](RuntimeState& state) { return state.draw_frame(); });
+}
+
+int set_color(RuntimeHandle handle, std::int64_t color) {
+    return call_state(handle, [color](RuntimeState& state) { return state.set_color(color); });
 }
 
 int pause(RuntimeHandle handle) {

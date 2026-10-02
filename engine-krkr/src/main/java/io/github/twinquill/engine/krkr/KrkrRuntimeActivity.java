@@ -28,12 +28,16 @@ public final class KrkrRuntimeActivity extends Activity
     private final AtomicBoolean finished = new AtomicBoolean();
     private KrkrGLSurfaceView surfaceView;
     private KrkrRuntimeRenderer renderer;
+    private KrkrScriptSession scriptSession;
     private OnBackInvokedCallback backCallback;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Object retained = getLastNonConfigurationInstance();
+        if (retained instanceof KrkrScriptSession) scriptSession = (KrkrScriptSession) retained;
         if (savedInstanceState != null && savedInstanceState.getBoolean(STATE_FINISHED)) {
+            if (scriptSession != null) scriptSession.close();
             finish();
             return;
         }
@@ -41,12 +45,18 @@ public final class KrkrRuntimeActivity extends Activity
         try {
             KrkrRuntimeRequest request = KrkrRuntimeRequest.fromIntent(this, getIntent());
             System.loadLibrary("twinquill_engine_krkr");
+            KrkrScriptSession requestedSession = KrkrScriptSession.require(request);
+            if (scriptSession != null && scriptSession != requestedSession) {
+                throw new IllegalArgumentException("Retained script session does not match request");
+            }
+            scriptSession = requestedSession;
             renderer = new KrkrRuntimeRenderer(
                 request,
                 new WeakReference<>(this)
             );
             surfaceView = new KrkrGLSurfaceView(this, renderer);
             setContentView(surfaceView);
+            surfaceView.requestFocus();
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 backCallback = () -> finishRuntime(0);
                 getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
@@ -68,6 +78,9 @@ public final class KrkrRuntimeActivity extends Activity
         state.putBoolean(STATE_FINISHED, finished.get());
         super.onSaveInstanceState(state);
     }
+
+    @Override
+    public Object onRetainNonConfigurationInstance() { return scriptSession; }
 
     @Override
     protected void onPause() {
@@ -114,12 +127,15 @@ public final class KrkrRuntimeActivity extends Activity
         if (renderer != null) {
             renderer.destroyAndWait();
         }
+        if (scriptSession != null && !isChangingConfigurations()) scriptSession.close();
         super.onDestroy();
     }
 
     @Override
     public void onRuntimeDiagnostic(int diagnostic) {
-        runOnUiThread(() -> finishRuntime(diagnostic));
+        runOnUiThread(() -> {
+            if (!isDestroyed() && !isChangingConfigurations()) finishRuntime(diagnostic);
+        });
     }
 
     private void finishRuntime(int diagnostic) {

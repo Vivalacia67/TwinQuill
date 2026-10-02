@@ -35,6 +35,7 @@ final class KrkrGLSurfaceView extends GLSurfaceView {
             return false;
         }
         final int action = event.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN) requestFocus();
         final long eventTime = event.getEventTime();
         final int eventPointerCount = event.getPointerCount();
         final int pointerCount = Math.min(eventPointerCount, MAX_POINTERS);

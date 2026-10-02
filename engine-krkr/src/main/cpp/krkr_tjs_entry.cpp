@@ -15,6 +15,7 @@
 #include "tjsError.h"
 #include "krkr_tjs_entry.h"
 #include "krkr_tjs_text.h"
+#include "krkr_tjs_session.h"
 #include "krkr_xp3.h"
 
 namespace {
@@ -22,7 +23,8 @@ namespace {
 constexpr char kLogTag[] = "TwinQuill/Krkr";
 
 // TJS2 contains process-global caches; concurrent broker workers must not
-// construct overlapping engines or clear another engine's globals.
+// construct overlapping engines or clear another engine's globals. Persistent
+// sessions use this same mutex for startup, callbacks, and shutdown.
 std::mutex g_tjs_mutex;
 
 class AndroidConsoleOutput final : public TJS::iTJSConsoleOutput {
@@ -72,10 +74,13 @@ private:
 
 }  // namespace
 
+std::mutex& twinquill::krkr::tjs_engine_mutex() { return g_tjs_mutex; }
+
 int twinquill::krkr::run_tjs_source(std::string_view source) noexcept {
     try {
         const std::u16string script = decode_tjs_source(source);
         std::lock_guard<std::mutex> lock(g_tjs_mutex);
+        if (twinquill::krkr::tjs_session_active()) return 10;
         AndroidConsoleOutput output;
         TjsSession session;
         session.engine()->SetConsoleOutput(&output);

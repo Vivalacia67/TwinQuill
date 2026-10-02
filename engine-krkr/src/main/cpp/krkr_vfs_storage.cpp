@@ -340,6 +340,55 @@ void TqSafMedia::GetListAt(const ttstr& name, iTVPStorageLister* lister) {
 
 void TqSafMedia::GetLocallyAccessibleName(ttstr& name) { name = ttstr(""); }
 
+int exists_tqsaf_script(const std::string& tree_uri, const std::string& relative_path,
+                       bool* exists) {
+    if (exists == nullptr) return 10;
+    *exists = false;
+    try {
+        TqSafMedia media(tree_uri);
+        *exists = media.CheckExistentStorage(strict_ttstr(("./" + relative_path).c_str()));
+        if (media.last_status() == TQ_VFS_PERMISSION) return 40;
+        if (media.last_status() == TQ_VFS_INVALID) return 10;
+        return *exists || media.last_status() == TQ_VFS_NOT_FOUND ? 0 : 41;
+    } catch (const std::invalid_argument&) { return 10; }
+    catch (...) { return 41; }
+}
+
+int read_tqsaf_script(const std::string& tree_uri, const std::string& relative_path,
+                     std::string* output, bool startup) {
+    if (output == nullptr) return 10;
+    try {
+        TqSafMedia media(tree_uri);
+        if (startup) {
+            ListCollector collector;
+            media.GetListAt(ttstr("./"), &collector);
+            if (collector.startup_ambiguous()) return 10;
+            if (!collector.has_startup()) return 11;
+        }
+        const ttstr name = strict_ttstr(("./" + relative_path).c_str());
+        std::unique_ptr<tTJSBinaryStream> stream(media.Open(name, TJS_BS_READ));
+        const tjs_uint64 size = stream->GetSize();
+        if (startup && size == 0) return 11;
+        if (size > twinquill::krkr::kStartupSourceLimit) return 20;
+        if (stream->Seek(0, TJS_BS_SEEK_SET) != 0) return 41;
+        output->assign(static_cast<std::size_t>(size), '\0');
+        std::size_t offset = 0;
+        while (offset < output->size()) {
+            const tjs_uint read = stream->Read(output->data() + offset,
+                static_cast<tjs_uint>(std::min<std::size_t>(output->size() - offset, 65536)));
+            if (read == 0) return 41;
+            offset += read;
+        }
+        return 0;
+    } catch (const std::invalid_argument&) { return 10; }
+    catch (const TqVfsException& exception) {
+        if (exception.status() == TQ_VFS_PERMISSION) return 40;
+        if (exception.status() == TQ_VFS_NOT_FOUND) return 11;
+        if (exception.status() == TQ_VFS_INVALID) return 10;
+        return 41;
+    } catch (...) { return 41; }
+}
+
 int run_tqsaf_startup(const char* tree_uri_utf8) {
     if (tree_uri_utf8 == nullptr || tree_uri_utf8[0] == '\0') return 10;
     try {

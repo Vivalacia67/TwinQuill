@@ -236,6 +236,10 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
         if (ONS_VIDEO_ROOT_ID.equals(parentDocumentId)) {
             addDocument(result, videoId(parentDocumentId));
         }
+        if (KRKR_UTF8_ROOT_ID.equals(parentDocumentId)) {
+            addDocument(result, "krkr-helper");
+            addDocument(result, "krkr-value");
+        }
         return result;
     }
 
@@ -252,6 +256,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
     public boolean isChildDocument(String parentDocumentId, String documentId) {
         return isKnownRoot(parentDocumentId)
             && (
+                (KRKR_UTF8_ROOT_ID.equals(parentDocumentId) && isKrkrHelper(documentId))
+                    ||
                 scriptId(parentDocumentId).equals(documentId)
                     || (
                         isArchiveRoot(parentDocumentId)
@@ -369,7 +375,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             && rootForLua(documentId) == null
             && rootForAudio(documentId) == null
             && rootForVideo(documentId) == null
-            && rootForUpperScript(documentId) == null) {
+            && rootForUpperScript(documentId) == null
+            && !isKrkrHelper(documentId)) {
             throw new FileNotFoundException(documentId);
         }
     }
@@ -400,6 +407,10 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
 
     private static String scriptId(String rootId) {
         return rootId + "-script";
+    }
+
+    private static boolean isKrkrHelper(String id) {
+        return "krkr-helper".equals(id) || "krkr-value".equals(id);
     }
 
     private static String krkrUpperScriptId() {
@@ -501,6 +512,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
 
     private static String documentDisplayName(String documentId)
         throws FileNotFoundException {
+        if ("krkr-helper".equals(documentId)) return "辅助.tjs";
+        if ("krkr-value".equals(documentId)) return "value.tjs";
         String archiveRoot = rootForArchive(documentId);
         if (ONS_NSA_ROOT_ID.equals(archiveRoot)) {
             return "arc.nsa";
@@ -541,6 +554,8 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
 
     private static byte[] documentBytes(String documentId)
         throws FileNotFoundException {
+        if ("krkr-helper".equals(documentId)) return "global.fromSaf = \"中文\";".getBytes(StandardCharsets.UTF_8);
+        if ("krkr-value".equals(documentId)) return "6*7".getBytes(StandardCharsets.UTF_8);
         String archiveRoot = rootForArchive(documentId);
         if (ONS_NSA_ROOT_ID.equals(archiveRoot)) {
             return NSA_ARCHIVE;
@@ -602,7 +617,16 @@ public final class LauncherFixtureDocumentsProvider extends DocumentsProvider {
             case KRKR_AMBIGUOUS_ROOT_ID:
                 return KRKR_SCRIPT;
             case KRKR_UTF8_ROOT_ID:
-                return KRKR_UNICODE_SCRIPT.getBytes(StandardCharsets.UTF_8);
+                return (KRKR_UNICODE_SCRIPT
+                    + "Scripts.execStorage(\"辅助.tjs\");\n"
+                    + "if (fromSaf != \"\\x4e2d\\x6587\" || !Storages.isExistentStorage(\"辅助.tjs\") "
+                    + "|| Storages.isExistentStorage(\"missing.tjs\") || Scripts.evalStorage(\"value.tjs\") != 42) "
+                    + "throw new Exception(\"SAF native classes\"); Debug.message(fromSaf);\n"
+                    + "TwinQuillHost.onKey = function(down,key,unicode,meta,repeat,time) { "
+                    + "if (down && key == 66) { Scripts.execStorage(\"辅助.tjs\"); "
+                    + "if (fromSaf != \"\\x4e2d\\x6587\") throw new Exception(\"SAF callback read\"); "
+                    + "System.exit(); } };\n")
+                    .getBytes(StandardCharsets.UTF_8);
             case KRKR_UTF8_BOM_ROOT_ID:
                 return ("\ufeff" + KRKR_UNICODE_SCRIPT).getBytes(StandardCharsets.UTF_8);
             case KRKR_UTF16_LE_ROOT_ID:

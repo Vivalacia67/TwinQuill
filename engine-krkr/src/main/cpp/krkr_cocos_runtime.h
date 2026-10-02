@@ -5,6 +5,8 @@
 #ifndef TWINQUILL_KRKR_COCOS_RUNTIME_H
 #define TWINQUILL_KRKR_COCOS_RUNTIME_H
 
+#include <cstdint>
+
 namespace twinquill::krkr_runtime {
 
 // A deliberately small first-party GLES2 host. It owns only the program and
@@ -22,7 +24,7 @@ class CocosRuntime final {
 
     int surface_created();
     int surface_changed(int width, int height);
-    int draw_frame(bool alternate_color);
+    int draw_frame(bool alternate_color, std::int64_t override_color = -1);
     int surface_lost();
     // The Android surface callback may replace a GL context without giving
     // this object a current context in which to delete the old objects.  This

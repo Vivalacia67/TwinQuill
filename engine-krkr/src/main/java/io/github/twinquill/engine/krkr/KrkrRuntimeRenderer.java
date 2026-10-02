@@ -35,6 +35,7 @@ final class KrkrRuntimeRenderer implements GLSurfaceView.Renderer {
     private static final int INPUT_QUEUE_CAPACITY = 64;
 
     private final long handle;
+    private final KrkrScriptSession scriptSession;
     private final WeakReference<RuntimeFailureListener> failureListener;
     private final AtomicBoolean destroyRequested = new AtomicBoolean();
     private final AtomicBoolean nativeDestroyed = new AtomicBoolean();
@@ -49,6 +50,7 @@ final class KrkrRuntimeRenderer implements GLSurfaceView.Renderer {
         WeakReference<RuntimeFailureListener> failureListener
     ) {
         this.failureListener = failureListener;
+        scriptSession = KrkrScriptSession.require(request);
         long created = nativeCreate(
             request.sourceKind(),
             request.source(),
@@ -94,7 +96,7 @@ final class KrkrRuntimeRenderer implements GLSurfaceView.Renderer {
             int result = nativeSurfaceChanged(handle, width, height);
             if (result != 0) {
                 reportFailure(result);
-            }
+            } else scriptSession.event(KrkrScriptSession.EVENT_SURFACE_CHANGED, width, height);
         } catch (RuntimeException | LinkageError exception) {
             reportFailure(41);
         }
@@ -106,6 +108,13 @@ final class KrkrRuntimeRenderer implements GLSurfaceView.Renderer {
             return;
         }
         try {
+            int scriptStatus = scriptSession.poll(handle);
+            if (scriptStatus != 0) {
+                RuntimeFailureListener listener = failureListener.get();
+                if (listener != null) listener.onRuntimeDiagnostic(
+                    scriptStatus == KrkrScriptSession.NORMAL_EXIT_REQUESTED ? 0 : scriptStatus);
+                return;
+            }
             int diagnostic = nativeDrawFrame(handle);
             releaseDrainedInputs();
             checkDiagnostic(diagnostic);
@@ -121,14 +130,19 @@ final class KrkrRuntimeRenderer implements GLSurfaceView.Renderer {
         float y,
         long eventTime
     ) {
-        queueInput(() -> nativeTouch(
-            handle,
-            actionMasked,
-            pointerId,
-            x,
-            y,
-            eventTime
-        ));
+        queueInput(() -> {
+            int result = nativeTouch(
+                handle,
+                actionMasked,
+                pointerId,
+                x,
+                y,
+                eventTime
+            );
+            if (result == 0) scriptSession.event(KrkrScriptSession.EVENT_TOUCH,
+                actionMasked, pointerId, x, y, eventTime);
+            return result;
+        });
     }
 
     void enqueueKey(
@@ -139,15 +153,20 @@ final class KrkrRuntimeRenderer implements GLSurfaceView.Renderer {
         int repeatCount,
         long eventTime
     ) {
-        queueInput(() -> nativeKey(
-            handle,
-            down,
-            keyCode,
-            unicodeCodePoint,
-            metaState,
-            repeatCount,
-            eventTime
-        ));
+        queueInput(() -> {
+            int result = nativeKey(
+                handle,
+                down,
+                keyCode,
+                unicodeCodePoint,
+                metaState,
+                repeatCount,
+                eventTime
+            );
+            if (result == 0) scriptSession.event(KrkrScriptSession.EVENT_KEY,
+                down ? 1 : 0, keyCode, unicodeCodePoint, metaState, repeatCount, eventTime);
+            return result;
+        });
     }
 
     void dropInput() {
@@ -162,14 +181,17 @@ final class KrkrRuntimeRenderer implements GLSurfaceView.Renderer {
     }
 
     void pauseAndWait() {
+        scriptSession.event(KrkrScriptSession.EVENT_PAUSE);
         queueLifecycle(() -> checkDiagnostic(nativePause(handle)), false);
     }
 
     void resumeAndWait() {
+        scriptSession.event(KrkrScriptSession.EVENT_RESUME);
         queueLifecycle(() -> checkDiagnostic(nativeResume(handle)), false);
     }
 
     void lowMemoryAndWait() {
+        scriptSession.event(KrkrScriptSession.EVENT_LOW_MEMORY);
         queueLifecycle(() -> checkDiagnostic(nativeLowMemory(handle)), false);
     }
 
@@ -323,8 +345,9 @@ final class KrkrRuntimeRenderer implements GLSurfaceView.Renderer {
     }
 
     private void queueLifecycle(Runnable operation, boolean destroy) {
+        if (!destroy && (destroyRequested.get() || isDestroyed())) return;
         KrkrGLSurfaceView currentView = view;
-        if (currentView == null || (destroyRequested.get() || isDestroyed()) && !destroy) {
+        if (currentView == null) {
             if (destroy) {
                 destroyNativeOnce();
             } else {

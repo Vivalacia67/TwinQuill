@@ -56,6 +56,7 @@ RuntimeHandle create(int source_kind,
 int surface_created(RuntimeHandle handle);
 int surface_changed(RuntimeHandle handle, int width, int height);
 int draw_frame(RuntimeHandle handle);
+int set_color(RuntimeHandle handle, std::int64_t color);
 int pause(RuntimeHandle handle);
 int resume(RuntimeHandle handle);
 int low_memory(RuntimeHandle handle);

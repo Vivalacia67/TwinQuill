@@ -525,6 +525,58 @@ public final class EngineProcessProtocolInstrumentedTest {
         }
     }
 
+    @Test
+    public void honorsKrkrSystemExitDuringStartup() throws Exception {
+        File gameRoot = new File(context.getCacheDir(), "krkr-exit-"
+            + android.os.SystemClock.elapsedRealtime());
+        assertTrue(gameRoot.mkdirs());
+        try {
+            Files.write(new File(gameRoot, "startup.tjs").toPath(),
+                "Debug.message(\"正常退出\"); System.exit(0);".getBytes(StandardCharsets.UTF_8));
+            Intent result = launchAndAwait(requestIntent(KrkrEngineActivity.class,
+                EngineType.KRKR, gameRoot.getName(), Uri.fromFile(gameRoot), Bundle.EMPTY));
+            assertEquals(Activity.RESULT_OK, host.engineResultCode());
+            assertEquals(EngineResult.NORMAL_EXIT.code(), result.getIntExtra(EngineContract.EXTRA_RESULT, -1));
+            assertEquals(0, result.getIntExtra(KrkrEngineActivity.EXTRA_RESULT_CODE, -1));
+        } finally { finishHost(); deleteFixture(gameRoot); }
+    }
+
+    @Test
+    public void mapsKrkrCallbackExitAndScriptFailureThenRecovers() throws Exception {
+        File gameRoot = new File(context.getCacheDir(), "krkr-callback-"
+            + android.os.SystemClock.elapsedRealtime());
+        assertTrue(gameRoot.mkdirs());
+        try {
+            for (boolean fail : new boolean[] {false, true}) {
+                String callback = "TwinQuillHost.onKey = function(down,key,unicode,meta,repeat,time) { "
+                    + "if (down && key == 66) { "
+                    + (fail ? "throw new Exception(\"回调错误\");" : "System.exit();") + " } };";
+                Files.write(new File(gameRoot, "startup.tjs").toPath(), callback.getBytes(StandardCharsets.UTF_8));
+                Intent launch = requestIntent(KrkrEngineActivity.class, EngineType.KRKR,
+                    gameRoot.getName() + (fail ? "-error" : "-exit"),
+                    fail ? Uri.fromFile(gameRoot) : grantFixture(LauncherFixtureDocumentsProvider.KRKR_UTF8_ROOT_ID),
+                    Bundle.EMPTY);
+                int taskId = host.getTaskId();
+                ComponentName component = new ComponentName(context, KrkrRuntimeActivity.class);
+                String process = context.getPackageName() + ":krkr";
+                try {
+                    instrumentation.runOnMainSync(() -> host.launchEngine(launch));
+                    assertTrue(waitForTaskTopActivity(taskId, component, process,
+                        TimeUnit.SECONDS.toMillis(ENGINE_RESULT_TIMEOUT_SECONDS)));
+                    assertTrue("Unable to inject Enter into the script host", injectKey(KeyEvent.KEYCODE_ENTER));
+                    assertTrue(host.awaitEngineResult(ENGINE_RESULT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+                    Intent result = host.engineResultData();
+                    assertNotNull(result);
+                    assertEquals(fail ? Activity.RESULT_CANCELED : Activity.RESULT_OK, host.engineResultCode());
+                    assertEquals((fail ? EngineResult.SCRIPT_ERROR : EngineResult.NORMAL_EXIT).code(),
+                        result.getIntExtra(EngineContract.EXTRA_RESULT, -1));
+                    assertEquals(fail ? 20 : 0, result.getIntExtra(KrkrEngineActivity.EXTRA_RESULT_CODE, -1));
+                } finally { dismissRuntimeIfVisible(taskId, component, process); }
+            }
+            assertNormalKrkrExit(grantFixture(LauncherFixtureDocumentsProvider.KRKR_UTF8_ROOT_ID));
+        } finally { finishHost(); deleteFixture(gameRoot); }
+    }
+
     private void assertNormalKrkrExit(Uri gameRoot) throws Exception {
         int mainPid = android.os.Process.myPid();
         int taskId = host.getTaskId();
@@ -615,6 +667,10 @@ public final class EngineProcessProtocolInstrumentedTest {
     }
 
     private boolean injectBackKey() {
+        return injectKey(KeyEvent.KEYCODE_BACK);
+    }
+
+    private boolean injectKey(int keyCode) {
         UiAutomation automation = instrumentation.getUiAutomation();
         long downTime = android.os.SystemClock.uptimeMillis();
         boolean downSent = automation.injectInputEvent(
@@ -622,7 +678,7 @@ public final class EngineProcessProtocolInstrumentedTest {
                 downTime,
                 downTime,
                 KeyEvent.ACTION_DOWN,
-                KeyEvent.KEYCODE_BACK,
+                keyCode,
                 0
             ),
             true
@@ -632,7 +688,7 @@ public final class EngineProcessProtocolInstrumentedTest {
                 downTime,
                 android.os.SystemClock.uptimeMillis(),
                 KeyEvent.ACTION_UP,
-                KeyEvent.KEYCODE_BACK,
+                keyCode,
                 0
             ),
             true

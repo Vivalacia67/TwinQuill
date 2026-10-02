@@ -10,23 +10,26 @@ M0 established the source/toolchain baseline and was accepted on 2026-10-02.
 M1 task 3 begins by replacing the fixed-value Krkr script probe with a common
 TJS2 startup entry. It executes ordinary scripts from a loose file, a raw,
 unprotected XP3 archive, or a read-only SAF tree via `tqsaf`/`native-vfs`.
-The first increment accepts UTF-8 and BOM-marked UTF-16LE/BE, rejects malformed
-text and embedded NULs, and bounds startup source bytes to 8 MiB. The existing
-GLES test surface remains the runtime host; KAG/game rendering is later work.
+The entry accepts UTF-8 and BOM-marked UTF-16LE/BE, rejects malformed text and
+embedded NULs, and bounds each script to 8 MiB. A persistent session registers
+the admitted `Scripts`, `Storages`, `System`, and `Debug` native-class subset.
+`TwinQuillHost` is a first-party callback/color extension for the existing GLES
+test surface; KAG/game rendering is later work.
 
 ## Module graph
 
 - `launcher-app` packages the application and owns the Compose/Room game
   library, directory grants, and engine routing.
 - `engine-api` defines detection, launch requests, and structured results.
-- `native-vfs` currently provides a read-only Krkr SAF probe via
+- `native-vfs` provides read-only Krkr SAF startup and subsequent script reads via
   `tqsaf`/`native-vfs`; generic media registration and writable/save
   capabilities remain future work.
 - `engine-ons` builds ONScripterYuri, SDL2, FreeType, Lua, bzip2, and selected
   codecs from pinned source.
 - `engine-krkr` currently builds the Kirikiroid2 TJS2 core and the exact krkrz
-  Oniguruma dependency from pinned source. Cocos/KAG/rendering/media follow in
-  M3.
+  Oniguruma dependency from pinned source. It also admits the source-pinned
+  Cocos image/math core and two GLES proof shaders; full KAG/rendering/media
+  integration remains later work.
 
 The launcher depends on both engine libraries, but the engines do not depend on
 each other.
@@ -41,13 +44,20 @@ allows explicit ADB launches for legal M0 smoke fixtures.
 
 The Krkr broker validates `EngineLaunchRequest`, executes `startup.tjs` on a
 worker, and opens the private runtime host only on successful script completion.
-TJS2 instances are serialized because the imported core owns process-global
-caches. Each startup gets a fresh engine that is shut down after execution;
-script globals do not yet drive the rendering host. Script or encoding errors
-return `SCRIPT_ERROR` through the existing launch contract. Game content remains
-read-only. Writable Krkr save-media, save redirection, persistent script/host
-integration, broader KAG/Cocos rendering, media, and playable support remain
-future work. See `KRKR_M1_TJS_ENTRY.md` for the current increment and checks.
+One TJS2 session is admitted per `:krkr` process because the imported core owns
+process-global caches. The broker executes startup once and transfers a private
+opaque handle to the runtime. Globals and callbacks survive surface/context
+replacement and Activity recreation. Closing, failed startup, or invalid
+recreated requests release the VM; process death invalidates the handle.
+
+Callbacks run on a separate worker with 64 pending slots. The UI and GL thread
+poll atomic status/color; they do not execute scripts. Teardown drops pending
+callbacks and releases the VM after the active callback returns. Script, syntax,
+and text errors return `SCRIPT_ERROR`; SAF permission/VFS errors retain their
+existing result categories. Storage names are relative to the game root; traversal,
+absolute paths, NULs, and canonical paths escaping through symlinks are rejected.
+Writable Krkr save-media, broader KAG/Cocos rendering, media, and playable support
+remain future work. See `KRKR_M1_TJS_ENTRY.md` for the API subset and checks.
 
 ## Source and binary policy
 

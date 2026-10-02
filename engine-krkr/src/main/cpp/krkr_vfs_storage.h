@@ -31,5 +31,9 @@ private:
 };
 
 int run_tqsaf_startup(const char* tree_uri_utf8);
+int read_tqsaf_script(const std::string& tree_uri, const std::string& relative_path,
+                     std::string* output, bool startup = false);
+int exists_tqsaf_script(const std::string& tree_uri, const std::string& relative_path,
+                       bool* exists);
 
 #endif

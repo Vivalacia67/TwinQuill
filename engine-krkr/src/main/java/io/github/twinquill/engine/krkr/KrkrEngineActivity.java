@@ -86,7 +86,7 @@ public final class KrkrEngineActivity extends Activity {
         if (retainedPreflight != null && retainedPreflight.matches(target)) {
             preflight = retainedPreflight;
         } else {
-            preflight = new PreflightCoordinator(target);
+            preflight = new PreflightCoordinator(target, request != null);
         }
         runtimeLaunchIssued.set(preflight.runtimeLaunched());
         preflight.attach(this);
@@ -110,6 +110,7 @@ public final class KrkrEngineActivity extends Activity {
     protected void onDestroy() {
         if (preflight != null) {
             preflight.detach(this);
+            if (!isChangingConfigurations() && !runtimeLaunchIssued.get()) preflight.cancel();
         }
         super.onDestroy();
     }
@@ -140,6 +141,11 @@ public final class KrkrEngineActivity extends Activity {
             return;
         }
         if (request != null && result == 0) {
+            if (coordinator.session() != null
+                && coordinator.session().poll(0) == KrkrScriptSession.NORMAL_EXIT_REQUESTED) {
+                finishWithResult(EngineResult.NORMAL_EXIT, 0);
+                return;
+            }
             if (coordinator.markRuntimeLaunched()) {
                 runtimeLaunchIssued.set(true);
                 launchRuntime(request, target);
@@ -170,7 +176,7 @@ public final class KrkrEngineActivity extends Activity {
                 source,
                 request.saveDirectoryPath(),
                 request.gameId()
-            );
+            ).withScriptSession(preflight.session());
             Intent runtimeIntent = new Intent(this, KrkrRuntimeActivity.class);
             runtime.putInto(runtimeIntent);
             runtimeLaunchIssued.set(true);
@@ -284,6 +290,7 @@ public final class KrkrEngineActivity extends Activity {
         if (!finished.compareAndSet(false, true)) {
             return;
         }
+        if (preflight != null) preflight.cancel();
         Intent data = EngineContract.resultData(result);
         if (diagnosticCode != null) {
             data.putExtra(EXTRA_RESULT_CODE, diagnosticCode);
@@ -296,6 +303,7 @@ public final class KrkrEngineActivity extends Activity {
         private static final int NO_RESULT = Integer.MIN_VALUE;
 
         private final LaunchTarget target;
+        private final boolean persistent;
         private final AtomicBoolean started = new AtomicBoolean();
         private final AtomicBoolean runtimeLaunched = new AtomicBoolean();
         private final Object lock = new Object();
@@ -303,9 +311,27 @@ public final class KrkrEngineActivity extends Activity {
         private long generation;
         private boolean completed;
         private int result = NO_RESULT;
+        private boolean cancelled;
+        private KrkrScriptSession session;
 
-        PreflightCoordinator(LaunchTarget target) {
+        PreflightCoordinator(LaunchTarget target, boolean persistent) {
             this.target = target;
+            this.persistent = persistent;
+        }
+
+        KrkrScriptSession session() {
+            synchronized (lock) { return session; }
+        }
+
+        void cancel() {
+            KrkrScriptSession retired;
+            synchronized (lock) {
+                cancelled = true;
+                retired = session;
+                owner.clear();
+                generation++;
+            }
+            if (retired != null) retired.close();
         }
 
         boolean matches(LaunchTarget other) {
@@ -365,16 +391,26 @@ public final class KrkrEngineActivity extends Activity {
             final LaunchTarget runTarget = target;
             Thread runner = new Thread(() -> {
                 final int nativeResult;
+                KrkrScriptSession created = null;
                 try {
-                    nativeResult = runTarget.runNative();
+                    if (persistent) {
+                        int kind = runTarget.saf ? KrkrRuntimeRequest.SOURCE_SAF
+                            : runTarget.xp3 ? KrkrRuntimeRequest.SOURCE_XP3 : KrkrRuntimeRequest.SOURCE_LOOSE;
+                        created = KrkrScriptSession.start(kind,
+                            runTarget.saf ? runTarget.treeUri : runTarget.file.getAbsolutePath());
+                        nativeResult = 0;
+                    } else nativeResult = runTarget.runNative();
+                } catch (KrkrScriptSession.StartupException exception) {
+                    complete(exception.diagnostic, null);
+                    return;
                 } catch (RuntimeException | LinkageError exception) {
                     Log.e(LOG_TAG, "Krkr native preflight failed", exception);
-                    complete(41);
+                    complete(41, created);
                     return;
                 }
                 Log.i(LOG_TAG, runTarget.kindLabel()
                     + " startup completed with result " + nativeResult);
-                complete(nativeResult);
+                complete(nativeResult, created);
             }, "TwinQuill-Krkr-Startup");
             runner.start();
         }
@@ -383,13 +419,15 @@ public final class KrkrEngineActivity extends Activity {
             return runtimeLaunched.compareAndSet(false, true);
         }
 
-        private void complete(int nativeResult) {
+        private void complete(int nativeResult, KrkrScriptSession created) {
             final KrkrEngineActivity attachedOwner;
             final long attachedGeneration;
             synchronized (lock) {
-                if (completed) {
+                if (completed || cancelled) {
+                    if (created != null) created.close();
                     return;
                 }
+                session = created;
                 completed = true;
                 result = nativeResult;
                 attachedOwner = owner.get();

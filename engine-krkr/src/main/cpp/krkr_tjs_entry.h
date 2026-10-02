@@ -4,9 +4,11 @@
  */
 #pragma once
 
+#include <mutex>
 #include <string_view>
 
 namespace twinquill::krkr {
+std::mutex& tjs_engine_mutex();
 
 // Execute startup.tjs once in a fresh TJS2 engine. Returns 0 on successful
 // completion, 20 for script/text errors, and 21/22 for native failures.

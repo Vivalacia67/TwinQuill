@@ -4,13 +4,15 @@ TwinQuill is a GPL Android runtime that will manage ONScripter and
 Kirikiri/Kirikiri Z games in one launcher and execute each engine in an
 isolated Android process.
 
-M0 was accepted on 2026-10-02. M1 has started with a general TJS2 startup entry;
-the runtime still provides a basic test surface rather than full game playback:
+M0 was accepted on 2026-10-02. M1 now provides a persistent TJS2 startup and
+callback session, basic TVP interfaces, and a script-controlled test surface:
 
 - ONScripterYuri runs a self-authored minimal `0.txt` fixture.
 - Kirikiroid2's TJS2 core executes `startup.tjs` from loose storage, raw
   unprotected XP3, or read-only SAF via `tqsaf`/`native-vfs`. Startup text accepts
   UTF-8 (including ASCII, with optional BOM) and BOM-marked UTF-16LE/BE.
+- Scripts can load additional read-only game scripts, retain variables across
+  input and Activity recreation, change the proof quad color, and request exit.
 - Both engine entry points run in app-private Android processes.
 
 The Compose/Room launcher imports game directories and routes engine requests.
@@ -18,7 +20,7 @@ Game compatibility, save redirection, full KAG/Cocos rendering,
 compressed XP3 support, media, and plugin handling remain future milestones.
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), the accepted
 [`M0 handoff`](docs/KRKR_M0_HANDOFF.md), and the
-[`M1 TJS entry progress`](docs/KRKR_M1_TJS_ENTRY.md).
+[`M1 TJS entry handoff and acceptance`](docs/KRKR_M1_TJS_ENTRY.md).
 
 ## Modules
 

@@ -30,11 +30,13 @@ final class KrkrRuntimeRequest {
     static final String EXTRA_SOURCE = EXTRA_PREFIX + "SOURCE";
     static final String EXTRA_SAVE_DIRECTORY = EXTRA_PREFIX + "SAVE_DIRECTORY";
     static final String EXTRA_GAME_ID = EXTRA_PREFIX + "GAME_ID";
+    static final String EXTRA_SCRIPT_HANDLE = EXTRA_PREFIX + "SCRIPT_HANDLE";
 
     private final int sourceKind;
     private final String source;
     private final String saveDirectory;
     private final String gameId;
+    private long scriptHandle;
 
     private KrkrRuntimeRequest(
         int sourceKind,
@@ -67,7 +69,9 @@ final class KrkrRuntimeRequest {
         String source = intent.getStringExtra(EXTRA_SOURCE);
         String saveDirectory = intent.getStringExtra(EXTRA_SAVE_DIRECTORY);
         String gameId = intent.getStringExtra(EXTRA_GAME_ID);
-        return validated(context, sourceKind, source, saveDirectory, gameId);
+        KrkrRuntimeRequest request = validated(context, sourceKind, source, saveDirectory, gameId);
+        request.scriptHandle = intent.getLongExtra(EXTRA_SCRIPT_HANDLE, 0L);
+        return request;
     }
 
     private static KrkrRuntimeRequest validated(
@@ -141,12 +145,21 @@ final class KrkrRuntimeRequest {
         intent.putExtra(EXTRA_SOURCE_KIND, sourceKind)
             .putExtra(EXTRA_SOURCE, source)
             .putExtra(EXTRA_SAVE_DIRECTORY, saveDirectory)
-            .putExtra(EXTRA_GAME_ID, gameId);
+            .putExtra(EXTRA_GAME_ID, gameId)
+            .putExtra(EXTRA_SCRIPT_HANDLE, scriptHandle);
     }
 
     int sourceKind() {
         return sourceKind;
     }
+
+    KrkrRuntimeRequest withScriptSession(KrkrScriptSession session) {
+        if (!session.matches(this)) throw new IllegalArgumentException("Script source mismatch");
+        scriptHandle = session.handle();
+        return this;
+    }
+
+    long scriptHandle() { return scriptHandle; }
 
     String source() {
         return source;

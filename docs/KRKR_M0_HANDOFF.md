@@ -90,3 +90,5 @@ python scripts/run_krkr_cocos_image_decode_test.py --adb <SDK-adb.exe> --binary 
 On 2026-09-24, the user attested “自行生成的” for the launcher vector icon and the queried embedded/generated test BMP, WAV, MP4, PNG, and JPEG fixtures. The attestation is recorded as user-provided provenance, not independent verification or a legal/license conclusion; exact per-asset generation recipes remain undocumented.
 
 M0 sign-off was received on 2026-10-02. The user authorized committing the acceptance updates and starting M1 task 3 (formal TJS entry). Task 3 begins after the M0 acceptance commit; this M0 record does not claim that M1 is complete. Do not treat the ignored `.agent-work/krkr-direct-integration/` notes as GitHub files. Never read or reuse `D:/Project/.agent-work/TwinQuill/HANDOFF.md`, which belongs to the M3 line.
+
+Current M1 implementation, API limits, test evidence, and separate device-acceptance steps are recorded in [`KRKR_M1_TJS_ENTRY.md`](KRKR_M1_TJS_ENTRY.md). They do not change this M0 acceptance record.

@@ -1,22 +1,40 @@
 # TwinQuill KRKR — M1 Task 3: TJS Entry
 
-Status as of 2026-10-02: M0 accepted and committed as `6bd353b`; M1 task 3 is in progress on `refactor/krkr-direct-integration`. The first implementation increment of the formal TJS entry is implemented and validated as recorded below. M1 formal acceptance remains pending.
+Status as of 2026-10-02: M0 accepted and committed as `6bd353b`; M1 task 3 (formal TJS entry) is implemented and passes the engineering checks below on `refactor/krkr-direct-integration`. It includes persistent state, basic TVP bindings, and script-driven host callbacks. Device sign-off by the user remains pending; M0 sign-off does not imply M1 sign-off.
 
-## First increment
+## Startup baseline (`001ddc6`)
 
 - Route loose files, raw unprotected XP3, and read-only SAF startup scripts through `krkr_tjs_entry.cpp`.
 - Execute ordinary TJS2 scripts without requiring `global.twinQuillM0Result` or a fixed return value.
 - Decode ASCII/UTF-8 with optional BOM and BOM-marked UTF-16LE/BE. Reject malformed sequences, unpaired surrogates, embedded NULs, and source files over 8 MiB.
-- Serialize TJS2 engine lifetimes, release each engine on both success and failure, and preserve Unicode diagnostics in logcat.
+- Serialize TJS2 engine operations and preserve Unicode diagnostics in logcat. The initial one-shot lifetime is superseded by the persistent session described below for normal launcher requests.
 - Return native diagnostic 20 / `SCRIPT_ERROR` for source-text, syntax, or script exceptions. Keep existing permission, request, VFS, and native-failure categories.
 - Preserve the validated broker, isolated `:krkr` process, and existing GLES runtime lifecycle.
 - Apply recorded patch `0002-fix-tjs-free-null.patch` to the generated TJS2 build copy. It fixes an invalid free when a syntax error destroys an engine before its variant stack has allocated storage. The patch and SHA-256 are recorded in `third_party/sources.toml`; upstream snapshot bytes are preserved.
+
+## Persistent session and native interfaces
+
+The broker executes startup once on its worker, then transfers a process-private opaque session handle to the GLES host. Variables, loaded functions, and callbacks remain alive until exit; surface/context replacement and Activity recreation preserve the VM. Failed startup, canceled broker work, invalid recreated requests, and host exit release the session. Stale handles cannot access or close a newer session. Only one live TJS engine is admitted in `:krkr`, protecting the imported core's process-global caches.
+
+Callbacks run on one separate worker with at most 64 pending events. The renderer polls atomic status/color without executing scripts on the UI or GL thread. Overflow is counted and dropped; close discards pending callbacks and schedules VM release after the active callback returns. The existing 11-value GL counter contract and its bounded input queue are preserved. The host explicitly takes keyboard focus and ignores callbacks from destroyed/recreated views.
+
+| Registered native class | Supported surface |
+| --- | --- |
+| `Scripts` | `exec(text, name?, lineOffset?, context?)`, `eval(...)`, `execStorage(name, mode?, context?)`, and `evalStorage(...)`. |
+| `Storages` | `isExistentStorage(name)` for read-only files in the current game root. |
+| `System` | Monotonic millisecond `getTickCount()`; `exit()` / `exit(0)` requests normal exit after the script returns. |
+| `Debug` | `message(...)` logs Unicode arguments to `TwinQuill/Krkr`. |
+| `TwinQuillHost` | First-party `setColor(red, green, blue)` changes the proof quad; components must be 0–255. |
+
+Assign functions to `TwinQuillHost.onTouch(action, pointerId, x, y, time)`, `onKey(down, keyCode, unicode, meta, repeat, time)`, `onSurfaceChanged(width, height)`, `onPause()`, `onResume()`, and `onLowMemory()`. Android action/key values are forwarded; times are uptime milliseconds. Unset/void callbacks are ignored. Callback exceptions return diagnostic 20 / `SCRIPT_ERROR`, and a subsequent launch creates a fresh engine.
+
+Storage names such as `辅助.tjs` or `scripts/helper.tjs` are relative to the game root; absolute paths, schemes, traversal, NULs, and symlinks escaping a loose root are rejected. SAF reads use `TqSafMedia` and `native-vfs`, including Unicode file names. Each script is limited to 8 MiB; nested `Scripts` calls are limited to 32. Storage encoding mode must be omitted, void, or empty; text is decoded by the startup rules. XP3 access retains the raw root `startup.tjs` boundary; additional scripts may be loose siblings of the archive. There is no general XP3 member lookup or writable storage API.
 
 ## Regression coverage
 
 The production text decoder has an Android-native executable target, `twinquill_krkr_tjs_text_test`, covering Unicode round trips, supplementary characters, malformed UTF-8/UTF-16, NUL rejection, and the source-size boundary. Debug builds compile it for both supported ABIs; it is not packaged in the APK.
 
-Launcher instrumentation covers the accepted ASCII script, ordinary Unicode scripts without the M0 sentinel, UTF-8/BOM/UTF-16 variants through SAF, loose startup, raw XP3 startup, syntax/script/text errors, and a successful launch after those errors. The fixtures are authored in the test source and need no game assets.
+Launcher instrumentation covers ASCII/Unicode encodings, SAF secondary-script execution/evaluation and reads from callbacks, loose/raw XP3 startup, startup and callback exit, error mapping, and recovery. Isolated-process tests check persistent globals/colors after real Activity recreation, pause/resume/low-memory callbacks, invalid recreated-request cleanup, traversal/symlink/recursion rejection, NUL in raw source and JNI names, stale handles, single-engine admission, and release behind a full callback queue. Fixtures are authored in test source and need no game assets.
 
 Run from the repository root:
 
@@ -25,12 +43,13 @@ python -m unittest discover -s tests -v
 python scripts/check_repository_hygiene.py
 python scripts/verify_source_snapshots.py
 .\gradlew.bat --no-daemon :launcher-app:assembleDebug :launcher-app:assembleRelease :launcher-app:lintDebug
+.\gradlew.bat --no-daemon :engine-api:testDebugUnitTest :engine-ons:testDebugUnitTest
 python scripts/check_apk_native_libraries.py launcher-app/build/outputs/apk/debug/launcher-app-debug.apk launcher-app/build/outputs/apk/release/launcher-app-release-unsigned.apk
 .\gradlew.bat --no-daemon :launcher-app:connectedDebugAndroidTest
 .\gradlew.bat --no-daemon :launcher-app:connectedDebugAndroidTest -PtwinquillKrkrRuntimeInstrumentation=true
 ```
 
-Local verification logs belong under ignored `.agent-work/m1-tjs-entry/`. Device results must identify API, ABI, and emulator/device configuration.
+Current local verification logs belong under ignored `.agent-work/m1-tjs-session/`; startup-baseline evidence remains under `.agent-work/m1-tjs-entry/`. Device results must identify API, ABI, and emulator/device configuration. The Cocos patch test sets a Git discovery ceiling so it also works when Python falls back to a temporary directory inside the checkout.
 
 For the standalone text test on this x86_64 emulator, compile the same production decoder with the pinned NDK and a static C++ runtime. This avoids the emulator's standalone ARM executable/library-loading restriction; app instrumentation still exercises the packaged ARM64 engine through translation.
 
@@ -47,7 +66,7 @@ $adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
 
 The executable should print `TJS text checks passed` and exit 0. ARMv7 device execution has not been established.
 
-## Validation results (2026-10-02)
+## Startup-baseline validation (`001ddc6`, 2026-10-02)
 
 | Check | Result |
 | --- | --- |
@@ -63,19 +82,59 @@ Device instrumentation used `emulator-5554` / `Medium_Phone`, Android 16 / API 3
 
 Debug APK SHA-256: `9302c04aaab7baec6587ad78550be903a620df8eaef2f3e372cdceec7195a7b2`. Release APK SHA-256: `4431a2490c38b264b9b46268e8dfdb88d4b5543b063cecdd245d5567ca922b5a`. Local evidence includes `focused-3.txt`, `full-release.txt`, `full-results.xml`, `krkr-runtime-results.xml`, `python-tests-2.txt`, and `native-text-x86_64.txt` under `.agent-work/m1-tjs-entry/`; these files are ignored.
 
-## Manual check
+## Persistent-session validation (2026-10-02)
 
-Save the following as UTF-8 `startup.tjs` in a new game directory, add the directory in TwinQuill, and launch with Kirikiri:
+| Check | Result |
+| --- | --- |
+| Repository regression | 89/89 Python tests passed, including temporary-directory Git isolation. |
+| Repository/source gates | Hygiene, `git diff --check`, and all 7,218 pinned source checksums passed. |
+| Build/APK | Debug and Release built for both ABIs; both APK native-library gates passed. |
+| Android lint | Passed: 0 errors, 7 warnings; no warnings were promoted or suppressed. |
+| JVM tests | `engine-api`: 5/5; `engine-ons`: 4/4. |
+| Full default instrumentation | 21/21 passed: 20 process/protocol tests and one persistence test. |
+| Isolated Krkr instrumentation | 6/6 passed: five runtime/session tests and one broker recreation test. |
 
+Device: `emulator-5554` / `Medium_Phone`, Android 16 / API 36, x86_64 with ARM64 translation, SwiftShader, Vulkan disabled. Both ARM ABIs build; this is not physical ARMv7 or API 26 execution evidence.
+
+Current Debug APK SHA-256: `7070f35a18eed724599a9ac32f026b3b2d98032eeacd50bc69971703b2302aa4`. Current unsigned Release APK SHA-256: `f7ac3a0f77223c1b99ae4ee325b8964ba29d8c7a3c1cdf73d0add52f3e52e5bf`.
+
+Local evidence under ignored `.agent-work/m1-tjs-session/`: `final-validation.txt`, `full-results.xml`, `krkr-verified.txt`, `krkr-results.xml`, `python-final.txt`, and `apk-check.txt`. The current results supersede the startup-baseline APK hashes and test counts above. The standalone decoder result remains the baseline proof for the unchanged text decoder.
+
+## M1 device acceptance
+
+Create a new game directory with the following two UTF-8 files. Add that directory in TwinQuill and launch with Kirikiri.
+
+`helper.tjs`:
 ```javascript
-var greeting = "中文";
-function add(a, b) { return a + b; }
-if (add(2, 5) != 7) throw new Exception("计算错误");
-global.twinQuillM1Value = greeting;
+global.greeting = "中文";
 ```
 
-The basic test surface should open; Back should return `NORMAL_EXIT`. Replacing the script with `throw new Exception("脚本错误");` should return `SCRIPT_ERROR`; restoring the valid script should allow another successful launch.
+`startup.tjs`:
+```javascript
+Scripts.execStorage("helper.tjs");
+if (!Storages.isExistentStorage("helper.tjs")) throw new Exception("缺少文件");
+Debug.message(greeting);
+var count = 0;
+TwinQuillHost.setColor(20, 210, 40);
+TwinQuillHost.onTouch = function(action, id, x, y, time) {
+    if (action == 0) {
+        count++;
+        if (count == 1) TwinQuillHost.setColor(220, 170, 30);
+        else System.exit();
+    }
+};
+```
 
-## Remaining M1 work
+1. Launch: the centered quad is green, and logcat contains `中文` under `TwinQuill/Krkr`.
+2. Tap once: the quad becomes yellow. Press Home, return to the app, and confirm it remains yellow.
+3. Tap again: the script exits and the launcher receives `NORMAL_EXIT` (diagnostic 0). Launch again: the initial green state is restored.
+4. Launch and press Back: expect `NORMAL_EXIT`. Replace the callback body with `throw new Exception("回调错误");`: tapping should return `SCRIPT_ERROR` (diagnostic 20).
+5. Restore the valid scripts: another launch succeeds. Replacing startup with `Scripts.execStorage("../outside.tjs");` must return `SCRIPT_ERROR`.
 
-The current entry executes startup once and disposes the engine before displaying the test surface. Persistent TJS state, TVP native-class/storage registration, and script-driven host behavior need further integration and acceptance criteria. Legacy codepages, KAG, compressed/protected XP3, save media, and broader game compatibility remain outside this increment. Imported snapshots and their per-file checksums are unchanged.
+Record device model, API, ABI, and the tested APK hash. These manual results have not yet been supplied for M1.
+
+## Scope and later work
+
+Task 3's engineering scope is Unicode startup plus persistent TJS state, the listed native-class/storage subset, host callbacks, deterministic result mapping, and lifecycle cleanup for returning scripts. `TwinQuillHost` is a proof interface, not Kirikiri `Window`/`Layer` or KAG. Scripts must return; the admitted VM has no instruction deadline or interruption for non-terminating loops. A dead process invalidates session handles; it does not replay startup automatically.
+
+Legacy codepages, complete TVP/media registration, KAG, compressed/protected XP3, save media, full game rendering/audio/video, API 26 runtime proof, and physical ARMv7 runtime proof remain later work. Imported snapshots and their per-file checksums are unchanged.

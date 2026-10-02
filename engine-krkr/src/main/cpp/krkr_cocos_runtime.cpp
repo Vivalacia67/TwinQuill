@@ -180,7 +180,7 @@ int CocosRuntime::surface_changed(int width, int height) {
     return kRuntimeOk;
 }
 
-int CocosRuntime::draw_frame(bool alternate_color) {
+int CocosRuntime::draw_frame(bool alternate_color, std::int64_t override_color) {
     if (!ready() || width_ <= 0 || height_ <= 0) {
         return kRuntimeSurfaceNotReady;
     }
@@ -213,12 +213,17 @@ int CocosRuntime::draw_frame(bool alternate_color) {
         -0.5F,  0.5F, 0.0F, 1.0F,
          0.5F,  0.5F, 0.0F, 1.0F,
     };
-    const GLfloat color[] = {
+    GLfloat color[] = {
         alternate_color ? 0.95F : 0.18F,
         alternate_color ? 0.25F : 0.62F,
         alternate_color ? 0.20F : 0.95F,
         1.0F,
     };
+    if (override_color >= 0) {
+        color[0] = static_cast<float>((override_color >> 16) & 255) / 255.0F;
+        color[1] = static_cast<float>((override_color >> 8) & 255) / 255.0F;
+        color[2] = static_cast<float>(override_color & 255) / 255.0F;
+    }
     glEnableVertexAttribArray(static_cast<GLuint>(position_attribute_));
     if (!gl_ok()) {
         glUseProgram(0U);
