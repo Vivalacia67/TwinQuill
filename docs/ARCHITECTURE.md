@@ -1,5 +1,9 @@
 # TwinQuill architecture
 
+The branch delivery plan, M0–M8 status, and remaining acceptance gates are
+recorded in [ROADMAP.md](ROADMAP.md). This document describes the current
+architecture; planned capabilities are marked in the roadmap.
+
 ## Product boundary
 
 TwinQuill is a GPL Android launcher and source-built runtime for standard ONS

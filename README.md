@@ -24,6 +24,10 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), the accepted
 [`M0 handoff`](docs/KRKR_M0_HANDOFF.md), and the
 [`M1 TJS entry handoff and acceptance`](docs/KRKR_M1_TJS_ENTRY.md).
 
+The [Krkr integration roadmap](docs/ROADMAP.md) defines the remaining M2–M8
+work, dependencies, and acceptance gates through game execution and unified
+game/save management. ONS integration remains the existing regression baseline.
+
 ## Modules
 
 - `launcher-app`: Android launcher application.
