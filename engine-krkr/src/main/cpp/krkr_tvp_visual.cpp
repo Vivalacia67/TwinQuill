@@ -14,6 +14,7 @@
 #include <cmath>
 #include <map>
 #include <mutex>
+#include <set>
 
 tTJSNI_Window* TVPMainWindow = nullptr;
 namespace {
@@ -31,8 +32,10 @@ struct VisualContext {
     std::function<void()> exit;
     std::vector<tTJSVariant> owners;
     std::vector<tTJSNI_Layer*> layers;
+    std::vector<tTJSNI_Layer*> modal;
     std::map<int, tTJSVariant> captures;
     int primary_pointer = -1;
+    std::set<int> pressed_keys;
     int game_width = 640, game_height = 480;
     bool had_window = false;
     tTJSNativeClass* font_class = nullptr; // VM owns it.
@@ -196,16 +199,42 @@ std::vector<std::uint32_t> compose(tTJSNI_Layer* layer) {
     }
     return result;
 }
-tTJSNI_Layer* hit(tTJSNI_Layer* layer, int x, int y) {
+struct HitCandidate {
+    tTJSVariant owner;
+    int x, y;
+    bool initial;
+};
+void collect_hits(tTJSNI_Layer* layer, int x, int y, std::vector<HitCandidate>& candidates) {
     if (!layer || !layer->visible || !layer->enabled || x < 0 || y < 0
-        || x >= layer->width || y >= layer->height) return nullptr;
-    for (auto it = layer->children.rbegin(); it != layer->children.rend(); ++it) {
-        if (auto* found = hit(*it, x - (*it)->left, y - (*it)->top)) return found;
+        || x >= layer->width || y >= layer->height) return;
+    for (auto it = layer->children.rbegin(); it != layer->children.rend(); ++it)
+        collect_hits(*it, x - (*it)->left, y - (*it)->top, candidates);
+    if (!visual->modal.empty()) {
+        auto* node = layer;
+        while (node && node != visual->modal.back()) node = node->parent;
+        if (!node) return;
     }
     const int ix = x - layer->image_left, iy = y - layer->image_top;
-    if (layer->type == ltOpaque || (ix >= 0 && iy >= 0 && ix < layer->image_width
-        && iy < layer->image_height && (layer->pixels[std::size_t(iy) * layer->image_width + ix] >> 24) > 16))
-        return layer;
+    const bool inside = ix >= 0 && iy >= 0 && ix < layer->image_width && iy < layer->image_height;
+    const bool initial = layer->hit_type == 1
+        ? inside && !layer->province.empty() && layer->province[std::size_t(iy) * layer->image_width + ix]
+        : layer->hit_threshold == 0 || (layer->hit_threshold < 256 && (layer->type == ltOpaque
+            || (inside && (layer->pixels[std::size_t(iy) * layer->image_width + ix] >> 24) >= layer->hit_threshold)));
+    candidates.push_back({tTJSVariant(layer->owner, layer->owner), x, y, initial});
+}
+tTJSNI_Layer* hit(tTJSNI_Layer* root, int x, int y) {
+    // Scripts may invalidate or reorder layers during onHitTest. Retain a
+    // bounded snapshot and never iterate a live tree across a script callback.
+    std::vector<HitCandidate> candidates;
+    collect_hits(root, x, y, candidates);
+    for (const auto& candidate : candidates) {
+        auto* object = candidate.owner.AsObjectNoAddRef();
+        if (object->IsValid(0, nullptr, nullptr, object) != TJS_S_TRUE) continue;
+        auto* layer = TVPAndroidLayer(candidate.owner);
+        layer->hit_work = candidate.initial;
+        call(object, TJS_W("onHitTest"), {tTJSVariant(candidate.x), tTJSVariant(candidate.y), tTJSVariant(candidate.initial)});
+        if (layer->owner && layer->hit_work) return layer;
+    }
     return nullptr;
 }
 std::pair<int, int> local(tTJSNI_Layer* layer, int x, int y) {
@@ -220,6 +249,8 @@ int virtual_key(int key) {
     switch (key) {
         case 19: return 38; case 20: return 40; case 21: return 37; case 22: return 39;
         case 23: case 66: return 13; case 61: return 9; case 62: return 32;
+        case 59: case 60: return 16; case 113: case 114: return 17;
+        case 57: case 58: return 18; case 92: return 33; case 93: return 34;
         case 67: return 8; case 111: return 27; case 112: return 46;
         default: return 0;
     }
@@ -238,6 +269,15 @@ tjs_error TJS_INTF_METHOD tTJSNI_Window::Construct(tjs_int, tTJSVariant**, iTJSD
 }
 void TJS_INTF_METHOD tTJSNI_Window::Invalidate() {
     if (!owner) return;
+    while (!owned.empty()) {
+        tTJSVariant child = owned.back();
+        owned.pop_back();
+        auto* object = child.AsObjectNoAddRef();
+        if (object && object != owner) {
+            try { object->Invalidate(0, nullptr, nullptr, object); } catch (...) {}
+        }
+    }
+    menu.Clear();
     for (auto* layer : visual->layers) if (layer->window == this) layer->window = nullptr;
     primary = focused = nullptr;
     if (TVPMainWindow == this) TVPMainWindow = nullptr;
@@ -245,6 +285,25 @@ void TJS_INTF_METHOD tTJSNI_Window::Invalidate() {
     owner = nullptr;
     forget(previous);
     dirty();
+}
+iTJSDispatch2* tTJSNI_Window::GetMenuObjectNoAddRef() {
+    if (menu.Type() != tvtObject) {
+        auto* object = TVPCreateAndroidMenu(owner);
+        menu = tTJSVariant(object, object);
+        object->Release();
+    }
+    return menu.AsObjectNoAddRef();
+}
+void tTJSNI_Window::AddObject(const tTJSVariant& object) {
+    if (object.Type() != tvtObject || !object.AsObjectNoAddRef()) error(TJS_W("Invalid Window child"));
+    if (owned.size() >= 256) error(TJS_W("Window object limit exceeded"));
+    owned.push_back(object);
+}
+void tTJSNI_Window::RemoveObject(const tTJSVariant& object) {
+    const auto found = std::find_if(owned.begin(), owned.end(), [&](const tTJSVariant& value) {
+        return value.AsObjectNoAddRef() == object.AsObjectNoAddRef();
+    });
+    if (found != owned.end()) owned.erase(found);
 }
 void tTJSNI_Window::Close() {
     if (!owner || visual->closing) return;
@@ -291,6 +350,7 @@ tjs_error TJS_INTF_METHOD tTJSNI_Layer::Construct(tjs_int count, tTJSVariant** a
 }
 void TJS_INTF_METHOD tTJSNI_Layer::Invalidate() {
     if (!owner) return;
+    RemoveMode();
     detach(this);
     for (auto* child : children) child->parent = nullptr;
     children.clear();
@@ -302,7 +362,7 @@ void TJS_INTF_METHOD tTJSNI_Layer::Invalidate() {
         font_object->Release(); font_object = nullptr;
     }
     visual->layers.erase(std::remove(visual->layers.begin(), visual->layers.end(), this), visual->layers.end());
-    pixels.clear();
+    pixels.clear(); province.clear();
     auto* previous = owner; owner = nullptr;
     forget(previous); dirty();
 }
@@ -329,6 +389,13 @@ void tTJSNI_Layer::SetImageSize(tjs_uint w, tjs_uint h) {
     for (int y = 0; y < std::min<int>(h, image_height); ++y)
         std::copy_n(pixels.data() + std::size_t(y) * image_width,
             std::min<int>(w, image_width), replacement.data() + std::size_t(y) * w);
+    if (!province.empty()) {
+        std::vector<unsigned char> replacement_province(std::size_t(w) * h, 0);
+        for (int y = 0; y < std::min<int>(h, image_height); ++y)
+            std::copy_n(province.data() + std::size_t(y) * image_width,
+                std::min<int>(w, image_width), replacement_province.data() + std::size_t(y) * w);
+        province.swap(replacement_province);
+    }
     pixels.swap(replacement); image_width = w; image_height = h; ResetClip(); dirty();
 }
 void tTJSNI_Layer::SetImagePosition(tjs_int x, tjs_int y) { position(x, y); image_left = x; image_top = y; dirty(); }
@@ -346,7 +413,7 @@ void tTJSNI_Layer::SetType(tTVPLayerType value) {
     type = value; dirty();
 }
 void tTJSNI_Layer::SetFace(tTVPDrawFace value) {
-    if (value != dfAuto && value != dfOpaque && value != dfAlpha) error(TJS_W("Unsupported draw face"));
+    if (value != dfAuto && value != dfOpaque && value != dfAlpha && value != dfProvince) error(TJS_W("Unsupported draw face"));
     face = value;
 }
 void tTJSNI_Layer::SetParent(tTJSNI_Layer* value) {
@@ -407,14 +474,19 @@ iTJSDispatch2* tTJSNI_Layer::LoadImages(const ttstr& name, tjs_uint32 key) {
         replacement[i] = (a << 24) | (unsigned(r) << 16) | (unsigned(g) << 8) | b;
     }
     pixels.swap(replacement); image_width = image.getWidth(); image_height = image.getHeight();
+    province.clear(); image_modified = true;
     ResetClip(); dirty();
     return TJS::TJSCreateDictionaryObject();
 }
 void tTJSNI_Layer::FillRect(const tTVPRect& rect, tjs_uint32 color) {
+    if (face == dfProvince && color > 255) error(TJS_W("Province value must be 0..255"));
+    image_modified = true;
     const bool opaque = face == dfOpaque || (face == dfAuto && type == ltOpaque);
+    if (face == dfProvince && province.empty()) province.resize(pixels.size(), 0);
     for (int y = std::max(rect.top, clip.top); y < std::min(rect.bottom, clip.bottom); ++y) {
         check_execution();
         for (int x = std::max(rect.left, clip.left); x < std::min(rect.right, clip.right); ++x) {
+            if (face == dfProvince) { province[std::size_t(y) * image_width + x] = color & 255; continue; }
             auto& pixel = pixels[std::size_t(y) * image_width + x];
             pixel = opaque && hold_alpha ? ((pixel & 0xff000000) | (color & 0xffffff)) : color;
         }
@@ -427,6 +499,7 @@ void tTJSNI_Layer::DrawText(tjs_int x, tjs_int y, const ttstr& text, tjs_uint32 
     if (opa < 0 || opa > 255 || shadow || shadow_width || shadow_x || shadow_y)
         error(TJS_W("M2 text supports 0..255 opacity and no shadow"));
     position(x, y);
+    image_modified = true;
     auto* font = font_face(font_height);
     const int start_x = x;
     int baseline = y + (font->size->metrics.ascender >> 6);
@@ -471,7 +544,92 @@ tjs_uint32 tTJSNI_Layer::GetMainPixel(tjs_int x, tjs_int y) const {
 void tTJSNI_Layer::SetMainPixel(tjs_int x, tjs_int y, tjs_uint32 value) {
     (void)GetMainPixel(x, y);
     auto& pixel = pixels[std::size_t(y) * image_width + x];
-    pixel = (pixel & 0xff000000) | (value & 0xffffff); dirty();
+    pixel = (pixel & 0xff000000) | (value & 0xffffff); image_modified = true; dirty();
+}
+void tTJSNI_Layer::ColorRect(const tTVPRect& rect, tjs_uint32 color, int opa) {
+    if (face == dfProvince) { FillRect(rect, color); return; }
+    if (opa < 0 || opa > 255) error(TJS_W("Color rectangle opacity must be 0..255"));
+    image_modified = true;
+    for (int y = std::max(rect.top, clip.top); y < std::min(rect.bottom, clip.bottom); ++y) {
+        check_execution();
+        for (int x = std::max(rect.left, clip.left); x < std::min(rect.right, clip.right); ++x) {
+            auto& pixel = pixels[std::size_t(y) * image_width + x];
+            pixel = blend(pixel, color | 0xff000000, opa);
+        }
+    }
+    dirty();
+}
+void tTJSNI_Layer::SetAbsolute(tjs_int value) {
+    absolute = value;
+    if (parent && parent->absolute_order_mode) {
+        std::stable_sort(parent->children.begin(), parent->children.end(),
+            [](const auto* a, const auto* b) { return a->absolute < b->absolute; });
+        dirty();
+    }
+}
+void tTJSNI_Layer::SetMode() {
+    RemoveMode();
+    visual->modal.push_back(this);
+    visual->captures.clear();
+}
+void tTJSNI_Layer::RemoveMode() {
+    if (visual) visual->modal.erase(std::remove(visual->modal.begin(), visual->modal.end(), this), visual->modal.end());
+}
+void tTJSNI_Layer::SetAbsoluteOrderMode(bool value) {
+    absolute_order_mode = value;
+    if (value) std::stable_sort(children.begin(), children.end(),
+        [](const auto* a, const auto* b) { return a->absolute < b->absolute; });
+    dirty();
+}
+int tTJSNI_Layer::GetCursorX() const { return window ? local(const_cast<tTJSNI_Layer*>(this), window->cursor_x, window->cursor_y).first : 0; }
+int tTJSNI_Layer::GetCursorY() const { return window ? local(const_cast<tTJSNI_Layer*>(this), window->cursor_x, window->cursor_y).second : 0; }
+unsigned tTJSNI_Layer::GetProvincePixel(tjs_int x, tjs_int y) const {
+    if (x < 0 || y < 0 || x >= image_width || y >= image_height) return 0;
+    return province.empty() ? 0 : province[std::size_t(y) * image_width + x];
+}
+void tTJSNI_Layer::SetProvincePixel(tjs_int x, tjs_int y, unsigned value) {
+    if (x < 0 || y < 0 || x >= image_width || y >= image_height || value > 255)
+        error(TJS_W("Province pixel outside supported range"));
+    if (province.empty()) province.resize(pixels.size(), 0);
+    province[std::size_t(y) * image_width + x] = value;
+}
+void tTJSNI_Layer::AssignImages(const tTJSNI_Layer* source) {
+    if (!source || !source->owner || source->window != window) error(TJS_W("Invalid source Layer"));
+    SetImageSize(source->image_width, source->image_height);
+    pixels = source->pixels; province = source->province; image_modified = true;
+    font_height = source->font_height;
+    dirty();
+}
+void tTJSNI_Layer::CopyRect(tjs_int x, tjs_int y, const tTJSNI_Layer* source,
+        const tTVPRect& area, bool operate, int mode, int opa) {
+    if (!source || !source->owner || source->window != window) error(TJS_W("Invalid source Layer"));
+    position(x, y);
+    if (opa < 0 || opa > 255 || (operate && mode != 128 && mode != 1 && mode != 2))
+        error(TJS_W("Only opaque/alpha rectangle operations are supported"));
+    image_modified = true;
+    const int w = area.right - area.left, h = area.bottom - area.top;
+    const auto source_pixels = source == this ? source->pixels : std::vector<tjs_uint32>();
+    const auto source_province = source == this ? source->province : std::vector<unsigned char>();
+    const auto& input = source == this ? source_pixels : source->pixels;
+    const auto& map = source == this ? source_province : source->province;
+    if (face == dfProvince && province.empty()) province.resize(pixels.size(), 0);
+    for (int row = 0; row < h; ++row) {
+        check_execution();
+        const int dy = y + row, sy = area.top + row;
+        if (dy < clip.top || dy >= clip.bottom || sy < 0 || sy >= source->image_height) continue;
+        for (int col = 0; col < w; ++col) {
+            const int dx = x + col, sx = area.left + col;
+            if (dx < clip.left || dx >= clip.right || sx < 0 || sx >= source->image_width) continue;
+            const auto dest_index = std::size_t(dy) * image_width + dx;
+            const auto source_index = std::size_t(sy) * source->image_width + sx;
+            if (face == dfProvince) { province[dest_index] = map.empty() ? 0 : map[source_index]; continue; }
+            auto pixel = input[source_index];
+            const bool source_opaque = mode == 1 || (mode == 128 && source->type == ltOpaque);
+            if (operate && source_opaque) pixel |= 0xff000000;
+            pixels[dest_index] = operate ? blend(pixels[dest_index], pixel, opa) : pixel;
+        }
+    }
+    dirty();
 }
 void tTJSNI_Layer::UpdateByScript() { call(owner, TJS_W("onPaint")); dirty(); }
 void tTJSNI_Layer::SetClip(tjs_int x, tjs_int y, tjs_int w, tjs_int h) {
@@ -544,6 +702,10 @@ void begin_visual_session(std::function<std::string(const ttstr&)> read,
 void shutdown_visual_session() {
     if (!visual) return;
     visual->captures.clear();
+    if (TVPMainWindow && TVPMainWindow->owner) {
+        auto* object = TVPMainWindow->owner;
+        object->Invalidate(0, nullptr, nullptr, object);
+    }
     while (!visual->owners.empty()) {
         tTJSVariant owner = visual->owners.back();
         auto* object = owner.AsObjectNoAddRef();
@@ -591,7 +753,7 @@ void visual_event(int kind, const std::vector<double>& args) {
     if (!visual || !window || !window->visible) return;
     tTJSVariant retained(window->owner, window->owner);
     if (kind == 2 || kind == 3) {
-        if (kind == 2) visual->captures.clear();
+        if (kind == 2) { visual->captures.clear(); visual->pressed_keys.clear(); }
         call(window->owner, kind == 2 ? TJS_W("onDeactivate") : TJS_W("onActivate"));
     } else if (kind == 5) call(window->owner, TJS_W("onResize"));
     else if (kind == 0 && args.size() == 5) {
@@ -605,6 +767,7 @@ void visual_event(int kind, const std::vector<double>& args) {
         const auto game_y = (args[3] - (surface_height - window->height * scale) / 2) / scale;
         if (game_x < -kPosition || game_x > kPosition || game_y < -kPosition || game_y > kPosition) return;
         const int x = std::floor(game_x), y = std::floor(game_y);
+        window->cursor_x = x; window->cursor_y = y;
         const int raw_action = args[0], id = args[1];
         const int action = raw_action == 5 ? 0 : raw_action == 6 ? 1 : raw_action;
         if (raw_action == 0) { visual->captures.clear(); visual->primary_pointer = id; }
@@ -617,7 +780,7 @@ void visual_event(int kind, const std::vector<double>& args) {
         const auto captured = visual->captures.find(id);
         tTJSVariant capture = captured == visual->captures.end() ? tTJSVariant() : captured->second;
         if (capture.Type() == tvtObject) target = instance<tTJSNI_Layer>(capture, tTJSNC_Layer::ClassID);
-        if (action == 3) { visual->captures.erase(id); return; }
+        if (action == 3) { visual->captures.erase(id); visual->pressed_keys.erase(1); return; }
         const tjs_char* touch_name = action == 0 ? TJS_W("onTouchDown")
             : action == 1 ? TJS_W("onTouchUp") : TJS_W("onTouchMove");
         call(window->owner, touch_name, {tTJSVariant(x), tTJSVariant(y), tTJSVariant(0), tTJSVariant(0), tTJSVariant(id)});
@@ -626,6 +789,8 @@ void visual_event(int kind, const std::vector<double>& args) {
             call(target->owner, touch_name, {tTJSVariant(xy.first), tTJSVariant(xy.second), tTJSVariant(0), tTJSVariant(0), tTJSVariant(id)});
         }
         if (id == visual->primary_pointer && action <= 2) {
+            if (action == 0) visual->pressed_keys.insert(1);
+            if (action == 1) visual->pressed_keys.erase(1);
             const auto* mouse = action == 0 ? TJS_W("onMouseDown")
                 : action == 1 ? TJS_W("onMouseUp") : TJS_W("onMouseMove");
             std::vector<tTJSVariant> values{tTJSVariant(x), tTJSVariant(y)};
@@ -645,6 +810,7 @@ void visual_event(int kind, const std::vector<double>& args) {
         const auto key = virtual_key(args[1]);
         if (!key) return;
         const bool down = args[0] != 0;
+        if (down) visual->pressed_keys.insert(key); else visual->pressed_keys.erase(key);
         const auto* name = down ? TJS_W("onKeyDown") : TJS_W("onKeyUp");
         // Native Android meta bits do not match TVP shift flags.
         const int meta = args[3];
@@ -666,3 +832,5 @@ void visual_event(int kind, const std::vector<double>& args) {
     }
 }
 }
+
+bool TVPAndroidKeyState(tjs_int key) { return visual && visual->pressed_keys.count(key) != 0; }

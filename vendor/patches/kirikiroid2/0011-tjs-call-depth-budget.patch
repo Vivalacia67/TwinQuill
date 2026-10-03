@@ -1,0 +1,30 @@
+Subject: [PATCH] Bound script call depth before allocating VM frames
+Tested-by: tests/test_krkr_tjs2_source_admission.py focused git-apply unittest; forced Android CMake configure
+
+Prevent recursive KAG callbacks or malformed scripts from overflowing the native
+worker stack. The first-party host caps live call frames at 128 and unwinds using
+a TJS exception; all calls continue to share the execution deadline.
+
+--- a/src/core/tjs2/tjsInterCodeExec.cpp
++++ b/src/core/tjs2/tjsInterCodeExec.cpp
+@@ -37,6 +37,12 @@
+ namespace TJS
+ {
+ extern void TJSCheckExecutionBudget();
++extern void TJSEnterScriptCall();
++extern void TJSLeaveScriptCall();
++struct TJSHostCallFrame {
++    TJSHostCallFrame() { TJSEnterScriptCall(); }
++    ~TJSHostCallFrame() { TJSLeaveScriptCall(); }
++};
+ //---------------------------------------------------------------------------
+ // utility functions
+ //---------------------------------------------------------------------------
+@@ -743,6 +749,7 @@
+ void tTJSInterCodeContext::ExecuteAsFunction(iTJSDispatch2 *objthis,
+ 	tTJSVariant **args, tjs_int numargs, tTJSVariant *result, tjs_int start_ip)
+ {
++	TJSHostCallFrame host_frame;
+ 	tjs_int num_alloc = MaxVariableCount + VariableReserveCount + 1 + MaxFrameCount;
+ 	TJSVariantArrayStackAddRef();
+ //	AddRef();

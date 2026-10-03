@@ -1,0 +1,3 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
+#pragma once
+inline const tjs_char* kAndroidKagHost = TJS_W(R"KAG(@KAG_HOST_SCRIPT@)KAG");

@@ -4,43 +4,34 @@ TwinQuill is a GPL Android runtime that will manage ONScripter and
 Kirikiri/Kirikiri Z games in one launcher and execute each engine in an
 isolated Android process.
 
-M0 and M1 task 3 (formal TJS entry) were accepted on 2026-10-02, with M1
-validated on the Android 16 / API 36 simulator. M1 provides a persistent TJS2
-startup and callback session, basic TVP interfaces, and a script-controlled test surface:
+The Compose/Room launcher imports game directories and routes engine requests
+into private `:ons` and `:krkr` processes. ONS integration is the existing
+regression baseline. Krkr M0–M4 have passed simulator acceptance.
 
-- ONScripterYuri runs a self-authored minimal `0.txt` fixture.
-- Kirikiroid2's TJS2 core executes `startup.tjs` from loose storage, raw
-  unprotected XP3, or read-only SAF via `tqsaf`/`native-vfs`. Startup text accepts
-  UTF-8 (including ASCII, with optional BOM) and BOM-marked UTF-16LE/BE.
-- Scripts can load additional read-only game scripts, retain variables across
-  input, Home/task return, and Activity recreation, change the proof quad color,
-  and request exit.
-- Both engine entry points run in app-private Android processes.
+M1 provides a persistent Unicode TJS2 session and lifecycle callbacks. M2 adds
+Window/Layer/Font, Timer/AsyncTrigger, basic PNG/JPEG, Noto text, composition and
+input. M3 unifies loose/SAF/XP3 resources, raw/zlib and chained indexes,
+patch/search-path ordering, strict Unicode or explicit CP932, and atomic private
+writes under `filesDir/saves/<game-id>/krkr/`. ONS retains its parent-directory
+save layout. See the [M2 handoff](docs/KRKR_M2_HANDOFF.md) and
+[M3 storage contract](docs/KRKR_M3_STORAGE_CONTRACT.md).
 
-The Compose/Room launcher imports game directories and routes engine requests.
-Full KAG execution, game-state save/load, wider media and plugin compatibility,
-and unified save management remain future milestones.
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), the accepted
-[`M0 handoff`](docs/KRKR_M0_HANDOFF.md), and the
-[`M1 TJS entry handoff and acceptance`](docs/KRKR_M1_TJS_ENTRY.md).
+M4 executes the complete pinned KAG3 startup and framework with a bounded
+Android host, native KAGParser and real PCM16 WAV output. Its authored scene
+covers text/pages, images, two branches, macros, embedded TJS, cross-file
+call/return, Home recovery and normal/error exits from loose SAF or compressed
+XP3. The selected configuration uses plain horizontal text and direct image
+changes. M4 passed user acceptance on 2026-10-04; supported interfaces and emulator
+instructions are in the [M4 audit](docs/KRKR_M4_INTERFACE_AUDIT.md) and
+[M4 handoff](docs/KRKR_M4_HANDOFF.md).
 
-The [Krkr integration roadmap](docs/ROADMAP.md) defines the remaining M2–M8
-work, dependencies, and acceptance gates through game execution and unified
-game/save management. ONS integration remains the existing regression baseline.
-
-M2 implements host-ready startup, the pinned Window/Layer/Font, Timer and
-AsyncTrigger bindings, and an Android backend for basic PNG/JPEG, text,
-composition and input. Script cancellation and lifecycle recovery are bounded.
-The pinned KAG3 framework remains an audit source until M4. M2 implementation
-was accepted on the simulator on 2026-10-03; supported members, limits and instructions
-are in the [M2 handoff](docs/KRKR_M2_HANDOFF.md).
-
-M3 development adds unified loose/SAF/XP3 resources, raw/zlib and chained XP3
-indexes, patch/search-path ordering, strict Unicode or explicit per-game CP932,
-and atomic private writes under `filesDir/saves/<game-id>/krkr/`. ONS keeps
-its existing parent-directory layout. M3 has passed simulator acceptance;
-see the [storage contract](docs/KRKR_M3_STORAGE_CONTRACT.md) and
-[M3 handoff and emulator procedure](docs/KRKR_M3_HANDOFF.md).
+Game-state save/load, wider media/plugins and unified save management remain
+M5–M7 work; representative-game compatibility is verified in M8. The
+[roadmap](docs/ROADMAP.md) defines dependencies and acceptance gates. Self-authored
+fixtures passing does not establish arbitrary commercial-game compatibility.
+Architecture and earlier acceptance records are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md),
+[the M0 handoff](docs/KRKR_M0_HANDOFF.md) and
+[the M1 handoff](docs/KRKR_M1_TJS_ENTRY.md).
 
 ## Modules
 
@@ -84,7 +75,12 @@ python scripts/check_apk_native_libraries.py <debug.apk> <release.apk>
 
 ## Windows emulator testing
 
-Run `gradlew.bat --no-daemon :launcher-app:connectedDebugAndroidTest` for the
+When preserving existing emulator data, use the rebuild/overwrite-install/direct
+instrumentation commands in the [M4 handoff](docs/KRKR_M4_HANDOFF.md).
+Gradle connected tests uninstall the target application and remove its private data.
+
+On a disposable emulator, run
+`gradlew.bat --no-daemon :launcher-app:connectedDebugAndroidTest` for the
 device smoke tests. Repeat with `-PtwinquillKrkrRuntimeInstrumentation=true`
 for the Krkr process tests. Functional launches allow 60 seconds for cold
 starts and ARM translation; each test removes its task and waits for the

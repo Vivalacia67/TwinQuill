@@ -1,0 +1,501 @@
+From: TwinQuill contributors
+Subject: [PATCH] Admit bounded Android KAG window and layer bindings
+Tested-by: tests/test_krkr_tjs2_source_admission.py focused git-apply unittest; forced Android CMake configure
+
+--- a/src/core/visual/WindowIntf.cpp
++++ b/src/core/visual/WindowIntf.cpp
+@@ -897,8 +897,10 @@
+ #else
+ TJS_BEGIN_NATIVE_METHOD_DECL(add)
+ {
+-	TJS_eTJSError(TJS_W("Unsupported M2 method: add"));
+-	return TJS_E_NOTIMPL;
++	TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Window);
++	if(numparams < 1) return TJS_E_BADPARAMCOUNT;
++	_this->AddObject(*param[0]);
++	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(add)
+ #endif
+@@ -916,8 +918,10 @@
+ #else
+ TJS_BEGIN_NATIVE_METHOD_DECL(remove)
+ {
+-	TJS_eTJSError(TJS_W("Unsupported M2 method: remove"));
+-	return TJS_E_NOTIMPL;
++	TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Window);
++	if(numparams < 1) return TJS_E_BADPARAMCOUNT;
++	_this->RemoveObject(*param[0]);
++	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(remove)
+ #endif
+@@ -1725,10 +1729,10 @@
+ TJS_BEGIN_NATIVE_PROP_DECL(left)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: left")); return TJS_E_NOTIMPL; }
+-	TJS_END_NATIVE_PROP_GETTER
+-	TJS_BEGIN_NATIVE_PROP_SETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: left")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Window); if(result) *result = _this->desktop_left; return TJS_S_OK; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Window); if((tjs_int)*param < -32768 || (tjs_int)*param > 32768) TJS_eTJSError(TJS_W("Virtual window position exceeds range")); _this->desktop_left=*param; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(left)
+@@ -1758,10 +1762,10 @@
+ TJS_BEGIN_NATIVE_PROP_DECL(top)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: top")); return TJS_E_NOTIMPL; }
+-	TJS_END_NATIVE_PROP_GETTER
+-	TJS_BEGIN_NATIVE_PROP_SETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: top")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Window); if(result) *result = _this->desktop_top; return TJS_S_OK; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Window); if((tjs_int)*param < -32768 || (tjs_int)*param > 32768) TJS_eTJSError(TJS_W("Virtual window position exceeds range")); _this->desktop_top=*param; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(top)
+@@ -1891,10 +1895,10 @@
+ TJS_BEGIN_NATIVE_PROP_DECL(innerSunken)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: innerSunken")); return TJS_E_NOTIMPL; }
+-	TJS_END_NATIVE_PROP_GETTER
+-	TJS_BEGIN_NATIVE_PROP_SETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: innerSunken")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Window); if(result) *result = _this->inner_sunken; return TJS_S_OK; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Window); _this->inner_sunken = (bool)*param; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(innerSunken)
+@@ -2031,10 +2035,10 @@
+ TJS_BEGIN_NATIVE_PROP_DECL(borderStyle)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: borderStyle")); return TJS_E_NOTIMPL; }
+-	TJS_END_NATIVE_PROP_GETTER
+-	TJS_BEGIN_NATIVE_PROP_SETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: borderStyle")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Window); if(result) *result = _this->border_style; return TJS_S_OK; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Window); _this->border_style = (tjs_int)*param; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(borderStyle)
+@@ -2098,10 +2102,10 @@
+ TJS_BEGIN_NATIVE_PROP_DECL(showScrollBars)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: showScrollBars")); return TJS_E_NOTIMPL; }
+-	TJS_END_NATIVE_PROP_GETTER
+-	TJS_BEGIN_NATIVE_PROP_SETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: showScrollBars")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Window); if(result) *result = false; return TJS_S_OK; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Window); if((bool)*param) TJS_eTJSError(TJS_W("Android scroll bars are unsupported")); return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(showScrollBars)
+@@ -2165,10 +2169,10 @@
+ TJS_BEGIN_NATIVE_PROP_DECL(trapKey)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: trapKey")); return TJS_E_NOTIMPL; }
+-	TJS_END_NATIVE_PROP_GETTER
+-	TJS_BEGIN_NATIVE_PROP_SETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: trapKey")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Window); if(result) *result = _this->trap_key; return TJS_S_OK; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Window); if(!(bool)*param) TJS_eTJSError(TJS_W("Android requires trapped game keys")); return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(trapKey)
+@@ -2264,10 +2268,10 @@
+ TJS_BEGIN_NATIVE_PROP_DECL(fullScreen)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: fullScreen")); return TJS_E_NOTIMPL; }
+-	TJS_END_NATIVE_PROP_GETTER
+-	TJS_BEGIN_NATIVE_PROP_SETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: fullScreen")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Window); if(result) *result = _this->full_screen; return TJS_S_OK; }
++	TJS_END_NATIVE_PROP_GETTER
++	TJS_BEGIN_NATIVE_PROP_SETTER
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Window); if((bool)*param) TJS_eTJSError(TJS_W("Desktop fullscreen switching is unsupported")); return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(fullScreen)
+@@ -2414,6 +2418,16 @@
+ #endif
+ //----------------------------------------------------------------------
+ 
++TJS_BEGIN_NATIVE_PROP_DECL(menu)
++{
++    TJS_BEGIN_NATIVE_PROP_GETTER
++    { TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Window);
++      if(result) *result = tTJSVariant(_this->GetMenuObjectNoAddRef(), _this->GetMenuObjectNoAddRef());
++      return TJS_S_OK; }
++    TJS_END_NATIVE_PROP_GETTER
++    TJS_DENY_NATIVE_PROP_SETTER
++}
++TJS_END_NATIVE_PROP_DECL(menu)
+ 	TJS_END_NATIVE_MEMBERS
+ 
+ }
+--- a/src/core/visual/LayerIntf.cpp
++++ b/src/core/visual/LayerIntf.cpp
+@@ -7713,8 +7713,9 @@
+ #else
+ TJS_BEGIN_NATIVE_METHOD_DECL(getProvincePixel)
+ {
+-	TJS_eTJSError(TJS_W("Unsupported M2 method: getProvincePixel"));
+-	return TJS_E_NOTIMPL;
++TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer);
++ if(numparams<2) return TJS_E_BADPARAMCOUNT; if(result) *result=(tjs_int)_this->GetProvincePixel(*param[0],*param[1]);
++ return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(getProvincePixel)
+ #endif
+@@ -7731,8 +7732,9 @@
+ #else
+ TJS_BEGIN_NATIVE_METHOD_DECL(setProvincePixel)
+ {
+-	TJS_eTJSError(TJS_W("Unsupported M2 method: setProvincePixel"));
+-	return TJS_E_NOTIMPL;
++TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer);
++ if(numparams<3) return TJS_E_BADPARAMCOUNT; _this->SetProvincePixel(*param[0],*param[1],(tjs_int)*param[2]);
++ return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(setProvincePixel)
+ #endif
+@@ -7935,8 +7937,9 @@
+ #else
+ TJS_BEGIN_NATIVE_METHOD_DECL(colorRect)
+ {
+-	TJS_eTJSError(TJS_W("Unsupported M2 method: colorRect"));
+-	return TJS_E_NOTIMPL;
++TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer);
++ if(numparams<5) return TJS_E_BADPARAMCOUNT; _this->ColorRect(TVPAndroidRect(*param[0],*param[1],*param[2],*param[3]),(tjs_int)*param[4],numparams>=6?(tjs_int)*param[5]:255);
++ return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(colorRect)
+ #endif
+@@ -8074,8 +8077,11 @@
+ #else
+ TJS_BEGIN_NATIVE_METHOD_DECL(copyRect)
+ {
+-	TJS_eTJSError(TJS_W("Unsupported M2 method: copyRect"));
+-	return TJS_E_NOTIMPL;
++TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer);
++ if(numparams<7) return TJS_E_BADPARAMCOUNT;
++ auto* src=TVPAndroidLayer(*param[2]);
++ _this->CopyRect(*param[0],*param[1],src,TVPAndroidRect(*param[3],*param[4],*param[5],*param[6]),false,128,255);
++ return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(copyRect)
+ #endif
+@@ -8274,8 +8280,11 @@
+ #else
+ TJS_BEGIN_NATIVE_METHOD_DECL(operateRect)
+ {
+-	TJS_eTJSError(TJS_W("Unsupported M2 method: operateRect"));
+-	return TJS_E_NOTIMPL;
++TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer);
++ if(numparams<7) return TJS_E_BADPARAMCOUNT;
++ auto* src=TVPAndroidLayer(*param[2]);
++ _this->CopyRect(*param[0],*param[1],src,TVPAndroidRect(*param[3],*param[4],*param[5],*param[6]),true,numparams>=8&&param[7]->Type()!=tvtVoid?(tjs_int)*param[7]:128,numparams>=9&&param[8]->Type()!=tvtVoid?(tjs_int)*param[8]:255);
++ return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(operateRect)
+ #endif
+@@ -8913,8 +8922,9 @@
+ #else
+ TJS_BEGIN_NATIVE_METHOD_DECL(adjustGamma)
+ {
+-	TJS_eTJSError(TJS_W("Unsupported M2 method: adjustGamma"));
+-	return TJS_E_NOTIMPL;
++TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer);
++ for(tjs_int i=0;i<numparams;i++) { if(param[i]->Type()!=tvtVoid && (tjs_real)*param[i] != (i%3==0?1:i%3==1?0:255)) TJS_eTJSError(TJS_W("Image gamma correction requires M6")); }
++ return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(adjustGamma)
+ #endif
+@@ -9188,8 +9198,9 @@
+ #else
+ TJS_BEGIN_NATIVE_METHOD_DECL(setMode)
+ {
+-	TJS_eTJSError(TJS_W("Unsupported M2 method: setMode"));
+-	return TJS_E_NOTIMPL;
++TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer);
++ _this->SetMode();
++ return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(setMode)
+ #endif
+@@ -9207,8 +9218,9 @@
+ #else
+ TJS_BEGIN_NATIVE_METHOD_DECL(removeMode)
+ {
+-	TJS_eTJSError(TJS_W("Unsupported M2 method: removeMode"));
+-	return TJS_E_NOTIMPL;
++TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer);
++ _this->RemoveMode();
++ return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(removeMode)
+ #endif
+@@ -9320,8 +9332,9 @@
+ #else
+ TJS_BEGIN_NATIVE_METHOD_DECL(assignImages)
+ {
+-	TJS_eTJSError(TJS_W("Unsupported M2 method: assignImages"));
+-	return TJS_E_NOTIMPL;
++TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer);
++ if(numparams<1) return TJS_E_BADPARAMCOUNT; _this->AssignImages(TVPAndroidLayer(*param[0]));
++ return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(assignImages)
+ #endif
+@@ -9431,8 +9444,9 @@
+ #else
+ TJS_BEGIN_NATIVE_METHOD_DECL(onHitTest)
+ {
+-	TJS_eTJSError(TJS_W("Unsupported M2 method: onHitTest"));
+-	return TJS_E_NOTIMPL;
++TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer);
++ if(numparams<3)return TJS_E_BADPARAMCOUNT; _this->hit_work=param[2]->operator bool();
++ return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(onHitTest)
+ #endif
+@@ -10234,10 +10248,10 @@
+ TJS_BEGIN_NATIVE_PROP_DECL(absolute)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: absolute")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer); if(result) *result = _this->absolute; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_GETTER
+ 	TJS_BEGIN_NATIVE_PROP_SETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: absolute")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer); _this->SetAbsolute(*param); return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(absolute)
+@@ -10267,10 +10281,10 @@
+ TJS_BEGIN_NATIVE_PROP_DECL(absoluteOrderMode)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: absoluteOrderMode")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer); if(result) *result = _this->absolute_order_mode; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_GETTER
+ 	TJS_BEGIN_NATIVE_PROP_SETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: absoluteOrderMode")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer); _this->SetAbsoluteOrderMode((bool)*param); return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(absoluteOrderMode)
+@@ -10724,10 +10738,10 @@
+ TJS_BEGIN_NATIVE_PROP_DECL(imageModified)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: imageModified")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer); if(result) *result = _this->image_modified; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_GETTER
+ 	TJS_BEGIN_NATIVE_PROP_SETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: imageModified")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer); _this->image_modified=(bool)*param; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(imageModified)
+@@ -10757,10 +10771,10 @@
+ TJS_BEGIN_NATIVE_PROP_DECL(hitType)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: hitType")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer); if(result) *result = _this->hit_type; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_GETTER
+ 	TJS_BEGIN_NATIVE_PROP_SETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: hitType")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer); if((tjs_int)*param<0 || (tjs_int)*param>1) TJS_eTJSError(TJS_W("Invalid hit type")); _this->hit_type=*param; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(hitType)
+@@ -10790,10 +10804,10 @@
+ TJS_BEGIN_NATIVE_PROP_DECL(hitThreshold)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: hitThreshold")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer); if(result) *result = _this->hit_threshold; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_GETTER
+ 	TJS_BEGIN_NATIVE_PROP_SETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: hitThreshold")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer); if((tjs_int)*param<0 || (tjs_int)*param>256) TJS_eTJSError(TJS_W("Invalid hit threshold")); _this->hit_threshold=*param; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(hitThreshold)
+@@ -10826,10 +10840,10 @@
+ TJS_BEGIN_NATIVE_PROP_DECL(cursor)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: cursor")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer); if(result) *result = _this->cursor; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_GETTER
+ 	TJS_BEGIN_NATIVE_PROP_SETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: cursor")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer); _this->cursor=*param; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(cursor)
+@@ -10859,10 +10873,10 @@
+ TJS_BEGIN_NATIVE_PROP_DECL(cursorX)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: cursorX")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer); if(result) *result = _this->GetCursorX(); return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_GETTER
+ 	TJS_BEGIN_NATIVE_PROP_SETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: cursorX")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer); TJS_eTJSError(TJS_W("Cursor positioning is unsupported")); return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(cursorX)
+@@ -10892,10 +10906,10 @@
+ TJS_BEGIN_NATIVE_PROP_DECL(cursorY)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: cursorY")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer); if(result) *result = _this->GetCursorY(); return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_GETTER
+ 	TJS_BEGIN_NATIVE_PROP_SETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: cursorY")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer); TJS_eTJSError(TJS_W("Cursor positioning is unsupported")); return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(cursorY)
+@@ -10925,10 +10939,10 @@
+ TJS_BEGIN_NATIVE_PROP_DECL(hint)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: hint")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer); if(result) *result = _this->hint; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_GETTER
+ 	TJS_BEGIN_NATIVE_PROP_SETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: hint")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer); _this->hint=*param; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(hint)
+@@ -10958,10 +10972,10 @@
+ TJS_BEGIN_NATIVE_PROP_DECL(showParentHint)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: showParentHint")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer); if(result) *result = _this->show_parent_hint; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_GETTER
+ 	TJS_BEGIN_NATIVE_PROP_SETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: showParentHint")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer); _this->show_parent_hint=(bool)*param; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(showParentHint)
+@@ -11024,10 +11038,10 @@
+ TJS_BEGIN_NATIVE_PROP_DECL(focusable)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: focusable")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer); if(result) *result = _this->focusable; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_GETTER
+ 	TJS_BEGIN_NATIVE_PROP_SETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: focusable")); return TJS_E_NOTIMPL; }
++	{ TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer); _this->focusable=(bool)*param; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(focusable)
+@@ -12300,10 +12314,10 @@
+ TJS_BEGIN_NATIVE_PROP_DECL(bold)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: bold")); return TJS_E_NOTIMPL; }
++	{ if(result) *result = (tjs_int)0; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_GETTER
+ 	TJS_BEGIN_NATIVE_PROP_SETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: bold")); return TJS_E_NOTIMPL; }
++	{ if((tjs_int)*param != 0) TJS_eTJSError(TJS_W("Only plain horizontal fonts are supported")); return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(bold)
+@@ -12333,10 +12347,10 @@
+ TJS_BEGIN_NATIVE_PROP_DECL(italic)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: italic")); return TJS_E_NOTIMPL; }
++	{ if(result) *result = (tjs_int)0; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_GETTER
+ 	TJS_BEGIN_NATIVE_PROP_SETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: italic")); return TJS_E_NOTIMPL; }
++	{ if((tjs_int)*param != 0) TJS_eTJSError(TJS_W("Only plain horizontal fonts are supported")); return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(italic)
+@@ -12366,10 +12380,10 @@
+ TJS_BEGIN_NATIVE_PROP_DECL(strikeout)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: strikeout")); return TJS_E_NOTIMPL; }
++	{ if(result) *result = (tjs_int)0; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_GETTER
+ 	TJS_BEGIN_NATIVE_PROP_SETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: strikeout")); return TJS_E_NOTIMPL; }
++	{ if((tjs_int)*param != 0) TJS_eTJSError(TJS_W("Only plain horizontal fonts are supported")); return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(strikeout)
+@@ -12399,10 +12413,10 @@
+ TJS_BEGIN_NATIVE_PROP_DECL(underline)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: underline")); return TJS_E_NOTIMPL; }
++	{ if(result) *result = (tjs_int)0; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_GETTER
+ 	TJS_BEGIN_NATIVE_PROP_SETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: underline")); return TJS_E_NOTIMPL; }
++	{ if((tjs_int)*param != 0) TJS_eTJSError(TJS_W("Only plain horizontal fonts are supported")); return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(underline)
+@@ -12432,10 +12446,10 @@
+ TJS_BEGIN_NATIVE_PROP_DECL(angle)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: angle")); return TJS_E_NOTIMPL; }
++	{ if(result) *result = (tjs_int)0; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_GETTER
+ 	TJS_BEGIN_NATIVE_PROP_SETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: angle")); return TJS_E_NOTIMPL; }
++	{ if((tjs_int)*param != 0) TJS_eTJSError(TJS_W("Only plain horizontal fonts are supported")); return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(angle)
+@@ -12466,10 +12480,10 @@
+ TJS_BEGIN_NATIVE_PROP_DECL(faceIsFileName)
+ {
+ 	TJS_BEGIN_NATIVE_PROP_GETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: faceIsFileName")); return TJS_E_NOTIMPL; }
++	{ if(result) *result = (tjs_int)0; return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_GETTER
+ 	TJS_BEGIN_NATIVE_PROP_SETTER
+-	{ TJS_eTJSError(TJS_W("Unsupported M2 property: faceIsFileName")); return TJS_E_NOTIMPL; }
++	{ if((tjs_int)*param != 0) TJS_eTJSError(TJS_W("Only plain horizontal fonts are supported")); return TJS_S_OK; }
+ 	TJS_END_NATIVE_PROP_SETTER
+ }
+ TJS_END_NATIVE_PROP_DECL(faceIsFileName)

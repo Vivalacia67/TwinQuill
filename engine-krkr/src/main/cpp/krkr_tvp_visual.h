@@ -80,6 +80,13 @@ public:
     tTJSNI_Layer* GetFocusedLayer() const { return focused; }
     void SetFocusedLayer(tTJSNI_Layer* value);
 
+    iTJSDispatch2* GetMenuObjectNoAddRef();
+    void AddObject(const tTJSVariant&);
+    void RemoveObject(const tTJSVariant&);
+    std::vector<tTJSVariant> owned;
+    tTJSVariant menu;
+    int border_style = 1, cursor_x = 0, cursor_y = 0, desktop_left = 0, desktop_top = 0;
+    bool inner_sunken = false, full_screen = false, trap_key = true;
     iTJSDispatch2* owner = nullptr;
     tTJSNI_Layer* primary = nullptr;
     tTJSNI_Layer* focused = nullptr;
@@ -88,6 +95,7 @@ public:
     ttstr caption;
 };
 extern tTJSNI_Window* TVPMainWindow;
+iTJSDispatch2* TVPCreateAndroidMenu(iTJSDispatch2*);
 
 class tTJSNI_Layer : public tTJSNativeInstance {
 public:
@@ -147,6 +155,15 @@ public:
                   tjs_int shadow_width, tjs_int shadow_x, tjs_int shadow_y);
     tjs_uint32 GetMainPixel(tjs_int x, tjs_int y) const;
     void SetMainPixel(tjs_int x, tjs_int y, tjs_uint32 value);
+    void CopyRect(tjs_int x, tjs_int y, const tTJSNI_Layer* source, const tTVPRect&, bool operate, int mode, int opacity);
+    void AssignImages(const tTJSNI_Layer*);
+    void ColorRect(const tTVPRect&, tjs_uint32, int);
+    unsigned GetProvincePixel(tjs_int x, tjs_int y) const;
+    void SetProvincePixel(tjs_int x, tjs_int y, unsigned);
+    void SetAbsolute(tjs_int value);
+    void SetMode();
+    void RemoveMode();
+    void SetAbsoluteOrderMode(bool value);
     void UpdateByScript();
     void UpdateByScript(const tTVPRect&) { UpdateByScript(); }
     void SetClip(tjs_int x, tjs_int y, tjs_int width, tjs_int height);
@@ -166,6 +183,13 @@ public:
     tTJSNI_Layer* parent = nullptr;
     std::vector<tTJSNI_Layer*> children;
     std::vector<tjs_uint32> pixels;
+    std::vector<unsigned char> province;
+    bool hit_work = false;
+    int absolute = 0, hit_type = 0, hit_threshold = 16, cursor = 0;
+    ttstr hint;
+    int GetCursorX() const;
+    int GetCursorY() const;
+    bool absolute_order_mode = false, focusable = false, image_modified = false, show_parent_hint = true;
     int left = 0, top = 0, width = 32, height = 32;
     int image_left = 0, image_top = 0, image_width = 32, image_height = 32;
     int opacity = 255, font_height = 24;
@@ -175,6 +199,15 @@ public:
     tTVPRect clip{0, 0, 32, 32};
     ttstr name;
 };
+
+inline tTJSNI_Layer* TVPAndroidLayer(const tTJSVariant& value) {
+    auto* object = value.AsObjectNoAddRef();
+    tTJSNI_Layer* result = nullptr;
+    if (!object || TJS_FAILED(object->NativeInstanceSupport(TJS_NIS_GETINSTANCE,
+            tTJSNC_Layer::ClassID, reinterpret_cast<iTJSNativeInstance**>(&result))))
+        TVPThrowExceptionMessage(TJS_W("Invalid source Layer"));
+    return result;
+}
 
 class tTJSNI_Font : public tTJSNativeInstance {
 public:
@@ -204,3 +237,5 @@ void end_visual_session();
 void publish_visual_frame();
 void visual_event(int kind, const std::vector<double>& args);
 }
+
+bool TVPAndroidKeyState(tjs_int key);

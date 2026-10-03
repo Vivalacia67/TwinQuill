@@ -1,0 +1,138 @@
+Subject: [PATCH] Admit pinned KAG parser with Android storage/expression adapters
+Tested-by: tests/test_krkr_tjs2_source_admission.py focused git-apply unittest; forced Android CMake configure
+
+Remove desktop header closure; read scenarios through the existing strict resource
+stream and poll the session execution budget inside native parser loops.
+Cache is explicitly released before each VM shutdown. Tested by KAG scenarios.
+
+diff --git a/src/core/utils/KAGParser.h b/src/core/utils/KAGParser.h
+--- a/src/core/utils/KAGParser.h
++++ b/src/core/utils/KAGParser.h
+@@ -15,18 +15,19 @@
+ 
+ //#include <windows.h>
+ //#include "tp_stub.h"
++#include "krkr_kag_support.h"
+ #include "tjs.h"
+ #include "tjsNative.h"
+-#include "ScriptMgnIntf.h"
++
+ #include "tjsArray.h"
+ #include "tjsDictionary.h"
+-#include "DebugIntf.h"
+-#include "StorageImpl.h"
+-#include "TextStream.h"
+-#include "MsgIntf.h"
+-#include "PluginImpl.h"
+-#include "CharacterSet.h"
+-#include "TransIntf.h"
++
++
++
++
++
++
++
+ #include "tjsHashSearch.h"
+ #include <vector>
+ using namespace TJS;
+diff --git a/src/core/utils/KAGParser.cpp b/src/core/utils/KAGParser.cpp
+--- a/src/core/utils/KAGParser.cpp
++++ b/src/core/utils/KAGParser.cpp
+@@ -10,7 +10,7 @@
+ //---------------------------------------------------------------------------
+ 
+ #include "KAGParser.h"
+-#include "EventIntf.h"
++#include "krkr_kag_support.h"
+ namespace TJS { ttstr TJSMapGlobalStringMap(const ttstr & string); }
+ 
+ //---------------------------------------------------------------------------
+@@ -127,6 +127,7 @@
+ 	tjs_char *p = buffer_p;
+ 	while(*p)
+ 	{
++		TJSCheckExecutionBudget();
+ 		if(*p == TJS_W('\r') || *p == TJS_W('\n'))
+ 		{
+ 			count++;
+@@ -157,6 +158,7 @@
+ 	p = ls;
+ 	while(*p)
+ 	{
++		TJSCheckExecutionBudget();
+ 		if(*p == TJS_W('\r') || *p == TJS_W('\n'))
+ 		{
+ 			Lines[count].Start = ls;
+@@ -1214,6 +1216,7 @@
+ //---------------------------------------------------------------------------
+ void tTJSNI_KAGParser::PushMacroArgs(iTJSDispatch2 *args)
+ {
++	if(MacroArgStackDepth >= 128) TVPThrowExceptionMessage(TJS_W("KAG macro depth exceeds 128"));
+ 	iTJSDispatch2 *dsp;
+ 	if(MacroArgs.size() > MacroArgStackDepth)
+ 	{
+@@ -1268,6 +1271,7 @@
+ 	start--;
+ 	while(start >= 0)
+ 	{
++		TJSCheckExecutionBudget();
+ 		if(Lines[start].Start[0] == TJS_W('*'))
+ 		{
+ 			// label found
+@@ -1282,6 +1286,7 @@
+ //---------------------------------------------------------------------------
+ void tTJSNI_KAGParser::PushCallStack()
+ {
++	if(CallStack.size() >= 128) TVPThrowExceptionMessage(TJS_W("KAG call depth exceeds 128"));
+ 	// push current position information
+ 	if(DebugLevel >= tkdlVerbose)
+ 	{
+@@ -1420,6 +1425,7 @@
+ 
+ 	while(true)
+ 	{
++		TJSCheckExecutionBudget();
+ 		DicClear->FuncCall(0, NULL, NULL, NULL, 0, NULL, DicObj);
+ 			// clear dictionary object
+ 
+@@ -1646,6 +1652,7 @@
+ 		// tag attributes
+ 		while(true)
+ 		{
++			TJSCheckExecutionBudget();
+ 			while(TVPIsWS(CurLineStr[CurPos])) CurPos ++;
+ 
+ 			if(CurLineStr[CurPos] == ldelim)
+@@ -1732,6 +1739,7 @@
+ 				// if/ignore
+ 				if(tagkind == tag_if || tagkind == tag_ignore)
+ 				{
++					if(IfLevel >= 128) TVPThrowExceptionMessage(TJS_W("KAG conditional depth exceeds 128"));
+ 					IfLevel ++;
+ 					IfLevelExecutedStack.push_back(false);
+ 					ExcludeLevelStack.push_back(ExcludeLevel);
+@@ -1853,6 +1861,7 @@
+ 							tjs_int r_count = 0;
+ 							while(*p)
+ 							{
++								TJSCheckExecutionBudget();
+ 								if(*p == TJS_W('[')) r_count++;
+ 								p++;
+ 								r_count++;
+@@ -1874,6 +1883,7 @@
+ 							p = exp.c_str();
+ 							while(*p)
+ 							{
++								TJSCheckExecutionBudget();
+ 								if(*p == TJS_W('['))
+ 								{
+ 									*d = TJS_W('['); d++;
+@@ -2179,6 +2189,7 @@
+ 
+ 					while(*vp)
+ 					{
++						TJSCheckExecutionBudget();
+ 						if(*vp == TJS_W('`'))
+ 						{
+ 							vp++;

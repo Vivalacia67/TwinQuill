@@ -12,6 +12,7 @@
 #include <cstring>
 #include <limits>
 #include <mutex>
+#include <memory>
 #include <vector>
 
 namespace {
@@ -25,6 +26,8 @@ jmethodID g_close = nullptr;
 jmethodID g_stat = nullptr;
 jmethodID g_list_public = nullptr;
 jmethodID g_list_framed = nullptr;
+jmethodID g_begin_lookup = nullptr;
+jmethodID g_end_lookup = nullptr;
 
 jmethodID g_mkdir = nullptr;
 jmethodID g_rename = nullptr;
@@ -61,6 +64,9 @@ private:
     JNIEnv* env_ = nullptr;
     bool attached_ = false;
 };
+
+// Keep native callers attached for the entire Java ThreadLocal scope.
+thread_local std::unique_ptr<AttachedEnv> lookup_env;
 
 jbyteArray bytes(JNIEnv* env, const char* value) {
     if (value == nullptr) {
@@ -138,6 +144,27 @@ Java_io_github_twinquill_nativevfs_NativeVfs_nativeInstall(JNIEnv* env, jclass) 
     g_mkdir = env->GetStaticMethodID(g_backend, "mkdir", "([B[B)I");
     g_rename = env->GetStaticMethodID(g_backend, "rename", "([B[B[B)I");
     g_delete = env->GetStaticMethodID(g_backend, "delete", "([B[B)I");
+    g_begin_lookup = env->GetStaticMethodID(g_backend, "beginLookup", "()V");
+    g_end_lookup = env->GetStaticMethodID(g_backend, "endLookup", "()V");
+}
+
+extern "C" TQ_VFS_API int tq_vfs_begin_lookup(void) {
+    if (lookup_env) return TQ_VFS_INVALID;
+    auto attached = std::make_unique<AttachedEnv>();
+    auto* env = attached->get();
+    if (!ready(env)) return TQ_VFS_INVALID;
+    env->CallStaticVoidMethod(g_backend, g_begin_lookup);
+    if (env->ExceptionCheck()) { env->ExceptionClear(); return TQ_VFS_ERROR; }
+    lookup_env = std::move(attached);
+    return TQ_VFS_OK;
+}
+
+extern "C" TQ_VFS_API void tq_vfs_end_lookup(void) {
+    if (!lookup_env) return;
+    auto* env = lookup_env->get();
+    env->CallStaticVoidMethod(g_backend, g_end_lookup);
+    if (env->ExceptionCheck()) env->ExceptionClear();
+    lookup_env.reset();
 }
 
 extern "C" JNIEXPORT jlong JNICALL

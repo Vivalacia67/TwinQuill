@@ -705,6 +705,248 @@ public final class KrkrRuntimeHostInstrumentedTest {
     }
 
     @Test
+    public void m4BootsPinnedKagFramework() throws Exception {
+        File directory = fixture("m4-kag");
+        copyM3Asset("m4-loose", directory);
+        KrkrScriptSession session = launchM3Storage(2,
+            new File(directory,"startup.tjs").getCanonicalPath(),directory.getName());
+        waitForM4Color(300,100,40,80,64);
+        assertEquals("Pinned KAG startup must succeed", 0, session.poll(0));
+        assertM4Text();
+        assertAudioAdvances();
+        try (BitmapCloser shot = new BitmapCloser(captureSurface());
+             java.io.OutputStream out = Files.newOutputStream(new File(context.getExternalFilesDir(null), "m4-opening.png").toPath())) {
+            assertTrue(shot.bitmap.compress(Bitmap.CompressFormat.PNG,100,out));
+        }
+    }
+
+    @Test
+    public void m4SafLooseAndXp3PlayBothBranchesAndResumeAudio() throws Exception {
+        for (String root : new String[] {"m4-loose","m4-compressed"}) {
+            long starts=scriptStats()[1];
+            KrkrScriptSession session=launchM3Saf(root,"m4-"+android.os.SystemClock.elapsedRealtime());
+            waitForM4Color(300,100,40,80,64);
+            assertM4Text(); assertAudioAdvances();
+            long lost=renderer.counters()[KrkrRuntimeRenderer.COUNTER_SURFACE_LOSS_COUNT];
+            try(InputStream output=new ParcelFileDescriptor.AutoCloseInputStream(
+                    instrumentation.getUiAutomation().executeShellCommand("input keyevent 3"))) {
+                while(output.read()!=-1) {}
+            }
+            waitForCounter(KrkrRuntimeRenderer.COUNTER_SURFACE_LOSS_COUNT,lost+1);
+            Thread.sleep(150);
+            long paused=KrkrPcmAudio.renderedFrames(); Thread.sleep(350);
+            assertEquals("Home must pause actual AudioTrack playback",paused,KrkrPcmAudio.renderedFrames());
+            ActivityManager manager=(ActivityManager)context.getSystemService(Context.ACTIVITY_SERVICE);
+            ActivityManager.AppTask match=null;
+            for(ActivityManager.AppTask task:manager.getAppTasks())
+                if(task.getTaskInfo().id==runtime.getTaskId())match=task;
+            assertNotNull(match); ActivityManager.AppTask front=match;
+            instrumentation.runOnMainSync(front::moveToFront);
+            waitForM4Color(300,100,40,80,64); assertAudioAdvances();
+            assertEquals("KAG startup must run once",starts+1,scriptStats()[1]);
+            touchGame(300,400,640,480); Thread.sleep(400);
+            assertM4Text();
+            touchGame(130,root.equals("m4-loose")?309:339,640,480);
+            if(root.equals("m4-loose"))waitForM4Color(300,100,32,64,176);
+            else waitForM4Color(300,100,176,96,32);
+            waitForM4PageGlyph(); assertM4Text();
+            assertEquals(0,session.poll(0));
+            touchGame(300,400,640,480); waitForScriptsReleased();
+            assertEquals("Audio resources must be released",0,KrkrPcmAudio.activeSoundCount());
+            assertTrue(runtime.isFinishing()||runtime.isDestroyed()); runtime=null;
+        }
+    }
+
+    @Test
+    public void m4SlowSafLookupStillInitializesKagAndCompletesRoute() throws Exception {
+        KrkrScriptSession session = launchM3Saf("m4-slow",
+            "m4-slow-" + android.os.SystemClock.elapsedRealtime());
+        waitForM4Color(300,100,40,80,64);
+        assertM4Text();
+        assertAudioAdvances();
+        assertEquals("KAG must initialize within its existing execution budget",0,session.poll(0));
+        touchGame(300,400,640,480);
+        Thread.sleep(400);
+        touchGame(130,309,640,480);
+        waitForM4Color(300,100,32,64,176);
+        waitForM4PageGlyph();
+        assertM4Text();
+        touchGame(300,400,640,480);
+        waitForScriptsReleased();
+        assertEquals(0,KrkrPcmAudio.activeSoundCount());
+    }
+
+    @Test
+    public void m4SafLookupSnapshotExpiresAndPreservesAmbiguityAndRevocation() throws Exception {
+        io.github.twinquill.nativevfs.NativeVfs.install(context);
+        context.getContentResolver().call("io.github.twinquill.test.grants", "reset-lookup", null, null);
+        android.net.Uri tree = grantM3("m4-batch");
+        Class<?> backend = Class.forName("io.github.twinquill.nativevfs.SafVfsBackend");
+        java.lang.reflect.Method begin = backend.getDeclaredMethod("beginLookup");
+        java.lang.reflect.Method end = backend.getDeclaredMethod("endLookup");
+        begin.setAccessible(true);
+        end.setAccessible(true);
+        begin.invoke(null);
+        try {
+            assertEquals(-3, io.github.twinquill.nativevfs.NativeVfs.stat(tree, "late.txt")[0]);
+            assertEquals(-3, io.github.twinquill.nativevfs.NativeVfs.stat(tree, "absent.txt")[0]);
+            assertEquals(1, context.getContentResolver().call("io.github.twinquill.test.grants",
+                "lookup-queries", null, null).getInt("count"));
+            context.getContentResolver().call("io.github.twinquill.test.grants", "add-lookup-file", null, null);
+            assertEquals(-3, io.github.twinquill.nativevfs.NativeVfs.stat(tree, "late.txt")[0]);
+        } finally { end.invoke(null); }
+        begin.invoke(null);
+        try {
+            assertEquals(0, io.github.twinquill.nativevfs.NativeVfs.stat(tree, "late.txt")[0]);
+            assertEquals(-3, io.github.twinquill.nativevfs.NativeVfs.stat(tree, "CASE.TXT")[0]);
+            assertEquals(0, io.github.twinquill.nativevfs.NativeVfs.stat(tree, "case.txt")[0]);
+            assertEquals(2, context.getContentResolver().call("io.github.twinquill.test.grants",
+                "lookup-queries", null, null).getInt("count"));
+            revokeM3("m4-batch", tree);
+            assertEquals(-2, io.github.twinquill.nativevfs.NativeVfs.stat(tree, "case.txt")[0]);
+        } finally { end.invoke(null); }
+        assertEquals(-2, io.github.twinquill.nativevfs.NativeVfs.stat(tree, "late.txt")[0]);
+        android.net.Uri many = grantM3("m3-many");
+        begin.invoke(null);
+        try {
+            assertEquals("Snapshot limits must fall back to streaming file lookup", 0,
+                io.github.twinquill.nativevfs.NativeVfs.stat(many, "file-4096")[0]);
+        } finally { end.invoke(null); }
+    }
+
+    @Test
+    public void m4ErrorsReleaseResourcesAndAllowNextGame() throws Exception {
+        for(String root:new String[]{"m4-missing","m4-script-error"}) {
+            KrkrScriptSession failed=launchM3Saf(root,"m4-error-"+android.os.SystemClock.elapsedRealtime());
+            long until=android.os.SystemClock.uptimeMillis()+15000;
+            while(failed.poll(0)==0 && android.os.SystemClock.uptimeMillis()<until)Thread.sleep(25);
+            assertTrue("KAG error must be reported",failed.poll(0)==20 || failed.poll(0)==11);
+            waitForScriptsReleased();
+            assertEquals(0,KrkrPcmAudio.activeSoundCount()); runtime=null;
+        }
+        File normal=fixture("after-m4-errors");
+        KrkrScriptSession session=startRuntime(normal,"TwinQuillHost.setColor(32,180,80);");
+        waitForColor(surface,32,180,80); assertEquals(0,session.poll(0));
+        instrumentation.runOnMainSync(runtime::onBackPressed);waitForScriptsReleased();
+    }
+
+    @Test
+    public void m4PcmCompletionAndUnsupportedFormatsAreExplicit() throws Exception {
+        File directory=fixture("m4-audio"); copyM3Asset("m4-loose",directory);
+        long before=KrkrPcmAudio.renderedFrames();
+        Files.write(new File(directory,"startup.tjs").toPath(), (
+            "var w=new Window();w.setInnerSize(320,200);var l=new Layer(w,null);"
+            +"l.setSize(320,200);l.setImageSize(320,200);l.fillRect(0,0,320,200,0xff3040c0);l.visible=true;w.visible=true;"
+            +"class TestSound extends WaveSoundBuffer {var began=false;function TestSound(){super.WaveSoundBuffer();}function onStatusChanged(s){"
+            +"if(s=='play')began=true;if(s=='stop'&&began)l.fillRect(0,0,320,200,0xff20b450);}}"
+            +"var sound=new TestSound();sound.open('sound/chime.wav');sound.volume=50000;sound.play();"
+            +"w.onKeyDown=function(key){if(key==13)w.close();};").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        KrkrScriptSession session=launchM3Storage(2,new File(directory,"startup.tjs").getCanonicalPath(),directory.getName());
+        waitForGameColor(160,100,32,180,80);
+        assertTrue("PCM EOF must follow actual sample playback",KrkrPcmAudio.renderedFrames()>=before+4000);
+        assertEquals(0,session.poll(0)); pressKey(KeyEvent.KEYCODE_ENTER,0);waitForScriptsReleased();runtime=null;
+        assertEquals(0,KrkrPcmAudio.activeSoundCount());
+        Files.write(new File(directory,"bad.wav").toPath(),new byte[]{1,2,3});
+        for(String code:new String[]{
+            "var s=new WaveSoundBuffer();s.open('bad.wav');",
+            "var s=new WaveSoundBuffer();s.pan=1;",
+            "var s=new WaveSoundBuffer();s.fade(0,100);",
+            "var s=new WaveSoundBuffer();s.samplePosition=0;",
+            "var v=new VideoOverlay();",
+            "function again(){again();}again();"}) {
+            Files.write(new File(directory,"startup.tjs").toPath(),code.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            try { KrkrScriptSession unexpected=KrkrScriptSession.start(2,new File(directory,"startup.tjs").getCanonicalPath());
+                unexpected.close();throw new AssertionError("Unsupported M4 operation accepted: "+code);
+            } catch(KrkrScriptSession.StartupException expected) {assertEquals(20,expected.diagnostic);}
+            waitForScriptsReleased();assertEquals(0,KrkrPcmAudio.activeSoundCount());
+        }
+    }
+
+    @Test
+    public void m4KagParserNativeLoopIsBoundedAndPrivateDoubleSeparatorIsSafe() throws Exception {
+        File directory=fixture("m4-budget");copyM3Asset("m4-loose",directory);
+        assertTrue(new File(directory,"system/Initialize.tjs").delete());
+        Files.write(new File(directory,"scenario/loop.ks").toPath(),"*loop\n[jump target='*loop']\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        File startup=new File(directory,"startup.tjs");
+        Files.write(startup.toPath(),("var p=new KAGParser();p.debugLevel=0;p.loadScenario('scenario/loop.ks');p.getNextTag();").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        long begin=android.os.SystemClock.uptimeMillis();
+        try {KrkrScriptSession unexpected=KrkrScriptSession.start(2,startup.getCanonicalPath());unexpected.close();
+            throw new AssertionError("Unbounded native KAG tag loop accepted");
+        }catch(KrkrScriptSession.StartupException expected){assertEquals(20,expected.diagnostic);}
+        assertTrue("KAG native loop must obey deadline",android.os.SystemClock.uptimeMillis()-begin<8000);
+        waitForScriptsReleased();
+        Files.write(startup.toPath(),("var p=System.dataPath+'/flags.tjs';Storages.writeText(p,'GOOD');"
+            +"if(Storages.readText(p)!='GOOD')throw 'URI joining failed';var rejected=false;"
+            +"try{Storages.writeText(System.dataPath+'/../escape.tjs','BAD');}catch(e){rejected=true;}"
+            +"if(!rejected)throw 'Traversal accepted';").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        File save=new File(context.getFilesDir(),"saves/"+directory.getName());assertTrue(save.mkdirs());fixtures.add(save);
+        KrkrScriptSession safe=KrkrScriptSession.start(2,startup.getCanonicalPath(),save.getCanonicalPath());
+        try {assertEquals(0,safe.poll(0));assertEquals("GOOD",new String(Files.readAllBytes(new File(save,"krkr/flags.tjs").toPath()),java.nio.charset.StandardCharsets.UTF_8));}
+        finally {safe.close();waitForScriptsReleased();}
+        try (InputStream init = instrumentation.getContext().getAssets().open("m4-loose/system/Initialize.tjs")) {
+            Files.copy(init, new File(directory, "system/Initialize.tjs").toPath());
+        }
+        Files.write(startup.toPath(), ("var w=new Window();w.setInnerSize(320,200);w.visible=true;"
+            + "var t=new Timer(function(){while(true){}},'');t.interval=20;t.enabled=true;")
+            .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        begin = android.os.SystemClock.uptimeMillis();
+        KrkrScriptSession bounded = launchM3Storage(2, startup.getCanonicalPath(), directory.getName());
+        try {
+            long deadline = begin + 14000;
+            while (bounded.poll(0) == 0 && android.os.SystemClock.uptimeMillis() < deadline) Thread.sleep(25);
+            assertEquals("A KAG callback loop must still terminate", 20, bounded.poll(0));
+            assertTrue("KAG callback exceeded its wall-clock budget", android.os.SystemClock.uptimeMillis() < deadline);
+        } finally { bounded.close(); waitForScriptsReleased(); }
+    }
+
+    private void assertAudioAdvances() throws Exception {
+        long before=KrkrPcmAudio.renderedFrames();
+        long deadline=android.os.SystemClock.uptimeMillis()+4000;
+        while(KrkrPcmAudio.renderedFrames()<=before+200 && android.os.SystemClock.uptimeMillis()<deadline) Thread.sleep(25);
+        assertTrue("Android AudioTrack must render PCM frames",KrkrPcmAudio.renderedFrames()>before+200);
+    }
+
+    private void assertM4Text() throws Exception {
+        try(BitmapCloser shot=new BitmapCloser(captureSurface())) {
+            int glyphs=0;
+            for(int y=270;y<400;y++)for(int x=26;x<390;x++) {
+                int color=gamePixel(shot.bitmap,x,y,640,480);
+                if(Color.red(color)>180 && Color.green(color)>180 && Color.blue(color)>180)glyphs++;
+            }
+            assertTrue("KAG must draw readable glyphs in its message layer",glyphs>100);
+        }
+    }
+
+    private void waitForM4PageGlyph() throws Exception {
+        long deadline=android.os.SystemClock.uptimeMillis()+15000;
+        while(android.os.SystemClock.uptimeMillis()<deadline) {
+            try(BitmapCloser shot=new BitmapCloser(captureSurface())) {
+                for(int y=270;y<400;y+=2)for(int x=26;x<590;x+=2) {
+                    int color=gamePixel(shot.bitmap,x,y,640,480);
+                    if(Math.abs(Color.red(color)-240)<=PIXEL_TOLERANCE
+                        && Math.abs(Color.green(color)-210)<=PIXEL_TOLERANCE
+                        && Math.abs(Color.blue(color)-70)<=PIXEL_TOLERANCE)return;
+                }
+            }
+            Thread.sleep(25);
+        }
+        throw new AssertionError("KAG must finish the page and display its wait glyph");
+    }
+
+    private void waitForM4Color(int x,int y,int r,int g,int b) throws Exception {
+        long deadline=android.os.SystemClock.uptimeMillis()+25000; int color=0;
+        while(android.os.SystemClock.uptimeMillis()<deadline) {
+            try(BitmapCloser shot=new BitmapCloser(captureSurface())) {
+                color=gamePixel(shot.bitmap,x,y,640,480);
+                if(Math.abs(Color.red(color)-r)<=PIXEL_TOLERANCE && Math.abs(Color.green(color)-g)<=PIXEL_TOLERANCE
+                   && Math.abs(Color.blue(color)-b)<=PIXEL_TOLERANCE)return;
+            }
+            Thread.sleep(25);
+        }
+        throw new AssertionError("M4 pixel "+x+","+y+" was "+Integer.toHexString(color));
+    }
+
+    @Test
     public void m3LooseAndCompressedResourcesMatchAcrossLocalAndSaf() throws Exception {
         for (boolean saf : new boolean[] {false, true}) {
             for (String asset : new String[] {"m3-loose", "m3-compressed"}) {
@@ -1164,10 +1406,11 @@ public final class KrkrRuntimeHostInstrumentedTest {
         instrumentation.runOnMainSync(() -> surface.onKeyDown(code, event));
     }
 
-    private void touchGame(int gameX, int gameY) {
-        float scale = Math.min(surface.getWidth() / 320f, surface.getHeight() / 200f);
-        float x = (surface.getWidth() - 320 * scale) / 2 + (gameX + 0.5f) * scale;
-        float y = (surface.getHeight() - 200 * scale) / 2 + (gameY + 0.5f) * scale;
+    private void touchGame(int gameX, int gameY) { touchGame(gameX,gameY,320,200); }
+    private void touchGame(int gameX,int gameY,int width,int height) {
+        float scale = Math.min(surface.getWidth() / (float)width, surface.getHeight() / (float)height);
+        float x = (surface.getWidth() - width * scale) / 2 + (gameX + 0.5f) * scale;
+        float y = (surface.getHeight() - height * scale) / 2 + (gameY + 0.5f) * scale;
         long now = android.os.SystemClock.uptimeMillis();
         for (int action : new int[] {MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP}) {
             MotionEvent event = MotionEvent.obtain(now, now + 20, action, x, y, 0);
@@ -1226,10 +1469,11 @@ public final class KrkrRuntimeHostInstrumentedTest {
         throw new AssertionError("display surface could not be copied");
     }
 
-    private static int gamePixel(Bitmap bitmap, int x, int y) {
-        float scale = Math.min(bitmap.getWidth() / 320f, bitmap.getHeight() / 200f);
-        int px = (int) ((bitmap.getWidth() - 320 * scale) / 2 + (x + 0.5f) * scale);
-        int py = (int) ((bitmap.getHeight() - 200 * scale) / 2 + (y + 0.5f) * scale);
+    private static int gamePixel(Bitmap bitmap,int x,int y) { return gamePixel(bitmap,x,y,320,200); }
+    private static int gamePixel(Bitmap bitmap,int x,int y,int width,int height) {
+        float scale = Math.min(bitmap.getWidth() / (float)width, bitmap.getHeight() / (float)height);
+        int px = (int) ((bitmap.getWidth() - width * scale) / 2 + (x + 0.5f) * scale);
+        int py = (int) ((bitmap.getHeight() - height * scale) / 2 + (y + 0.5f) * scale);
         return bitmap.getPixel(px, py);
     }
 

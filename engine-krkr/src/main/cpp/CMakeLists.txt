@@ -56,6 +56,9 @@ set(TJS2_PATCHES
     "${TWINQUILL_ROOT}/vendor/patches/kirikiroid2/0006-android-basic-visual-bindings.patch"
     "${TWINQUILL_ROOT}/vendor/patches/kirikiroid2/0007-tvp-async-worker-admission.patch"
     "${TWINQUILL_ROOT}/vendor/patches/kirikiroid2/0008-tjs-text-stream-abort.patch"
+    "${TWINQUILL_ROOT}/vendor/patches/kirikiroid2/0009-android-kag-parser.patch"
+    "${TWINQUILL_ROOT}/vendor/patches/kirikiroid2/0010-android-kag-bindings.patch"
+    "${TWINQUILL_ROOT}/vendor/patches/kirikiroid2/0011-tjs-call-depth-budget.patch"
 )
 file(REMOVE_RECURSE "${KIRIKIROID2_BUILD_DIR}")
 file(MAKE_DIRECTORY "${TJS2_BUILD_DIR}")
@@ -64,6 +67,10 @@ file(MAKE_DIRECTORY "${TVP_TIMER_BUILD_DIR}")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${KRKR2_CORE}/utils/TimerIntf.cpp" "${KRKR2_CORE}/utils/TimerIntf.h")
 file(COPY "${KRKR2_CORE}/utils/TimerIntf.cpp" "${KRKR2_CORE}/utils/TimerIntf.h"
+    DESTINATION "${TVP_TIMER_BUILD_DIR}")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${KRKR2_CORE}/utils/KAGParser.cpp" "${KRKR2_CORE}/utils/KAGParser.h")
+file(COPY "${KRKR2_CORE}/utils/KAGParser.cpp" "${KRKR2_CORE}/utils/KAGParser.h"
     DESTINATION "${TVP_TIMER_BUILD_DIR}")
 file(MAKE_DIRECTORY "${TVP_VISUAL_BUILD_DIR}")
 foreach(TVP_VISUAL_FILE WindowIntf.cpp LayerIntf.cpp)
@@ -175,13 +182,20 @@ set(TVP_HOST_SOURCES
     "${TVP_VISUAL_BUILD_DIR}/WindowIntf.cpp"
     "${TVP_VISUAL_BUILD_DIR}/LayerIntf.cpp"
     "${TVP_EVENT_BUILD_DIR}/EventIntf.cpp"
+    "${TVP_TIMER_BUILD_DIR}/KAGParser.cpp"
 )
+
+file(READ "${CMAKE_CURRENT_LIST_DIR}/krkr_kag_host.tjs" KAG_HOST_SCRIPT)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/krkr_kag_host.tjs")
+configure_file(krkr_kag_host_script.h.in "${CMAKE_BINARY_DIR}/krkr_kag_host_script.h" @ONLY)
 
 add_library(twinquill_engine_krkr SHARED
     krkr_jni.cpp
     krkr_tjs_entry.cpp
     krkr_tjs_execution.cpp
     krkr_tjs_session.cpp
+    krkr_kag_host.cpp
+    krkr_kag_audio.cpp
     krkr_tjs_session_jni.cpp
     krkr_tjs_text.cpp
     krkr_tvp_events.cpp
@@ -195,9 +209,11 @@ add_library(twinquill_engine_krkr SHARED
     krkr_vfs_storage.cpp
 )
 target_compile_features(twinquill_engine_krkr PRIVATE cxx_std_17)
-target_compile_definitions(twinquill_engine_krkr PRIVATE TWINQUILL_ANDROID_BASIC_TVP=1)
+target_compile_definitions(twinquill_engine_krkr PRIVATE TWINQUILL_ANDROID_BASIC_TVP=1
+    USE_OBSOLETE_FUNCTIONS=1)
 target_include_directories(twinquill_engine_krkr BEFORE PRIVATE
     "${CMAKE_CURRENT_LIST_DIR}/tvp"
+    "${CMAKE_BINARY_DIR}"
     "${KRKR_ZLIB_DIR}"
     "${TVP_TIMER_BUILD_DIR}"
     "${KRKR2_CORE}/visual"

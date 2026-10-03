@@ -1,0 +1,107 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// First-party Android adapters for the pinned KAG3 interface.
+// Root-qualified paths keep archive probes out of unrelated auto-search folders.
+System.exePath = "./";
+System.exeName = "TwinQuill";
+System.osName = "Android";
+System.platformName = "Android";
+System.versionString = "TwinQuill Android KAG3 host";
+System.title = "TwinQuill";
+System.desktopLeft = 0;
+System.desktopTop = 0;
+System.desktopWidth = 640;
+System.desktopHeight = 480;
+System.eventDisabled = false;
+System.getArgument = function(name) { return void; };
+// One live VM is enforced by the native session registry.
+System.createAppLock = function(name) { return true; };
+Debug.notice = Debug.message;
+Debug.logAsError = function() { Debug.message("KAG error"); };
+System.inform = function(message) { throw new Exception(message); };
+var gcsAuto = -1, dfProvince = 3, omAuto = 128, omAlpha = ltAlpha, omOpaque = ltOpaque;
+var bsSingle = 1, bsDialog = 3, htMask = 0, htProvince = 1;
+var vomOverlay = 0, vomLayer = 1;
+class MenuItem {
+    var caption = "", checked = false, enabled = true, visible = true;
+    var shortcut = 0, group = 0, radio = false, children = [], parent = null, owner;
+    function MenuItem(target=null, text="") { owner=target; caption=text; }
+    function add(item) { if(children.count >= 256) throw new Exception("Menu item limit"); children.add(item); item.parent=this; }
+    function remove(item) { var i=children.find(item); if(i>=0) children.erase(i); item.parent=null; }
+    function popup() { throw new Exception("Android desktop popup menus are unsupported"); }
+    function finalize() { for(var i=0;i<children.count;i++) invalidate children[i]; children.clear(); }
+}
+class VideoOverlay {
+    function VideoOverlay() { throw new Exception("Video playback requires M6"); }
+}
+class WaveSoundBuffer {
+    var _audio=0, _timer, _last="unload", _looping=false, _volume=100000, _volume2=100000, _paused=false;
+    var _labels=%[];
+    property pan { getter { return 0; } setter(v) { if(v!=0) throw new Exception("Stereo pan requires M6"); } }
+    property looping { getter { return _looping; } setter(v) { if(status=="play" && v!=_looping) throw new Exception("Change looping before play"); _looping=v; } }
+    property labels { getter { return _labels; } }
+    function WaveSoundBuffer() { _timer=new Timer(_tick,''); _timer.interval=33; }
+    function finalize() { invalidate _timer; if(_audio) System._audioControl(_audio,3,0); _audio=0; }
+    function open(storage) { if(_audio) System._audioControl(_audio,3,0); _audio=0;
+        _audio=System._audioOpen(storage); _applyVolume(); _tick(); }
+    function play() { System._audioControl(_audio,1,looping?1:0); _timer.enabled=true;
+        if(_paused) System._audioControl(_audio,6,1); _tick(); }
+    function stop() { if(_audio) System._audioControl(_audio,2,0); _timer.enabled=false; _tick(); }
+    function _applyVolume() { if(_audio) System._audioControl(_audio,5,int(_volume*_volume2/100000)); }
+    function _tick() { var next=status; if(_last!=next) { _last=next; onStatusChanged(next); }
+        if(status!="play") _timer.enabled=false; }
+    function onStatusChanged(state) {}
+    function fade(target,time,delay=0) { throw new Exception("Audio fades require M6"); }
+    function stopFade() {}
+    property status { getter { return !_audio?"unload":System._audioControl(_audio,4,0)?"play":"stop"; } }
+    property volume { getter { return _volume; } setter(v) { if(v<0 || v>100000) throw new Exception("Volume range"); _volume=v; _applyVolume(); } }
+    property volume2 { getter { return _volume2; } setter(v) { if(v<0 || v>100000) throw new Exception("Volume range"); _volume2=v; _applyVolume(); } }
+    property paused { getter { return _paused; } setter(v) { _paused=v; if(_audio) System._audioControl(_audio,6,v?1:0); } }
+    property samplePosition { getter { return _audio?System._audioControl(_audio,7,0):0; }
+        setter(v) { throw new Exception("Audio seek requires M6"); } }
+}
+
+var crDefault=0, crArrow=-2, crIBeam=-4, crHandPoint=-21, crSizeAll=-22, crHBeam=1;
+var ssShift=1, ssCtrl=4, ssRepeat=128, mbRight=1, imDontCare=3;
+var ltAddAlpha=12, ltAdditive=3, ltSubtractive=4, ltMultiplicative=5, ltDodge=8;
+var ltDarken=9, ltLighten=10, ltScreen=11, ltPsNormal=13, ltCoverRect=1;
+var dfBoth=0, dfMain=1, dfAddAlpha=4, vomMixer=2, stLinear=2;
+var tkdlNone=0, tkdlSimple=1, tkdlVerbose=2;
+var VK_LBUTTON=1, VK_BACK=8, VK_TAB=9, VK_RETURN=13, VK_CONTROL=17, VK_ESCAPE=27;
+var VK_SPACE=32, VK_PRIOR=33, VK_NEXT=34, VK_LEFT=37, VK_UP=38, VK_RIGHT=39, VK_DOWN=40;
+var VK_DELETE=46, VK_A=65, VK_C=67, VK_V=86, VK_X=88;
+var VK_PAD1=0x1C0, VK_PAD2=0x1C1, VK_PAD3=0x1C2;
+var VK_PADUP=0x1B6, VK_PADLEFT=0x1B5, VK_PADRIGHT=0x1B7, VK_PADDOWN=0x1B8;
+
+var clNone=0x1fffffff, clAdapt=0x01ffffff;
+
+// Image mode identities from the pinned ScriptMgnIntf constant table.
+var imageTagLayerType = %[
+    "opaque" => %["type" => 1],
+    "rect" => %["type" => 1],
+    "alpha" => %["type" => 2],
+    "transparent" => %["type" => 2],
+    "addalpha" => %["type" => 12],
+    "add" => %["type" => 3],
+    "sub" => %["type" => 4],
+    "mul" => %["type" => 5],
+    "dodge" => %["type" => 8],
+    "darken" => %["type" => 9],
+    "lighten" => %["type" => 10],
+    "screen" => %["type" => 11],
+    "psnormal" => %["type" => 13],
+    "psadd" => %["type" => 14],
+    "pssub" => %["type" => 15],
+    "psmul" => %["type" => 16],
+    "psscreen" => %["type" => 17],
+    "psoverlay" => %["type" => 18],
+    "pshlight" => %["type" => 19],
+    "psslight" => %["type" => 20],
+    "psdodge" => %["type" => 21],
+    "psdodge5" => %["type" => 22],
+    "psburn" => %["type" => 23],
+    "pslighten" => %["type" => 24],
+    "psdarken" => %["type" => 25],
+    "psdiff" => %["type" => 26],
+    "psdiff5" => %["type" => 27],
+    "psexcl" => %["type" => 28]
+];

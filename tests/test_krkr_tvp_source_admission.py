@@ -23,7 +23,8 @@ class KrkrTvpSourceAdmissionTests(unittest.TestCase):
                          ["${TVP_TIMER_BUILD_DIR}/TimerIntf.cpp",
                           "${TVP_VISUAL_BUILD_DIR}/WindowIntf.cpp",
                           "${TVP_VISUAL_BUILD_DIR}/LayerIntf.cpp",
-                          "${TVP_EVENT_BUILD_DIR}/EventIntf.cpp"])
+                          "${TVP_EVENT_BUILD_DIR}/EventIntf.cpp",
+                          "${TVP_TIMER_BUILD_DIR}/KAGParser.cpp"])
         self.assertNotRegex(block["body"], r"(?i)glob|\.\.\.")
         self.assertIn("${TVP_HOST_SOURCES}", cmake)
         self.assertIn("0004-tvp-timer-interval-bounds.patch", cmake)
@@ -68,10 +69,23 @@ class KrkrTvpSourceAdmissionTests(unittest.TestCase):
         initialize = (snapshot / "data/system/Initialize.tjs").read_text(encoding="utf-8")
         self.assertIn('var kagVersion = "3.32 stable rev. 2";', initialize)
 
-    def test_framework_is_not_implicitly_packaged_or_executed(self) -> None:
-        for path in ["engine-krkr/build.gradle.kts", "launcher-app/build.gradle.kts",
-                     "engine-krkr/src/main/cpp/CMakeLists.txt"]:
-            self.assertNotIn("vendor/kag3-1f3ab309", (ROOT / path).read_text(encoding="utf-8"), path)
+    def test_framework_assets_are_complete_and_test_only(self) -> None:
+        production = (ROOT / "engine-krkr/build.gradle.kts").read_text(encoding="utf-8")
+        self.assertNotIn("vendor/kag3-1f3ab309", production)
+        gradle = (ROOT / "launcher-app/build.gradle.kts").read_text(encoding="utf-8")
+        self.assertIn("vendor/kag3-1f3ab309", gradle)
+        self.assertIn("variant.androidTest?.sources?.assets?.addGeneratedSourceDirectory", gradle)
+        session = (ROOT / "engine-krkr/src/main/cpp/krkr_tjs_session.cpp").read_text(encoding="utf-8")
+        self.assertIn('kag_host_ = resources_.exists("system/Initialize.tjs")', session)
+        self.assertIn("TVPRegisterAndroidKagHost(engine_)", session)
+        cmake = (ROOT / "engine-krkr/src/main/cpp/CMakeLists.txt").read_text(encoding="utf-8")
+        self.assertNotIn("vendor/kag3-1f3ab309", cmake)
+
+    def test_kag_parser_and_recursive_calls_share_execution_budget(self) -> None:
+        parser = (ROOT / "vendor/patches/kirikiroid2/0009-android-kag-parser.patch").read_text(encoding="latin1")
+        depth = (ROOT / "vendor/patches/kirikiroid2/0011-tjs-call-depth-budget.patch").read_text(encoding="latin1")
+        self.assertIn("TJSCheckExecutionBudget", parser)
+        self.assertIn("TJSHostCallFrame host_frame", depth)
 
 
 if __name__ == "__main__":

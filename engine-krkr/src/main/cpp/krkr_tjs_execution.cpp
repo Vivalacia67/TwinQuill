@@ -32,6 +32,12 @@ void check_execution() {
 }  // namespace twinquill::krkr
 
 namespace TJS {
+namespace { thread_local unsigned script_call_depth = 0; }
+void TJSEnterScriptCall() {
+    if (script_call_depth >= 128) TJS_eTJSError(TJS_W("Script call depth exceeds 128"));
+    ++script_call_depth;
+}
+void TJSLeaveScriptCall() { --script_call_depth; }
 // Called only by the recorded patch in the generated TJS2 copy.
 void TJSCheckExecutionBudget() { twinquill::krkr::check_execution(); }
 bool TJSHostIsShuttingDown() { return twinquill::krkr::execution_is_cleanup(); }

@@ -49,6 +49,11 @@ typedef struct tq_vfs_stat {
 
 typedef int (*tq_vfs_list_callback)(const char* utf8_name, void* user_data);
 
+// Optional, same-thread read lookup scope. Share bounded directory snapshots
+// only until end_lookup; document stat/open still checks current access.
+TQ_VFS_API int tq_vfs_begin_lookup(void);
+TQ_VFS_API void tq_vfs_end_lookup(void);
+
 TQ_VFS_API int64_t tq_vfs_open(
     const char* tree_uri_utf8,
     const char* relative_path_utf8,

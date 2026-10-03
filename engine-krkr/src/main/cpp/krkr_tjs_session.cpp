@@ -18,9 +18,12 @@
 #include "tjsError.h"
 #include "tjsNative.h"
 #include "TimerIntf.h"
+#include "krkr_kag_support.h"
+#include "krkr_kag_audio.h"
 
 #include <android/log.h>
 #include <atomic>
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -29,6 +32,9 @@
 #include <memory>
 #include <mutex>
 #include <stdexcept>
+
+void TVPRegisterAndroidKagHost(TJS::tTJS*);
+void TVPShutdownAndroidKagHost();
 
 namespace twinquill::krkr {
 namespace {
@@ -73,8 +79,8 @@ public:
             const ttstr message = tjs_text(std::string("Storage error: ") + error.what());
             TJS_eTJSError(message);
         }
-        catch (const std::invalid_argument&) {
-            TJS_eTJSError(TJS_W("Invalid Unicode or source text"));
+        catch (const std::invalid_argument& error) {
+            TJS_eTJSError(tjs_text(error.what()));
         }
         return TJS_E_FAIL;
     }
@@ -91,6 +97,38 @@ public:
         if (result) *result = ttstr(kDataPath);
         return TJS_S_OK;
     }
+};
+class FlagProperty final : public tTJSNativeClassProperty {
+public:
+    FlagProperty(bool* value, std::function<void(bool)> setter)
+        : tTJSNativeClassProperty(nullptr, nullptr), value_(value), setter_(std::move(setter)) {}
+    tjs_error TJS_INTF_METHOD PropGet(tjs_uint32, const tjs_char* member,
+            tjs_uint32*, tTJSVariant* result, iTJSDispatch2*) override {
+        if (member) return TJS_E_MEMBERNOTFOUND;
+        if (result) *result = *value_;
+        return TJS_S_OK;
+    }
+    tjs_error TJS_INTF_METHOD PropSet(tjs_uint32, const tjs_char* member,
+            tjs_uint32*, const tTJSVariant* value, iTJSDispatch2*) override {
+        if (member) return TJS_E_MEMBERNOTFOUND;
+        setter_(value->operator bool());
+        return TJS_S_OK;
+    }
+private:
+    bool* value_;
+    std::function<void(bool)> setter_;
+};
+class ScreenProperty final : public tTJSNativeClassProperty {
+public:
+    explicit ScreenProperty(const int* value) : tTJSNativeClassProperty(nullptr, nullptr), value_(value) {}
+    tjs_error TJS_INTF_METHOD PropGet(tjs_uint32, const tjs_char* member,
+            tjs_uint32*, tTJSVariant* result, iTJSDispatch2*) override {
+        if (member) return TJS_E_MEMBERNOTFOUND;
+        if (result) *result = *value_;
+        return TJS_S_OK;
+    }
+private:
+    const int* value_;
 };
 class TextReader final : public iTJSTextReadStream {
 public:
@@ -160,6 +198,7 @@ private:
     std::shared_ptr<ByteSource> source_;
     std::uint64_t position_ = 0;
 };
+tTJSNativeClass* create_kag_parser() { return static_cast<tTJSNativeClass*>(TVPCreateNativeClass_KAGParser()); }
 class Session;
 Session* g_text_session = nullptr;
 
@@ -173,12 +212,16 @@ public:
         if (host_ != nullptr) host_->Release();
         if (engine_ != nullptr) {
             ExecutionScope cleanup(nullptr, std::chrono::seconds(2), true);
+            continuous_handlers_.clear();
+            TVPClearScnearioCache();
             clear_tvp_events();
+            shutdown_visual_session();
             shutdown_tvp_timers();
             shutdown_tvp_asyncs();
-            shutdown_visual_session();
+            TVPShutdownAndroidKagHost();
             try { engine_->Shutdown(); } catch (...) { }
             engine_->Release();
+            try { TVPControlAndroidAudio(0,11,0); } catch (...) {}
             if (g_text_session == this) {
                 TJSCreateTextStreamForRead = old_text_read_;
                 TJSCreateTextStreamForWrite = old_text_write_;
@@ -197,8 +240,10 @@ public:
         if (result != 0) return result;
         // Decode before constructing the engine so malformed source owns no VM resources.
         script_ = game_text(source);
+        kag_host_ = resources_.exists("system/Initialize.tjs");
         engine_ = new tTJS();
         engine_->SetConsoleOutput(&console_);
+        engine_->SetPPValue(TJS_W("kirikiriz"), 0);
         return 0;
     }
 
@@ -217,9 +262,10 @@ public:
                 return bytes;
             }, [this] { status.store(kNormalExit); }, width, height);
             register_classes();
+            if (kag_host_) TVPRegisterAndroidKagHost(engine_);
             engine_->ExecScript(script_, nullptr, nullptr, &startup_name_);
             script_.Clear();
-        }, std::chrono::seconds(5));
+        }, std::chrono::seconds(kag_host_ ? 20 : 5));
         if (result == 0) ++g_startups;
         return result;
     }
@@ -237,18 +283,31 @@ public:
         if (!activated_) return 0;
         return guarded([&] {
             if (event == 6) {
-                if (!paused_) pump_tvp_events();
+                if (!paused_ && !event_disabled_) {
+                    pump_tvp_events();
+                    const auto handlers = continuous_handlers_;
+                    for (const auto& handler : handlers) {
+                        if (std::none_of(continuous_handlers_.begin(), continuous_handlers_.end(),
+                                [&](const auto& value) { return value.AsObjectNoAddRef() == handler.AsObjectNoAddRef(); })) continue;
+                        if (TJS_FAILED(handler.AsObjectClosureNoAddRef().FuncCall(0, nullptr, nullptr,
+                                nullptr, 0, nullptr, nullptr))) TJS_eTJSError(TJS_W("Continuous handler failed"));
+                    }
+                }
                 return;
             }
-            if (event == 2) paused_ = true;
+            if (event == 2) { paused_ = true; TVPDeliverCompactEvent(TVP_COMPACT_LEVEL_DEACTIVATE); }
+            if (event == 4) TVPDeliverCompactEvent(TVP_COMPACT_LEVEL_MAX);
             if (event == 3) {
                 paused_ = false;
+                TVPControlAndroidAudio(0,10,0);
                 reset_tvp_timer_clocks();
             }
+            if (event == 2) TVPControlAndroidAudio(0,9,0);
             if (event == 5 && args.size() == 2) {
                 width_ = static_cast<int>(args[0]);
                 height_ = static_cast<int>(args[1]);
             }
+            if (event_disabled_ && (event == 0 || event == 1)) return;
             visual_event(event, args);
             tTJSVariant callback;
             const tjs_error get = host_->PropGet(0, names[event], nullptr, &callback, host_);
@@ -269,6 +328,10 @@ public:
         });
     }
 
+    void evaluate_kag(const ttstr& expression, iTJSDispatch2* context, tTJSVariant* result) {
+        engine_->EvalExpression(expression, result, context);
+    }
+
     std::atomic<int> status{0};
     std::atomic<bool> cancelled{false};
     std::atomic<std::int64_t> color{-1}, events{0};
@@ -277,7 +340,10 @@ public:
 
 private:
     template<class Call> int guarded(Call call,
-            std::chrono::milliseconds duration = std::chrono::seconds(2)) {
+            std::chrono::milliseconds duration = std::chrono::milliseconds(0)) {
+        // A KAG Conductor callback may synchronously load several assets and
+        // draw its first page before yielding, including real SAF/Binder work.
+        if (duration.count() == 0) duration = std::chrono::seconds(kag_host_ ? 10 : 2);
         ExecutionScope execution(&cancelled, duration);
         try { call(); publish_visual_frame(); }
         catch (const eTJSSilent&) {
@@ -288,6 +354,8 @@ private:
         }
         catch (const eTJS& error) {
             console_.ExceptionPrint(error.GetMessage().c_str());
+            if (const auto* script_error = dynamic_cast<const eTJSScriptError*>(&error))
+                console_.ExceptionPrint(script_error->GetTrace().c_str());
             if (status.load() == 0 || status.load() == kNormalExit) status.store(20);
         } catch (const std::invalid_argument& error) {
             __android_log_print(ANDROID_LOG_ERROR, "TwinQuill/Krkr", "%s", error.what());
@@ -377,6 +445,7 @@ private:
                 TJS_eTJSError(TJS_W("Unable to register TVP constant"));
         }
         for (const auto& item : {
+                std::make_pair(TJS_W("KAGParser"), create_kag_parser),
                 std::make_pair(TJS_W("Font"), TVPCreateNativeClass_Font),
                 std::make_pair(TJS_W("AsyncTrigger"), TVPCreateNativeClass_AsyncTrigger),
                 std::make_pair(TJS_W("Window"), TVPCreateNativeClass_Window),
@@ -413,6 +482,22 @@ private:
             if (result) *result = static_cast<tjs_int>(exists);
             return TJS_S_OK;
         });
+        for (const auto& item : {std::make_pair(TJS_W("extractStorageName"), false),
+                std::make_pair(TJS_W("chopStorageExt"), true)}) {
+            method(storages, item.first, [extension = item.second](auto* result, auto count, auto** args) {
+                if (count < 1) return TJS_E_BADPARAMCOUNT;
+                std::string name = utf8_text(*args[0]);
+                const auto separator = name.find_last_of("/\\>");
+                if (!extension) name = name.substr(separator == std::string::npos ? 0 : separator + 1);
+                else {
+                    const auto dot = name.find_last_of('.');
+                    if (dot != std::string::npos && (separator == std::string::npos || dot > separator))
+                        name.resize(dot);
+                }
+                if (result) *result = tjs_text(name);
+                return TJS_S_OK;
+            });
+        }
         method(storages, TJS_W("getPlacedPath"), [this](auto* result, auto count, auto** args) {
             if (count < 1) return TJS_E_BADPARAMCOUNT;
             if (result) *result = tjs_text(resources_.placed(utf8_text(*args[0])));
@@ -520,6 +605,35 @@ private:
             return nullptr;
         };
         auto* system = add_class(TJS_W("System"));
+        system->RegisterNCM(TJS_W("eventDisabled"), new FlagProperty(&event_disabled_, [this](bool value) {
+            if (event_disabled_ && !value) reset_tvp_timer_clocks();
+            event_disabled_ = value;
+        }), system->GetClassName().c_str(), nitProperty, TJS_STATICMEMBER);
+        method(system, TJS_W("getKeyState"), [](auto* result, auto count, auto** args) {
+            if (count < 1) return TJS_E_BADPARAMCOUNT;
+            if (result) *result = TVPAndroidKeyState(static_cast<tjs_int>(*args[0]));
+            return TJS_S_OK;
+        });
+        for (const auto& item : {std::make_pair(TJS_W("addContinuousHandler"), true),
+                std::make_pair(TJS_W("removeContinuousHandler"), false)}) {
+            method(system, item.first, [this, add = item.second](auto*, auto count, auto** args) {
+                if (count < 1 || args[0]->Type() != tvtObject) return TJS_E_BADPARAMCOUNT;
+                auto closure = args[0]->AsObjectClosureNoAddRef();
+                if (!closure.Object) return TJS_E_INVALIDPARAM;
+                auto found = std::find_if(continuous_handlers_.begin(), continuous_handlers_.end(),
+                    [&](const auto& value) { const auto other = value.AsObjectClosureNoAddRef();
+                        return other.Object == closure.Object && other.ObjThis == closure.ObjThis; });
+                if (add && found == continuous_handlers_.end()) {
+                    if (continuous_handlers_.size() >= 32) TJS_eTJSError(TJS_W("Continuous handler limit exceeded"));
+                    continuous_handlers_.push_back(*args[0]);
+                } else if (!add && found != continuous_handlers_.end()) continuous_handlers_.erase(found);
+                return TJS_S_OK;
+            });
+        }
+        system->RegisterNCM(TJS_W("screenWidth"), new ScreenProperty(&width_),
+            system->GetClassName().c_str(), nitProperty, TJS_STATICMEMBER);
+        system->RegisterNCM(TJS_W("screenHeight"), new ScreenProperty(&height_),
+            system->GetClassName().c_str(), nitProperty, TJS_STATICMEMBER);
         system->RegisterNCM(TJS_W("dataPath"), new DataPathProperty(),
             system->GetClassName().c_str(), nitProperty, TJS_STATICMEMBER);
         method(system, TJS_W("getTickCount"), [](auto* result, auto, auto**) {
@@ -533,6 +647,19 @@ private:
                 TJS_eTJSError(TJS_W("Only normal System.exit(0) is supported"));
             }
             status.store(kNormalExit);
+            return TJS_S_OK;
+        });
+        method(system, TJS_W("_audioOpen"), [this](auto* result, auto count, auto** args) {
+            if(count!=1) return TJS_E_BADPARAMCOUNT;
+            std::string bytes; const int error=read(utf8_text(*args[0]),&bytes);
+            if(error) storage_failure(error);
+            const auto id = TVPOpenAndroidWave(bytes);
+            if (result) *result=id; return TJS_S_OK;
+        });
+        method(system, TJS_W("_audioControl"), [](auto* result, auto count, auto** args) {
+            if(count!=3) return TJS_E_BADPARAMCOUNT;
+            const auto value = TVPControlAndroidAudio(static_cast<tjs_int>(*args[0]),static_cast<tjs_int>(*args[1]),static_cast<tjs_int>(*args[2]));
+            if (result) *result=value;
             return TJS_S_OK;
         });
         auto* debug = add_class(TJS_W("Debug"));
@@ -578,6 +705,9 @@ private:
     tTJSNativeClass* host_ = nullptr;
     ttstr startup_name_{TJS_W("startup.tjs")};
     ttstr script_;
+    std::vector<tTJSVariant> continuous_handlers_;
+    bool event_disabled_ = false;
+    bool kag_host_ = false;
     bool activated_ = false;
     bool paused_ = false;
     int width_ = 0, height_ = 0;
@@ -674,3 +804,27 @@ void tjs_session_stats(std::uint64_t handle, std::int64_t* output) {
     output[4] = session == nullptr ? 11 : session->status.load();
 }
 }  // namespace twinquill::krkr
+
+iTJSTextReadStream* TVPCreateTextStreamForRead(const ttstr& name, const ttstr& mode) {
+    return TJSCreateTextStreamForRead(name, mode);
+}
+void TVPExecuteExpression(const ttstr& expression, iTJSDispatch2* context, tTJSVariant* result) {
+    twinquill::krkr::g_text_session->evaluate_kag(expression, context, result);
+}
+void TVPAddLog(const ttstr& message) {
+    const auto bytes = twinquill::krkr::utf8_text(message);
+    __android_log_print(ANDROID_LOG_INFO, "TwinQuill/Krkr", "%s", bytes.c_str());
+}
+
+namespace { std::vector<tTVPCompactEventCallbackIntf*> kag_compact_hooks; }
+void TVPAddCompactEventHook(tTVPCompactEventCallbackIntf* hook) {
+    if (std::find(kag_compact_hooks.begin(), kag_compact_hooks.end(), hook) == kag_compact_hooks.end())
+        kag_compact_hooks.push_back(hook);
+}
+
+void TVPDeliverCompactEvent(tjs_int level) {
+    for (auto* hook : kag_compact_hooks) hook->OnCompact(level);
+}
+void TVPRemoveCompactEventHook(tTVPCompactEventCallbackIntf* hook) {
+    kag_compact_hooks.erase(std::remove(kag_compact_hooks.begin(), kag_compact_hooks.end(), hook), kag_compact_hooks.end());
+}

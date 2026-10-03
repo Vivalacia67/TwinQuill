@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -54,6 +55,52 @@ final class SafVfsBackend {
 
     private static volatile ContentResolver resolver;
     private static volatile File cacheDirectory;
+    private static final ThreadLocal<LookupSnapshot> LOOKUP = new ThreadLocal<>();
+
+    static void beginLookup() {
+        if (LOOKUP.get() != null) throw new IllegalStateException("Nested VFS lookup");
+        LOOKUP.set(new LookupSnapshot());
+    }
+
+    static void endLookup() { LOOKUP.remove(); }
+
+    private static final class ChildName {
+        final String name;
+        final String id;
+        ChildName(String name, String id) { this.name = name; this.id = id; }
+    }
+
+    private static final class LookupSnapshot {
+        final Map<Uri, List<ChildName>> directories = new HashMap<>();
+        int entries;
+        int characters;
+
+        List<ChildName> children(Uri uri) throws FileNotFoundException {
+            List<ChildName> known = directories.get(uri);
+            if (known != null) return known;
+            // On larger directories use the existing streaming resolver. Never
+            // reject an otherwise readable file merely because batching is full.
+            if (directories.size() >= 128 || entries >= 4096) return null;
+            List<ChildName> names = new ArrayList<>();
+            int addedCharacters = 0;
+            try (Cursor cursor = resolver.query(uri, CHILD_PROJECTION, null, null, null)) {
+                if (cursor == null) throw new FileNotFoundException(uri.toString());
+                while (cursor.moveToNext()) {
+                    String id = cursor.getString(0), name = cursor.getString(1);
+                    if (id == null) throw new FileNotFoundException("Missing document ID");
+                    long length = (long) id.length() + (name == null ? 0 : name.length());
+                    if (entries + names.size() >= 4096
+                        || length > 524288L - characters - addedCharacters) return null;
+                    addedCharacters += (int) length;
+                    names.add(new ChildName(name, id));
+                }
+            }
+            directories.put(uri, names);
+            entries += names.size();
+            characters += addedCharacters;
+            return names;
+        }
+    }
 
     private SafVfsBackend() {
     }
@@ -520,6 +567,25 @@ final class SafVfsBackend {
             Uri exact = null;
             Uri folded = null;
             boolean foldedAmbiguous = false;
+            LookupSnapshot lookup = caseInsensitiveFallback ? LOOKUP.get() : null;
+            List<ChildName> cached = lookup == null ? null : lookup.children(children);
+            if (cached != null) {
+                for (ChildName child : cached) {
+                    if (segment.equals(child.name)) {
+                        exact = DocumentsContract.buildDocumentUriUsingTree(treeUri, child.id);
+                        break;
+                    }
+                    if (child.name != null && segment.equalsIgnoreCase(child.name)) {
+                        Uri candidate = DocumentsContract.buildDocumentUriUsingTree(treeUri, child.id);
+                        if (folded == null) folded = candidate;
+                        else foldedAmbiguous = true;
+                    }
+                }
+                Uri found = exact != null ? exact : (foldedAmbiguous ? null : folded);
+                if (found == null) return null;
+                current = found;
+                continue;
+            }
             try (Cursor cursor = resolver.query(
                 children,
                 CHILD_PROJECTION,

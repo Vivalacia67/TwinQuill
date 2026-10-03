@@ -24,7 +24,13 @@ public:
     explicit Backend(std::string root) : root(std::move(root)) {}
     bool revoked = false;
     int opens = 0;
+    int stats = 0;
+    int lists = 0;
+    int lookups = 0, lookup_ends = 0;
+    void begin_lookup() override { ++lookups; }
+    void end_lookup() noexcept override { ++lookup_ends; }
     StorageStat stat(const std::string& path) override {
+        ++stats;
         if (revoked) throw StorageError(40, "Revoked test medium");
         auto file = std::filesystem::path(root) / path;
         if (!std::filesystem::exists(file)) return {};
@@ -32,6 +38,7 @@ public:
         return {true, directory, directory ? -1 : static_cast<std::int64_t>(std::filesystem::file_size(file)), 1};
     }
     std::vector<std::string> list(const std::string& path) override {
+        ++lists;
         if (revoked) throw StorageError(40, "Revoked test medium");
         std::vector<std::string> names;
         for (const auto& file : std::filesystem::directory_iterator(std::filesystem::path(root)/path))
@@ -82,6 +89,16 @@ int main(int count, char** args) {
         check(read_source(*store.open("loose.txt")) == "LOOSE", "Loose precedence failure");
         check(store.placed("startup.tjs") == "patch.xp3>startup.tjs", "Startup selected wrong archive");
         check(store.list("data.xp3>images/").size() == 2, "Archive member listing failure");
+        check(store.list("images/").size() == 2, "Mounted root archive directory listing failed");
+        store.add_path("images/");
+        check(store.exists("checker.png"), "KAG virtual directory search failed");
+        check(store.placed("checker.png").find(">images/checker.png") != std::string::npos,
+            "KAG virtual directory selected wrong archive member");
+        check(!store.exists("./checker.png"), "Explicit root fell back to a virtual search directory");
+        check(read_source(*store.open("./marker.txt")) == "PATCH", "Root qualifier lost XP3 patch precedence");
+        check(store.exists("./images/checker.png"), "Root qualifier lost XP3 member subdirectories");
+        store.remove_path("images/");
+        error(10, [&] { store.list("../images/"); });
         store.add_path("data.xp3>scripts/");
         check(store.exists("日本語.tjs"), "Archive search path failure");
         store.remove_path("data.xp3>scripts/");
@@ -89,6 +106,33 @@ int main(int count, char** args) {
         error(10, [&] { store.open("../escape"); });
         probe->revoked = true;
         error(40, [&] { store.open("marker.txt"); });
+        error(40, [&] { store.list("images/"); });
+        error(40, [&] { store.exists("./marker.txt"); });
+        std::filesystem::create_directories(saves/"lookup/search");
+        std::ofstream(saves/"lookup/search/shadow.xp3") << "NOT-AN-ARCHIVE";
+        auto lookup_backend = std::make_unique<Backend>((saves/"lookup").string());
+        auto* lookup_probe = lookup_backend.get();
+        ResourceStore lookup(std::move(lookup_backend));
+        const int before_register_lists = lookup_probe->lists;
+        lookup.add_path("search/");
+        check(lookup_probe->lists == before_register_lists, "Registering a physical directory enumerated its children");
+        check(lookup.list("search/").size() == 1, "Registered directory lost explicit enumeration");
+        error(10, [&] { lookup.add_path("search/shadow.xp3/"); });
+        error(11, [&] { lookup.add_path("missing/"); });
+        check(lookup.exists("shadow.xp3"), "Unqualified auto-search stopped working");
+        const int before_root_probe = lookup_probe->stats;
+        check(!lookup.exists("./shadow.xp3"), "Root archive probe selected a search-folder file");
+        check(lookup_probe->stats == before_root_probe + 1, "Root archive probe performed unrelated metadata queries");
+        check(!lookup.exists(".\\shadow.xp3"), "Backslash root qualifier selected a search-folder file");
+        error(10, [&] { lookup.exists("./../escape"); });
+        std::ofstream(saves/"lookup/shadow.xp3") << "ROOT";
+        check(lookup.exists("./shadow.xp3"), "A negative root probe concealed a newly created file");
+        lookup_probe->revoked = true;
+        error(40, [&] { lookup.exists("./shadow.xp3"); });
+        error(40, [&] { lookup.add_path("unregistered/"); });
+        check(lookup_probe->lookups == lookup_probe->lookup_ends,
+            "Failed or successful storage lookup retained its directory snapshot");
+        check(probe->lookups == probe->lookup_ends, "Archive lookup retained its directory snapshot");
         check(game_text_encoding("# sample\ntextEncoding=CP932\n") == "cp932", "Explicit encoding configuration failure");
         bool invalid = false;
         try { game_text_encoding("textEncoding=cp932\ntextEncoding=utf-8"); }

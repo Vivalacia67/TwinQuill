@@ -8,6 +8,7 @@
 #include "krkr_tjs_session.h"
 #include "krkr_tjs_text.h"
 #include "krkr_game_text.h"
+#include "krkr_kag_audio.h"
 #include <mutex>
 #include "krkr_runtime_state.h"
 #include "krkr_tvp_visual.h"
@@ -26,6 +27,7 @@ jmethodID text_decode = nullptr;
 std::mutex text_decoder_mutex;
 void install_decoder(JNIEnv* env, jclass caller) {
     std::lock_guard<std::mutex> lock(text_decoder_mutex);
+    TVPInitializeAndroidAudio(env);
     if (text_class) return;
     if (env->GetJavaVM(&text_vm) != JNI_OK) throw std::runtime_error("Missing Java VM");
     text_decode = env->GetStaticMethodID(caller, "decodeCp932", "([B)Ljava/lang/String;");

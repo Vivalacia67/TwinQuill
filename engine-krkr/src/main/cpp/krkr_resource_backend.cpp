@@ -54,6 +54,8 @@ private:
 class SafBackend final : public ResourceBackend {
 public:
     explicit SafBackend(std::string tree) : tree_(std::move(tree)) {}
+    void begin_lookup() override { vfs_check(tq_vfs_begin_lookup()); }
+    void end_lookup() noexcept override { tq_vfs_end_lookup(); }
     StorageStat stat(const std::string& path) override {
         tq_vfs_stat info{};
         const int result = tq_vfs_stat_path(tree_.c_str(), path.c_str(), &info);

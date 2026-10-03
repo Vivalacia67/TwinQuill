@@ -33,6 +33,19 @@ public final class LauncherGrantBrokerProvider extends ContentProvider {
 
     @Override
     public Bundle call(String method, String argument, Bundle extras) {
+        if ("reset-lookup".equals(method)) {
+            KrkrM3FixtureDocumentsProvider.resetLookup();
+            return Bundle.EMPTY;
+        }
+        if ("add-lookup-file".equals(method)) {
+            KrkrM3FixtureDocumentsProvider.addLookupFile();
+            return Bundle.EMPTY;
+        }
+        if ("lookup-queries".equals(method)) {
+            Bundle result = new Bundle();
+            result.putInt("count", KrkrM3FixtureDocumentsProvider.lookupQueries());
+            return result;
+        }
         if (METHOD_RESET_VISUAL_OPEN_COUNT.equals(method)) {
             LauncherFixtureDocumentsProvider.resetVisualImageOpenCount();
             return Bundle.EMPTY;
@@ -108,7 +121,7 @@ public final class LauncherGrantBrokerProvider extends ContentProvider {
     }
 
     private static Uri fixtureTree(String argument) {
-        return argument.startsWith("m3-") ? KrkrM3FixtureDocumentsProvider.treeUri(argument)
+        return (argument.startsWith("m3-") || argument.startsWith("m4-")) ? KrkrM3FixtureDocumentsProvider.treeUri(argument)
             : LauncherFixtureDocumentsProvider.treeUri(argument);
     }
 

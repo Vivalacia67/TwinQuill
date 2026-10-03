@@ -63,6 +63,8 @@ public:
     virtual StorageStat stat(const std::string& path) = 0;
     virtual std::vector<std::string> list(const std::string& directory) = 0;
     virtual std::shared_ptr<ByteSource> open(const std::string& path) = 0;
+    virtual void begin_lookup() {}
+    virtual void end_lookup() noexcept {}
 };
 std::unique_ptr<ResourceBackend> game_backend(int source_kind, const std::string& source);
 

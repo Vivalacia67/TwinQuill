@@ -18,6 +18,9 @@ patches = [
     "vendor/patches/kirikiroid2/0006-android-basic-visual-bindings.patch",
     "vendor/patches/kirikiroid2/0007-tvp-async-worker-admission.patch",
     "vendor/patches/kirikiroid2/0008-tjs-text-stream-abort.patch",
+    "vendor/patches/kirikiroid2/0009-android-kag-parser.patch",
+    "vendor/patches/kirikiroid2/0010-android-kag-bindings.patch",
+    "vendor/patches/kirikiroid2/0011-tjs-call-depth-budget.patch",
 ]
 patch_sha256 = [
     "49dd651830e8a3ee2d8c3e776c1335435e9228b115d2f333338c84e70e71b4ae",
@@ -28,6 +31,9 @@ patch_sha256 = [
     "0b379abffc7abc917e90fb030db83927999bdc53a8e4b4f8f788a1dfdfe050fe",
     "236cb2f05da0fb4fb6e345237701edeec6d76f6c589057cea8a16075bc89af2b",
     "be1f5624d1096f7425bb38f870c68230c6afbf18f4540efceb841bb376ac81d4",
+    "dc297a756e4eef4b53cb8041ea931191b39eb1dcfc6de00fa7eaea20967ea3a5",
+    "3c21a7f3108967dbfcb6a13e0084503469a4170fa0b380cfe7e920c7cc25221b",
+    "dd9f58b2b03b84a470ee6f406bb0acc28b56ab7c5eba60741e10ddfb296ebea1",
 ]
 
 [[sources]]

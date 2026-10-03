@@ -519,6 +519,22 @@ public final class EngineProcessProtocolInstrumentedTest {
     }
 
     @Test
+    public void runsCompleteKagThroughProductionSafBrokerAndReportsScriptError() throws Exception {
+        for(String root:new String[]{"m4-script-error","m4-broker"}) {
+            String id=root+"-"+android.os.SystemClock.elapsedRealtime();
+            try {
+                Intent result=launchAndAwait(requestIntent(KrkrEngineActivity.class,EngineType.KRKR,
+                    id,grantFixture(root),Bundle.EMPTY));
+                boolean error=root.equals("m4-script-error");
+                assertEquals(error?Activity.RESULT_CANCELED:Activity.RESULT_OK,host.engineResultCode());
+                assertEquals(error?20:0,result.getIntExtra(KrkrEngineActivity.EXTRA_RESULT_CODE,-1));
+                assertEquals(error?EngineResult.SCRIPT_ERROR.code():EngineResult.NORMAL_EXIT.code(),
+                    result.getIntExtra(EngineContract.EXTRA_RESULT,-1));
+            } finally {deleteFixture(new File(context.getFilesDir(),"saves/"+id));}
+        }
+    }
+
+    @Test
     public void productionBrokerBindsPrivateSavesAndPreservesCounterAcrossRestart() throws Exception {
         String id="m3-broker-save-"+android.os.SystemClock.elapsedRealtime();
         File save=new File(context.getFilesDir(),"saves/"+id);

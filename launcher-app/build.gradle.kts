@@ -16,6 +16,39 @@ val krkrRuntimeTestClasses = listOf(
     krkrBrokerLifecycleTestClass
 ).joinToString(",")
 
+abstract class KagTestAssets : Copy() {
+    @get:org.gradle.api.tasks.OutputDirectory
+    abstract val assetsDirectory: org.gradle.api.file.DirectoryProperty
+}
+val prepareKagTestAssets by tasks.registering(KagTestAssets::class) {
+    from(rootProject.file("vendor/kag3-1f3ab309"))
+    assetsDirectory.set(layout.buildDirectory.dir("generated/kag-test-assets"))
+    into(layout.buildDirectory.dir("generated/kag-test-assets/kag3"))
+}
+abstract class M4TestAssets : Exec() {
+    @get:org.gradle.api.tasks.OutputDirectory
+    abstract val assetsDirectory: org.gradle.api.file.DirectoryProperty
+}
+val prepareM4TestAssets by tasks.registering(M4TestAssets::class) {
+    val destination = layout.buildDirectory.dir("generated/m4-test-assets")
+    assetsDirectory.set(destination)
+    inputs.files(rootProject.file("scripts/create_krkr_m4_fixtures.py"),
+        rootProject.file("scripts/create_krkr_m3_fixtures.py"))
+    inputs.dir(rootProject.file("vendor/kag3-1f3ab309"))
+    inputs.dir(rootProject.file("tests/fixtures/krkr-m4"))
+    val windows = System.getProperty("os.name").startsWith("Windows")
+    val environmentPython = rootProject.file(if (windows) ".venv/Scripts/python.exe" else ".venv/bin/python")
+    val python = providers.gradleProperty("twinquillPython").orElse(
+        if (environmentPython.isFile) environmentPython.absolutePath else if (windows) "python" else "python3")
+    workingDir(rootProject.projectDir)
+    commandLine(python.get(), rootProject.file("scripts/create_krkr_m4_fixtures.py").absolutePath,
+        "--output", destination.get().asFile.absolutePath)
+}
+androidComponents.onVariants { variant ->
+    variant.androidTest?.sources?.assets?.addGeneratedSourceDirectory(prepareKagTestAssets) { it.assetsDirectory }
+    variant.androidTest?.sources?.assets?.addGeneratedSourceDirectory(prepareM4TestAssets) { it.assetsDirectory }
+}
+
 android {
     sourceSets.getByName("androidTest").assets.srcDir(rootProject.file("tests/fixtures/krkr-m3"))
     namespace = "io.github.twinquill.launcher"

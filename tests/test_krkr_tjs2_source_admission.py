@@ -31,6 +31,9 @@ PATCH_RELATIVES = (
     Path("vendor/patches/kirikiroid2/0006-android-basic-visual-bindings.patch"),
     Path("vendor/patches/kirikiroid2/0007-tvp-async-worker-admission.patch"),
     Path("vendor/patches/kirikiroid2/0008-tjs-text-stream-abort.patch"),
+    Path("vendor/patches/kirikiroid2/0009-android-kag-parser.patch"),
+    Path("vendor/patches/kirikiroid2/0010-android-kag-bindings.patch"),
+    Path("vendor/patches/kirikiroid2/0011-tjs-call-depth-budget.patch"),
 )
 
 
@@ -121,6 +124,8 @@ class KrkrTjs2SourceAdmissionTests(unittest.TestCase):
             generated_utils = generated_root / "src" / "core" / "utils"
             generated_utils.mkdir(parents=True)
             shutil.copy2(TJS2_DIR.parent / "utils" / "TimerIntf.cpp", generated_utils / "TimerIntf.cpp")
+            for name in ("KAGParser.h", "KAGParser.cpp"):
+                shutil.copy2(TJS2_DIR.parent / "utils" / name, generated_utils / name)
             generated_visual = generated_root / "src" / "core" / "visual"
             generated_visual.mkdir(parents=True)
             for name in ("WindowIntf.cpp", "LayerIntf.cpp"):
@@ -153,6 +158,9 @@ class KrkrTjs2SourceAdmissionTests(unittest.TestCase):
                         encoding="utf-8",
                     )
                     self.assertEqual(result.returncode, 0, result.stderr)
+                    applied = subprocess.run([git, "-c", "core.fsmonitor=false", "apply", "--unsafe-paths",
+                                              str(ROOT / relative)], cwd=generated_root, capture_output=True)
+                    self.assertEqual(applied.returncode, 0, applied.stderr.decode("utf-8", errors="replace"))
 
 
 if __name__ == "__main__":

@@ -17,13 +17,19 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
-/** Read-only, pipe-backed M3 fixture tree, including real nested directories. */
+/** Read-only, pipe-backed M3/M4 fixture tree, including real nested directories. */
 public final class KrkrM3FixtureDocumentsProvider extends DocumentsProvider {
     public static final String AUTHORITY = "io.github.twinquill.test.m3.documents";
     private static final Set<String> ROOTS = Set.of("m3-loose", "m3-compressed", "m3-patches",
-        "m3-cp932", "m3-save", "m3-vectors", "m3-large", "m3-revoke", "m3-many", "m3-broker-compressed", "m3-broker-save");
+        "m3-cp932", "m3-save", "m3-vectors", "m3-large", "m3-revoke", "m3-many", "m3-broker-compressed", "m3-broker-save", "m4-loose", "m4-compressed", "m4-missing", "m4-script-error", "m4-broker", "m4-slow", "m4-batch");
     private final ConcurrentHashMap<String, Long> sizes = new ConcurrentHashMap<>();
+    private static final AtomicInteger lookupQueries = new AtomicInteger();
+    private static volatile boolean lookupFilePresent;
+    static void resetLookup() { lookupQueries.set(0); lookupFilePresent = false; }
+    static void addLookupFile() { lookupFilePresent = true; }
+    static int lookupQueries() { return lookupQueries.get(); }
 
     public static Uri treeUri(String root) {
         if (!ROOTS.contains(root)) throw new IllegalArgumentException("Unknown M3 fixture root");
@@ -54,12 +60,20 @@ public final class KrkrM3FixtureDocumentsProvider extends DocumentsProvider {
         MatrixCursor cursor = cursor(projection);
         try {
             check(id);
+            // Exercise Binder-sized lookup latency instead of only fast in-memory trees.
+            if (id.equals("m4-slow") || id.startsWith("m4-slow/")) android.os.SystemClock.sleep(40);
+            if (id.equals("m4-batch")) {
+                lookupQueries.incrementAndGet();
+                add(cursor, id + "/case.txt");
+                add(cursor, id + "/Case.txt");
+                if (lookupFilePresent) add(cursor, id + "/late.txt");
+            }
             if (id.equals("m3-many")) {
                 for(int i=0;i<4097;++i)add(cursor,id+"/file-"+i);
                 return cursor;
             }
             String[] children = id.equals("m3-large") ? new String[] {"startup.tjs", "oversized.bin"}
-                : getContext().getAssets().list(id);
+                : getContext().getAssets().list(assetPath(id));
             for (String name : children) add(cursor, id + "/" + name);
             return cursor;
         } catch (IOException error) { throw missing(error); }
@@ -85,7 +99,7 @@ public final class KrkrM3FixtureDocumentsProvider extends DocumentsProvider {
                         byte[] buffer = new byte[65536];
                         for (int i = 0; i < 2080; ++i) output.write(buffer);
                     } else {
-                        try (InputStream input = getContext().getAssets().open(id)) {
+                        try (InputStream input = getContext().getAssets().open(assetPath(id))) {
                             byte[] buffer = new byte[65536];
                             int count;
                             while ((count = input.read(buffer)) >= 0) if (count > 0) output.write(buffer, 0, count);
@@ -121,26 +135,38 @@ public final class KrkrM3FixtureDocumentsProvider extends DocumentsProvider {
             }
         } catch (IOException error) { throw missing(error); }
     }
+    private static String assetPath(String id) {
+        for (String alias : new String[] {"m4-slow", "m4-batch"}) {
+            if (id.equals(alias) || id.startsWith(alias + "/")) return "m4-loose" + id.substring(alias.length());
+        }
+        return id;
+    }
     private boolean directory(String id) throws IOException {
         check(id);
         if (ROOTS.contains(id)) return true;
+        if (lookupFile(id)) return false;
         if (id.startsWith("m3-large/") || id.startsWith("m3-many/")) return false;
-        return getContext().getAssets().list(id).length > 0;
+        return getContext().getAssets().list(assetPath(id)).length > 0;
     }
     private long length(String id) throws IOException {
+        if (lookupFile(id)) return 1;
         if (id.startsWith("m3-many/")) return 1;
         if (id.equals("m3-large/startup.tjs")) return largeStartup().length;
         if (id.equals("m3-large/oversized.bin")) return -1; // Provider has unknown size.
         Long known = sizes.get(id);
         if (known != null) return known;
         long length = 0;
-        try (InputStream input = getContext().getAssets().open(id)) {
+        try (InputStream input = getContext().getAssets().open(assetPath(id))) {
             byte[] buffer = new byte[8192];
             int count;
             while ((count = input.read(buffer)) >= 0) length += count;
         }
         sizes.put(id, length);
         return length;
+    }
+    private static boolean lookupFile(String id) {
+        return id.equals("m4-batch/case.txt") || id.equals("m4-batch/Case.txt")
+            || (lookupFilePresent && id.equals("m4-batch/late.txt"));
     }
     private static byte[] largeStartup() {
         return "Storages.readBytes('oversized.bin',0,1);".getBytes(java.nio.charset.StandardCharsets.UTF_8);

@@ -149,19 +149,54 @@ bool ResourceStore::direct_exists(const std::string& name) {
     return stat.exists && !stat.directory;
 }
 std::string ResourceStore::placed(const std::string& name) {
+    // An explicit ./ names the game root. KAG's executable-root archive probes
+    // must not fan out across every directory registered for short filenames.
+    const bool root_qualified = name.rfind("./", 0) == 0 || name.rfind(".\\", 0) == 0;
     const auto normalized = storage_path(name);
-    if (direct_exists(normalized)) return normalized;
+    backend_->begin_lookup();
+    struct LookupScope {
+        ResourceBackend* backend;
+        ~LookupScope() { backend->end_lookup(); }
+    } lookup{backend_.get()};
+    // Refresh each archive once per lookup. Weak references preserve the four
+    // index cache limit while avoiding repeated SAF metadata queries for every
+    // candidate directory in the same atomic resolution operation.
+    std::map<std::string, std::weak_ptr<Xp3Archive>> refreshed;
+    const auto exists = [&](const std::string& candidate) {
+        if (candidate.find('>') == std::string::npos) return direct_exists(candidate);
+        const auto [file, member] = split(candidate);
+        auto index = refreshed[file].lock();
+        if (!index) {
+            const auto info = backend_->stat(file);
+            if (!info.exists || info.directory) return false;
+            index = archive(file);
+            refreshed[file] = index;
+        }
+        return index->contains(member);
+    };
+    if (exists(normalized)) return normalized;
     if (normalized.find('>') != std::string::npos) return {};
     const auto slash = normalized.find_last_of('/');
     const auto basename = normalized.substr(slash == std::string::npos ? 0 : slash + 1);
     // Later-added paths win, as in upstream TVPAutoPathTable.Add.
     for (auto it = paths_.rbegin(); it != paths_.rend(); ++it) {
+        if (root_qualified && it->back() != '>') continue;
         const auto candidate = storage_path(*it + (it->back() == '>' ? archive_path(normalized) : basename));
-        if (direct_exists(candidate)) return candidate;
+        if (exists(candidate)) return candidate;
+        // KAG registers ordinary directories even when the complete game lives
+        // in root XP3 archives. Resolve that directory within each mounted root
+        // without trusting stale permissions or changing loose-file precedence.
+        if (it->find('>') == std::string::npos) {
+            for (auto root = paths_.rbegin(); root != paths_.rend(); ++root) {
+                if (root->back() != '>') continue;
+                const auto member = *root + archive_path(candidate);
+                if (exists(member)) return member;
+            }
+        }
         // Explicitly registered archive subdirectories use basename semantics.
         if (it->back() != '>' && it->find('>') != std::string::npos) {
             const auto by_name = storage_path(*it + archive_path(basename));
-            if (direct_exists(by_name)) return by_name;
+            if (exists(by_name)) return by_name;
         }
     }
     return {};
@@ -177,15 +212,45 @@ std::shared_ptr<ByteSource> ResourceStore::open(const std::string& name) {
 std::vector<std::string> ResourceStore::list(const std::string& directory) {
     const auto normalized = storage_path(directory, true);
     const auto [file, member] = split(normalized);
-    return normalized.find('>') == std::string::npos ? backend_->list(file) : archive(file)->list(member);
+    if (normalized.find('>') != std::string::npos) return archive(file)->list(member);
+    std::map<std::string, std::string> names;
+    bool found = false;
+    const auto append = [&](const std::vector<std::string>& children) {
+        for (const auto& child : children) {
+            names.emplace(archive_path(child, !child.empty() && child.back() == '/'), child);
+            if (names.size() > 4096) throw StorageError(20, "Merged directory exceeds 4096 entries");
+        }
+    };
+    const auto info = backend_->stat(file);
+    if (info.exists) {
+        if (!info.directory) throw StorageError(10, "Storage directory is a file");
+        found = true; append(backend_->list(file));
+    }
+    for (auto root = paths_.rbegin(); root != paths_.rend(); ++root) {
+        if (root->back() != '>') continue;
+        const auto children = archive(root->substr(0, root->size() - 1))->list(normalized);
+        if (!children.empty()) { found = true; append(children); }
+    }
+    if (!found) throw StorageError(11, "Game directory not found");
+    std::vector<std::string> children;
+    for (const auto& [key, value] : names) children.push_back(value);
+    return children;
 }
 void ResourceStore::add_path(const std::string& directory) {
     const auto normalized = storage_path(directory, true);
     if (normalized.empty()) throw StorageError(10, "Root is already searched directly");
     if (std::find(paths_.begin(), paths_.end(), normalized) != paths_.end()) return;
     if (paths_.size() >= 128) throw StorageError(20, "More than 128 search paths");
-    // Validate now, including provider permission and the archive index.
-    (void)list(normalized);
+    // Registering a physical directory needs its current type and permission,
+    // not every child's metadata. Enumerate only for virtual XP3 directories;
+    // GetListAt still enforces the directory-entry limit when actually called.
+    if (normalized.find('>') == std::string::npos) {
+        const auto info = backend_->stat(normalized.substr(0, normalized.size() - 1));
+        if (info.exists && !info.directory) throw StorageError(10, "Storage directory is a file");
+        if (!info.exists) (void)list(normalized);
+    } else {
+        (void)list(normalized);
+    }
     paths_.push_back(normalized);
     clear_cache();
 }

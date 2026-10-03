@@ -29,7 +29,11 @@ PrivateStorage::~PrivateStorage() { if (root_ >= 0) close(root_); }
 bool PrivateStorage::owns(const std::string& name) { return name.rfind(kDataPath, 0) == 0; }
 std::string PrivateStorage::relative(const std::string& name, bool folder) const {
     if (root_ < 0 || !owns(name)) throw StorageError(10, "Writes require System.dataPath");
-    auto path = storage_path(name.substr(std::char_traits<char>::length(kDataPath)), folder);
+    // KAG appends "/" to a directory URI that already ends in "/".
+    // Normalize only separators inside the validated private URI namespace.
+    auto suffix = name.substr(std::char_traits<char>::length(kDataPath));
+    while (!suffix.empty() && suffix.front() == '/') suffix.erase(0, 1);
+    auto path = storage_path(suffix, folder);
     if (path.find('>') != std::string::npos) throw StorageError(10, "Private archives are not writable");
     return path;
 }
