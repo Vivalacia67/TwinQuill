@@ -1,0 +1,21 @@
+var p=System.dataPath;
+Storages.createFolders(p+"checks/");
+var path=p+"checks/counter.tjs";
+var n=Storages.isExistentStorage(path)?int(Scripts.evalStorage(path,"utf-8")):0;
+Storages.writeText(path,string(n+1));
+if(Storages.readText(path,"utf-8")!=string(n+1)) throw "Private round trip failed";
+var good=p+"checks/last-good.tjs";
+Storages.writeText(good,"GOOD");
+var rejected=false;
+try { Storages.writeText("../escape.txt","BAD"); } catch(e) {rejected=true;}
+if(!rejected || Storages.readText(good)!="GOOD") throw "Write guard failed";
+var d=%["count"=>n+1,"message"=>"中文日本語"];
+(Dictionary.saveStruct incontextof d)(p+"checks/state.tjs");
+var loaded=Scripts.evalStorage(p+"checks/state.tjs","utf-8");
+if(loaded.count!=n+1) throw "Structured save failed";
+var w=new Window(); w.setInnerSize(320,200); w.caption="TwinQuill M3 saves: "+string(n+1);
+var l=new Layer(w,null); l.type=ltOpaque; l.setSize(320,200); l.setImageSize(320,200); l.visible=true;
+l.fillRect(0,0,320,200,n==0?0x3366cc:0x22aa66); w.visible=true;
+w.onKeyDown=function(key){if(key==13)w.close();};
+
+var brokerExitTicks=0;var brokerExitTimer=new Timer(function(){if(++brokerExitTicks>=6){brokerExitTimer.enabled=false;System.exit(0);}},"");brokerExitTimer.interval=250;brokerExitTimer.enabled=true;

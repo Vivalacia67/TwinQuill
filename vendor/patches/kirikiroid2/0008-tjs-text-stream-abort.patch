@@ -1,0 +1,51 @@
+From: TwinQuill contributors
+Subject: [PATCH] Abort failed text serialization before atomic save commit
+
+Purpose: Existing Array/Dictionary catch paths call Destruct even after failed
+serialization. Add an opt-in Abort hook; its default preserves existing hosts,
+while the Android private writer discards partial data. No new upstream TU.
+
+Tested-by: tests/test_krkr_tjs2_source_admission.py focused git-apply unittest; forced Android CMake configure; Krkr atomic serialization instrumentation
+
+--- a/src/core/tjs2/tjs.h
++++ b/src/core/tjs2/tjs.h
+@@ -193,6 +193,8 @@
+ public:
+ 	virtual void TJS_INTF_METHOD Write(const tTJSString & targ) = 0;
+ 	virtual void TJS_INTF_METHOD Destruct() = 0; // must delete itself
++	// Android atomic writers discard serialization failures.
++	virtual void TJS_INTF_METHOD Abort() { Destruct(); }
+ };
+ //---------------------------------------------------------------------------
+ extern iTJSTextReadStream * (*TJSCreateTextStreamForRead)(const tTJSString &name,
+--- a/src/core/tjs2/tjsArray.cpp
++++ b/src/core/tjs2/tjsArray.cpp
+@@ -437,7 +437,7 @@
+ 	}
+ 	catch(...)
+ 	{
+-		stream->Destruct();
++		stream->Abort();
+ 		throw;
+ 	}
+ 	stream->Destruct();
+@@ -482,7 +482,7 @@
+ 		}
+ 		catch(...)
+ 		{
+-			stream->Destruct();
++			stream->Abort();
+ 			throw;
+ 		}
+ 		stream->Destruct();
+--- a/src/core/tjs2/tjsDictionary.cpp
++++ b/src/core/tjs2/tjsDictionary.cpp
+@@ -153,7 +153,7 @@
+ 		}
+ 		catch(...)
+ 		{
+-			stream->Destruct();
++			stream->Abort();
+ 			throw;
+ 		}
+ 		stream->Destruct();

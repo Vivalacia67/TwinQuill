@@ -68,7 +68,7 @@ final class SafVfsBackend {
     }
 
     static long open(byte[] treeBytes, byte[] pathBytes, int flags) {
-        if (resolver == null || flags != 1) {
+        if (resolver == null || (flags != 1 && flags != 3)) {
             return resolver == null ? INVALID : UNSUPPORTED;
         }
         try {
@@ -77,7 +77,7 @@ final class SafVfsBackend {
             if (documentUri == null) {
                 return NOT_FOUND;
             }
-            OpenHandle handle = openSeekableRead(documentUri);
+            OpenHandle handle = openSeekableRead(documentUri, flags == 3);
             long id = NEXT_HANDLE.getAndIncrement();
             OPEN_HANDLES.put(id, handle);
             return id;
@@ -87,6 +87,8 @@ final class SafVfsBackend {
             return NOT_FOUND;
         } catch (IllegalArgumentException exception) {
             return INVALID;
+        } catch (SpoolLimitException exception) {
+            return UNSUPPORTED;
         } catch (IOException exception) {
             return ERROR;
         }
@@ -227,6 +229,10 @@ final class SafVfsBackend {
 
     /** Internal status-framed list used by the native bridge; not public API. */
     static byte[][] listFramed(byte[] treeBytes, byte[] pathBytes) {
+        return listFramed(treeBytes, pathBytes, Integer.MAX_VALUE);
+    }
+
+    static byte[][] listFramed(byte[] treeBytes, byte[] pathBytes, int limit) {
         try {
             Uri treeUri = parseTree(treeBytes);
             Uri directory = resolve(treeUri, text(pathBytes), true, true);
@@ -251,6 +257,18 @@ final class SafVfsBackend {
                 while (cursor.moveToNext()) {
                     String name = cursor.getString(0);
                     if (name != null) {
+                        if (names.size() >= limit) return statusFrame(UNSUPPORTED);
+                        if (limit != Integer.MAX_VALUE) {
+                            try {
+                                if (name.length() > 4096 || name.indexOf('\0') >= 0 || StandardCharsets.UTF_8.newEncoder()
+                                    .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                                    .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+                                    .encode(java.nio.CharBuffer.wrap(name)).remaining() > 4096)
+                                    return statusFrame(INVALID);
+                            } catch (java.nio.charset.CharacterCodingException invalidName) {
+                                return statusFrame(INVALID);
+                            }
+                        }
                         names.add(name);
                     }
                 }
@@ -361,7 +379,9 @@ final class SafVfsBackend {
         }
     }
 
-    private static OpenHandle openSeekableRead(Uri uri) throws IOException {
+    private static final class SpoolLimitException extends IOException { }
+
+    private static OpenHandle openSeekableRead(Uri uri, boolean bounded) throws IOException {
         ParcelFileDescriptor descriptor = resolver.openFileDescriptor(uri, "r");
         if (descriptor == null) {
             throw new FileNotFoundException(uri.toString());
@@ -375,28 +395,38 @@ final class SafVfsBackend {
             input.close();
             File cache = File.createTempFile("tq-vfs-", ".cache", cacheDirectory);
             boolean complete = false;
-            try (
-                InputStream source = resolver.openInputStream(uri);
-                FileOutputStream output = new FileOutputStream(cache)
-            ) {
-                if (source == null) {
-                    throw new FileNotFoundException(uri.toString());
-                }
-                byte[] buffer = new byte[1024 * 1024];
-                int count;
-                while ((count = source.read(buffer)) >= 0) {
-                    if (count > 0) {
-                        output.write(buffer, 0, count);
+            try {
+                try (
+                    InputStream source = resolver.openInputStream(uri);
+                    FileOutputStream output = new FileOutputStream(cache)
+                ) {
+                    if (source == null) {
+                        throw new FileNotFoundException(uri.toString());
+                    }
+                    byte[] buffer = new byte[1024 * 1024];
+                    int count;
+                    long total = 0;
+                    while ((count = source.read(buffer)) >= 0) {
+                        if (count == 0) {
+                            int next = source.read();
+                            if (next < 0) break;
+                            buffer[0] = (byte) next;
+                            count = 1;
+                        }
+                        total += count;
+                        if (bounded && total > 128L * 1024 * 1024) throw new SpoolLimitException();
+                        if (count > 0) {
+                            output.write(buffer, 0, count);
+                        }
                     }
                 }
+                FileInputStream cachedInput = new FileInputStream(cache);
+                OpenHandle handle = new OpenHandle(null, cachedInput, cachedInput.getChannel(), cache);
                 complete = true;
+                return handle;
             } finally {
-                if (!complete) {
-                    cache.delete();
-                }
+                if (!complete) cache.delete();
             }
-            FileInputStream cachedInput = new FileInputStream(cache);
-            return new OpenHandle(null, cachedInput, cachedInput.getChannel(), cache);
         }
     }
 

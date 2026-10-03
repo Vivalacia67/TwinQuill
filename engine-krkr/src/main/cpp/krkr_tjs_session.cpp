@@ -10,6 +10,10 @@
 #include "krkr_tjs_text.h"
 #include "krkr_vfs_storage.h"
 #include "krkr_xp3.h"
+#include "krkr_resource.h"
+#include "krkr_private_storage.h"
+#include "krkr_game_text.h"
+#include "tjsArray.h"
 #include "tjs.h"
 #include "tjsError.h"
 #include "tjsNative.h"
@@ -65,6 +69,10 @@ public:
         iTJSDispatch2*) override {
         if (member != nullptr) return TJS_E_MEMBERNOTFOUND;
         try { return method_(result, count, args); }
+        catch (const StorageError& error) {
+            const ttstr message = tjs_text(std::string("Storage error: ") + error.what());
+            TJS_eTJSError(message);
+        }
         catch (const std::invalid_argument&) {
             TJS_eTJSError(TJS_W("Invalid Unicode or source text"));
         }
@@ -74,29 +82,92 @@ private:
     Method method_;
 };
 
-std::string relative_name(const ttstr& name) {
-    std::string text = utf8_text(name);
-    if (text.rfind("./", 0) == 0) text.erase(0, 2);
-    if (text.empty() || text.front() == '/' || text.back() == '/'
-        || text.find_first_of(":\\") != std::string::npos || text.find('\0') != std::string::npos) {
-        TJS_eTJSError(TJS_W("Storage name must be relative to the game root"));
+class DataPathProperty final : public tTJSNativeClassProperty {
+public:
+    DataPathProperty() : tTJSNativeClassProperty(nullptr, nullptr) {}
+    tjs_error TJS_INTF_METHOD PropGet(tjs_uint32, const tjs_char* member,
+        tjs_uint32*, tTJSVariant* result, iTJSDispatch2*) override {
+        if (member) return TJS_E_MEMBERNOTFOUND;
+        if (result) *result = ttstr(kDataPath);
+        return TJS_S_OK;
     }
-    std::size_t start = 0;
-    while (start < text.size()) {
-        const std::size_t end = text.find('/', start);
-        const std::string part = text.substr(start, end - start);
-        if (part.empty() || part == "." || part == "..") {
-            TJS_eTJSError(TJS_W("Storage traversal is not permitted"));
+};
+class TextReader final : public iTJSTextReadStream {
+public:
+    explicit TextReader(ttstr text) : text_(std::move(text)) {}
+    tjs_uint TJS_INTF_METHOD Read(ttstr& target, tjs_uint size) override {
+        const auto available = static_cast<tjs_uint>(text_.GetLen()) - position_;
+        const auto count = size == 0 ? available : std::min(size, available);
+        target = ttstr(text_.c_str() + position_, static_cast<tjs_int>(count));
+        position_ += count;
+        return count;
+    }
+    void TJS_INTF_METHOD Destruct() override { delete this; }
+private:
+    ttstr text_;
+    tjs_uint position_ = 0;
+};
+class AtomicTextWriter final : public iTJSTextWriteStream {
+public:
+    explicit AtomicTextWriter(std::function<void(std::string_view)> commit) : commit_(std::move(commit)) {}
+    void TJS_INTF_METHOD Write(const ttstr& text) override {
+        try {
+            const auto bytes = utf8_text(text);
+            if (bytes.size() > kResourceReadLimit - bytes_.size())
+                TJS_eTJSError(TJS_W("Private text serialization exceeds 32 MiB"));
+            bytes_ += bytes;
+        } catch (...) { failed_ = true; throw; }
+    }
+    void TJS_INTF_METHOD Abort() override { delete this; }
+    void TJS_INTF_METHOD Destruct() override {
+        std::unique_ptr<AtomicTextWriter> self(this);
+        if (!failed_) {
+            try { commit_(bytes_); }
+            catch (const StorageError&) { TJS_eTJSError(TJS_W("Atomic private text commit failed")); }
         }
-        if (end == std::string::npos) break;
-        start = end + 1;
     }
-    return text;
-}
+private:
+    std::function<void(std::string_view)> commit_;
+    std::string bytes_;
+    bool failed_ = false;
+};
+class BinaryReader final : public tTJSBinaryStream {
+public:
+    explicit BinaryReader(std::shared_ptr<ByteSource> source) : source_(std::move(source)) {}
+    tjs_uint64 Seek(tjs_int64 offset, tjs_int whence) override {
+        const auto base = whence == TJS_BS_SEEK_SET ? 0 : whence == TJS_BS_SEEK_CUR ? position_ : source_->size();
+        if (whence < TJS_BS_SEEK_SET || whence > TJS_BS_SEEK_END)
+            TJS_eTJSError(TJS_W("Invalid storage seek origin"));
+        const auto magnitude = offset < 0 ? static_cast<std::uint64_t>(-(offset + 1)) + 1
+            : static_cast<std::uint64_t>(offset);
+        if ((offset < 0 && magnitude > base) || (offset >= 0 && magnitude > source_->size() - base))
+            TJS_eTJSError(TJS_W("Storage seek exceeds stream extent"));
+        position_ = offset < 0 ? base - magnitude : base + magnitude;
+        return position_;
+    }
+    tjs_uint Read(void* output, tjs_uint size) override {
+        const auto count = static_cast<tjs_uint>(std::min<std::uint64_t>(size, source_->size() - position_));
+        try { source_->read(position_, output, count); }
+        catch (const StorageError&) { TJS_eTJSError(TJS_W("Game binary stream read failed")); }
+        position_ += count; return count;
+    }
+    tjs_uint Write(const void*, tjs_uint) override {
+        TJS_eTJSError(TJS_W("Game binary streams are read-only")); return 0;
+    }
+    void SetEndOfStorage() override { TJS_eTJSError(TJS_W("Game binary streams are read-only")); }
+    tjs_uint64 GetSize() override { return source_->size(); }
+private:
+    std::shared_ptr<ByteSource> source_;
+    std::uint64_t position_ = 0;
+};
+class Session;
+Session* g_text_session = nullptr;
 
 class Session final {
 public:
-    Session(int kind, std::string source) : kind_(kind), source_(std::move(source)) {}
+    Session(int kind, std::string source, const std::string& save)
+        : kind_(kind), source_(std::move(source)), resources_(game_backend(kind_, source_)), private_(save),
+          encoding_(game_text_encoding(resources_.configuration())) {}
     // Every engine operation and destruction is performed under tjs_engine_mutex().
     ~Session() noexcept {
         if (host_ != nullptr) host_->Release();
@@ -108,6 +179,13 @@ public:
             shutdown_visual_session();
             try { engine_->Shutdown(); } catch (...) { }
             engine_->Release();
+            if (g_text_session == this) {
+                TJSCreateTextStreamForRead = old_text_read_;
+                TJSCreateTextStreamForWrite = old_text_write_;
+                TJSCreateBinaryStreamForRead = old_binary_read_;
+                TJSCreateBinaryStreamForWrite = old_binary_write_;
+                g_text_session = nullptr;
+            }
             end_visual_session();
             ++g_releases;
         }
@@ -118,7 +196,7 @@ public:
         const int result = read("startup.tjs", &source, true);
         if (result != 0) return result;
         // Decode before constructing the engine so malformed source owns no VM resources.
-        script_ = tjs_text(source);
+        script_ = game_text(source);
         engine_ = new tTJS();
         engine_->SetConsoleOutput(&console_);
         return 0;
@@ -134,7 +212,7 @@ public:
         const int result = guarded([&] {
             begin_visual_session([this](const ttstr& name) {
                 std::string bytes;
-                const int result = read(relative_name(name), &bytes);
+                const int result = read(utf8_text(name), &bytes);
                 if (result != 0) storage_failure(result);
                 return bytes;
             }, [this] { status.store(kNormalExit); }, width, height);
@@ -219,32 +297,19 @@ private:
         return status.load() == kNormalExit ? 0 : status.load();
     }
 
-    std::filesystem::path local_path(const std::string& name) const {
-        const auto root = std::filesystem::canonical(std::filesystem::path(source_).parent_path());
-        const auto path = std::filesystem::weakly_canonical(root / name);
-        auto left = root.begin(), right = path.begin();
-        for (; left != root.end(); ++left, ++right) {
-            if (right == path.end() || *left != *right) {
-                TJS_eTJSError(TJS_W("Storage path escapes game root"));
-            }
-        }
-        return path;
+    ttstr game_text(std::string_view bytes, const std::string& mode = "") {
+        const auto decoded = decode_game_text(bytes, mode.empty() ? encoding_ : mode);
+        return ttstr(std::basic_string<tjs_char>(decoded.begin(), decoded.end()));
     }
-
     int read(const std::string& name, std::string* output, bool startup = false) {
-        if (kind_ == 1) return read_tqsaf_script(source_, name, output, startup);
-        if (kind_ == 3 && name == "startup.tjs") return read_raw_xp3_startup(source_.c_str(), output);
-        const auto path = local_path(name);
-        std::ifstream input(path, std::ios::binary | std::ios::ate);
-        if (!input) return 11;
-        const auto length = input.tellg();
-        if (length < 0) return 41;
-        if (startup && length == 0) return 11;
-        if (length > static_cast<std::streamoff>(kStartupSourceLimit)) return 20;
-        output->assign(static_cast<std::size_t>(length), '\0');
-        input.seekg(0);
-        if (length != 0 && !input.read(output->data(), length)) return 41;
-        return 0;
+        try {
+            if (PrivateStorage::owns(name)) *output = private_.read(name);
+            else *output = read_source(*resources_.open(name), startup ? kStartupSourceLimit : kResourceReadLimit);
+            return startup && output->empty() ? 11 : 0;
+        } catch (const StorageError& error) {
+            __android_log_print(ANDROID_LOG_ERROR, "TwinQuill/Krkr", "%s", error.what());
+            return error.status;
+        }
     }
 
     void storage_failure(int result) {
@@ -281,14 +346,13 @@ private:
         iTJSDispatch2* context = nullptr;
         if (storage) {
             name = script;
-            if (count >= 2 && args[1]->Type() != tvtVoid && ((ttstr)*args[1]).GetLen() != 0) {
-                TJS_eTJSError(TJS_W("Explicit storage encoding modes are not supported"));
-            }
+            const std::string mode = count >= 2 && args[1]->Type() != tvtVoid
+                ? utf8_text(*args[1]) : "";
             if (count >= 3 && args[2]->Type() != tvtVoid) context = args[2]->AsObjectNoAddRef();
             std::string bytes;
-            const int read_result = read(relative_name(name), &bytes);
+            const int read_result = read(utf8_text(name), &bytes);
             if (read_result != 0) storage_failure(read_result);
-            script = tjs_text(bytes);
+            script = game_text(bytes, mode.empty() && PrivateStorage::owns(utf8_text(name)) ? "utf-8" : mode);
         } else {
             if (count >= 2 && args[1]->Type() != tvtVoid) name = *args[1];
             if (count >= 3 && args[2]->Type() != tvtVoid) line = *args[2];
@@ -344,17 +408,120 @@ private:
         auto* storages = add_class(TJS_W("Storages"));
         method(storages, TJS_W("isExistentStorage"), [this](auto* result, auto count, auto** args) {
             if (count < 1) return TJS_E_BADPARAMCOUNT;
-            const std::string name = relative_name(*args[0]);
-            bool exists = false;
-            if (kind_ == 1) {
-                const int status = exists_tqsaf_script(source_, name, &exists);
-                if (status != 0) storage_failure(status);
-            } else if (kind_ == 3 && name == "startup.tjs") exists = true;
-            else exists = std::filesystem::is_regular_file(local_path(name));
-            if (result != nullptr) *result = static_cast<tjs_int>(exists);
+            const std::string name = utf8_text(*args[0]);
+            const bool exists = PrivateStorage::owns(name) ? private_.exists(name) : resources_.exists(name);
+            if (result) *result = static_cast<tjs_int>(exists);
             return TJS_S_OK;
         });
+        method(storages, TJS_W("getPlacedPath"), [this](auto* result, auto count, auto** args) {
+            if (count < 1) return TJS_E_BADPARAMCOUNT;
+            if (result) *result = tjs_text(resources_.placed(utf8_text(*args[0])));
+            return TJS_S_OK;
+        });
+        for (const auto& item : {std::make_pair(TJS_W("addAutoPath"), true),
+                std::make_pair(TJS_W("removeAutoPath"), false)}) {
+            method(storages, item.first, [this, add = item.second](auto*, auto count, auto** args) {
+                if (count < 1) return TJS_E_BADPARAMCOUNT;
+                if (add) resources_.add_path(utf8_text(*args[0]));
+                else resources_.remove_path(utf8_text(*args[0]));
+                return TJS_S_OK;
+            });
+        }
+        method(storages, TJS_W("clearAutoPathCache"), [this](auto*, auto, auto**) {
+            resources_.clear_cache(); return TJS_S_OK;
+        });
+        method(storages, TJS_W("getListAt"), [this](auto* result, auto count, auto** args) {
+            if (count < 1) return TJS_E_BADPARAMCOUNT;
+            const auto names = resources_.list(utf8_text(*args[0]));
+            auto* array = TJSCreateArrayObject();
+            tTJSVariant value(array, array); array->Release();
+            for (std::size_t i = 0; i < names.size(); ++i) {
+                tTJSVariant name(tjs_text(names[i]));
+                if (TJS_FAILED(array->PropSetByNum(TJS_MEMBERENSURE, static_cast<tjs_int>(i), &name, array)))
+                    TJS_eTJSError(TJS_W("Storage list allocation failed"));
+            }
+            if (result) *result = value;
+            return TJS_S_OK;
+        });
+        method(storages, TJS_W("readText"), [this](auto* result, auto count, auto** args) {
+            if (count < 1) return TJS_E_BADPARAMCOUNT;
+            std::string bytes;
+            const auto error = read(utf8_text(*args[0]), &bytes);
+            if (error) storage_failure(error);
+            const auto text = game_text(bytes, count >= 2 && args[1]->Type() != tvtVoid
+                ? utf8_text(*args[1]) : PrivateStorage::owns(utf8_text(*args[0])) ? "utf-8" : "");
+            if (result) *result = text;
+            return TJS_S_OK;
+        });
+        method(storages, TJS_W("readBytes"), [this](auto* result, auto count, auto** args) {
+            if (count < 1) return TJS_E_BADPARAMCOUNT;
+            const auto name = utf8_text(*args[0]);
+            auto source = PrivateStorage::owns(name) ? memory_source(private_.read(name)) : resources_.open(name);
+            const tjs_int64 offset = count >= 2 && args[1]->Type() != tvtVoid ? static_cast<tjs_int64>(*args[1]) : 0;
+            const tjs_int64 length = count >= 3 && args[2]->Type() != tvtVoid ? static_cast<tjs_int64>(*args[2])
+                : offset >= 0 && static_cast<std::uint64_t>(offset) <= source->size()
+                    ? static_cast<tjs_int64>(source->size() - offset) : -1;
+            if (offset < 0 || length < 0 || static_cast<std::uint64_t>(offset) > source->size()
+                || static_cast<std::uint64_t>(length) > source->size() - offset || length > kResourceReadLimit)
+                TJS_eTJSError(TJS_W("Invalid or excessive resource read range"));
+            std::string bytes(static_cast<std::size_t>(length), '\0');
+            source->read(offset, bytes.data(), bytes.size());
+            if (result) *result = tTJSVariant(reinterpret_cast<const tjs_uint8*>(bytes.data()), static_cast<tjs_uint>(bytes.size()));
+            return TJS_S_OK;
+        });
+        method(storages, TJS_W("writeText"), [this](auto*, auto count, auto** args) {
+            if (count < 2) return TJS_E_BADPARAMCOUNT;
+            const auto bytes = utf8_text(*args[1]);
+            (void)decode_tjs_source(bytes);
+            private_.write(utf8_text(*args[0]), bytes);
+            return TJS_S_OK;
+        });
+        method(storages, TJS_W("writeBytes"), [this](auto*, auto count, auto** args) {
+            if (count < 2) return TJS_E_BADPARAMCOUNT;
+            const auto* octet = args[1]->AsOctetNoAddRef();
+            if (!octet) return TJS_E_INVALIDPARAM;
+            private_.write(utf8_text(*args[0]), std::string_view(reinterpret_cast<const char*>(octet->GetData()), octet->GetLength()));
+            return TJS_S_OK;
+        });
+        method(storages, TJS_W("createFolders"), [this](auto*, auto count, auto** args) {
+            if (count < 1) return TJS_E_BADPARAMCOUNT;
+            private_.create_folders(utf8_text(*args[0])); return TJS_S_OK;
+        });
+        old_text_read_ = TJSCreateTextStreamForRead;
+        old_text_write_ = TJSCreateTextStreamForWrite;
+        old_binary_read_ = TJSCreateBinaryStreamForRead;
+        old_binary_write_ = TJSCreateBinaryStreamForWrite;
+        g_text_session = this;
+        TJSCreateTextStreamForRead = [](const ttstr& name, const ttstr& mode) -> iTJSTextReadStream* {
+            if (!mode.IsEmpty()) TJS_eTJSError(TJS_W("Text stream read modes are unsupported; use explicit readText encoding"));
+            std::string bytes;
+            const int error = g_text_session->read(utf8_text(name), &bytes);
+            if (error) g_text_session->storage_failure(error);
+            return new TextReader(g_text_session->game_text(bytes, PrivateStorage::owns(utf8_text(name)) ? "utf-8" : ""));
+        };
+        TJSCreateTextStreamForWrite = [](const ttstr& name, const ttstr& mode) -> iTJSTextWriteStream* {
+            if (!mode.IsEmpty()) TJS_eTJSError(TJS_W("Private text stream modes are unsupported"));
+            const auto filename = utf8_text(name);
+            if (!PrivateStorage::owns(filename)) TJS_eTJSError(TJS_W("Text writes require System.dataPath"));
+            return new AtomicTextWriter([filename](std::string_view bytes) { g_text_session->private_.write(filename, bytes); });
+        };
+        TJSCreateBinaryStreamForRead = [](const ttstr& name, const ttstr& mode) -> tTJSBinaryStream* {
+            if (!mode.IsEmpty() && mode != TJS_W("b")) TJS_eTJSError(TJS_W("Unsupported binary stream mode"));
+            try {
+                const auto path = utf8_text(name);
+                return new BinaryReader(PrivateStorage::owns(path)
+                    ? memory_source(g_text_session->private_.read(path)) : g_text_session->resources_.open(path));
+            }
+            catch (const StorageError&) { TJS_eTJSError(TJS_W("Unable to open game binary stream")); }
+            return nullptr;
+        };
+        TJSCreateBinaryStreamForWrite = [](const ttstr&, const ttstr&) -> tTJSBinaryStream* {
+            TJS_eTJSError(TJS_W("Binary object serialization is not admitted; use Storages.writeBytes"));
+            return nullptr;
+        };
         auto* system = add_class(TJS_W("System"));
+        system->RegisterNCM(TJS_W("dataPath"), new DataPathProperty(),
+            system->GetClassName().c_str(), nitProperty, TJS_STATICMEMBER);
         method(system, TJS_W("getTickCount"), [](auto* result, auto, auto**) {
             using namespace std::chrono;
             if (result != nullptr) *result = static_cast<tjs_int64>(
@@ -399,6 +566,13 @@ private:
         });
     }
 
+    ResourceStore resources_;
+    PrivateStorage private_;
+    std::string encoding_;
+    decltype(TJSCreateTextStreamForRead) old_text_read_ = nullptr;
+    decltype(TJSCreateTextStreamForWrite) old_text_write_ = nullptr;
+    decltype(TJSCreateBinaryStreamForRead) old_binary_read_ = nullptr;
+    decltype(TJSCreateBinaryStreamForWrite) old_binary_write_ = nullptr;
     Console console_;
     tTJS* engine_ = nullptr;
     tTJSNativeClass* host_ = nullptr;
@@ -425,13 +599,13 @@ bool tjs_session_active() {
     return g_session != nullptr;
 }
 
-std::int64_t start_tjs_session(int source_kind, const std::string& source, bool deferred) {
+std::int64_t start_tjs_session(int source_kind, const std::string& source, bool deferred, const std::string& save) {
     if (source_kind < 1 || source_kind > 3 || source.empty()
         || source.find('\0') != std::string::npos) return -10;
     std::lock_guard<std::mutex> engine_lock(tjs_engine_mutex());
     if (tjs_session_active()) return -10;
     try {
-        auto session = std::make_unique<Session>(source_kind, source);
+        auto session = std::make_unique<Session>(source_kind, source, save);
         int result = session->prepare();
         if (result == 0 && !deferred) result = session->activate(1, 1);
         if (result != 0) return -result;
@@ -440,6 +614,9 @@ std::int64_t start_tjs_session(int source_kind, const std::string& source, bool 
         g_session_handle = g_next_session++;
         g_session = std::move(session);
         return static_cast<std::int64_t>(g_session_handle);
+    } catch (const StorageError& error) {
+        __android_log_print(ANDROID_LOG_ERROR, "TwinQuill/Krkr", "%s", error.what());
+        return -error.status;
     } catch (const eTJS& error) {
         Console output;
         output.ExceptionPrint(error.GetMessage().c_str());

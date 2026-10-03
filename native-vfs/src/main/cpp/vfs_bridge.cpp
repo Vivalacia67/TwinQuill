@@ -134,7 +134,7 @@ Java_io_github_twinquill_nativevfs_NativeVfs_nativeInstall(JNIEnv* env, jclass) 
     g_list_framed = env->GetStaticMethodID(
         g_backend,
         "listFramed",
-        "([B[B)[[B");
+        "([B[BI)[[B");
     g_mkdir = env->GetStaticMethodID(g_backend, "mkdir", "([B[B)I");
     g_rename = env->GetStaticMethodID(g_backend, "rename", "([B[B[B)I");
     g_delete = env->GetStaticMethodID(g_backend, "delete", "([B[B)I");
@@ -371,11 +371,11 @@ extern "C" TQ_VFS_API int tq_vfs_stat_path(
     return TQ_VFS_OK;
 }
 
-extern "C" TQ_VFS_API int tq_vfs_list(
+static int list_impl(
     const char* tree_uri_utf8,
     const char* relative_path_utf8,
     tq_vfs_list_callback callback,
-    void* user_data) {
+    void* user_data, int limit) {
     if (callback == nullptr) {
         return TQ_VFS_INVALID;
     }
@@ -387,7 +387,7 @@ extern "C" TQ_VFS_API int tq_vfs_list(
     jbyteArray tree = bytes(env, tree_uri_utf8);
     jbyteArray path = bytes(env, relative_path_utf8);
     jobjectArray names = static_cast<jobjectArray>(
-        env->CallStaticObjectMethod(g_backend, g_list_framed, tree, path));
+        env->CallStaticObjectMethod(g_backend, g_list_framed, tree, path, limit));
     env->DeleteLocalRef(tree);
     env->DeleteLocalRef(path);
     if (names == nullptr || env->GetArrayLength(names) == 0) {
@@ -409,7 +409,7 @@ extern "C" TQ_VFS_API int tq_vfs_list(
         (static_cast<std::uint32_t>(status_bytes[3]) & 0xffU);
     const int status = static_cast<int>(static_cast<std::int32_t>(unsigned_status));
     if (status != TQ_VFS_OK && status != TQ_VFS_ERROR && status != TQ_VFS_PERMISSION &&
-        status != TQ_VFS_NOT_FOUND && status != TQ_VFS_INVALID) {
+        status != TQ_VFS_NOT_FOUND && status != TQ_VFS_INVALID && status != TQ_VFS_UNSUPPORTED) {
         env->DeleteLocalRef(names);
         return TQ_VFS_ERROR;
     }
@@ -448,6 +448,16 @@ extern "C" TQ_VFS_API int tq_vfs_list(
     }
     env->DeleteLocalRef(names);
     return TQ_VFS_OK;
+}
+
+extern "C" TQ_VFS_API int tq_vfs_list(const char* tree, const char* path,
+    tq_vfs_list_callback callback, void* data) {
+    return list_impl(tree, path, callback, data, 0x7fffffff);
+}
+
+extern "C" TQ_VFS_API int tq_vfs_list_bounded(const char* tree, const char* path,
+    tq_vfs_list_callback callback, void* data) {
+    return list_impl(tree, path, callback, data, 4096);
 }
 
 extern "C" TQ_VFS_API int tq_vfs_mkdir(

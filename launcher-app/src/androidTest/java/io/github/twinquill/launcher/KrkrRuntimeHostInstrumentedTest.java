@@ -64,21 +64,28 @@ public final class KrkrRuntimeHostInstrumentedTest {
     private Activity runtime;
     private KrkrRuntimeRenderer renderer;
     private KrkrGLSurfaceView surface;
+    private boolean correctProcess;
     private final List<File> fixtures = new ArrayList<>();
+    private final java.util.Map<String,android.net.Uri> m3Grants = new java.util.LinkedHashMap<>();
 
     @Before
     public void setUp() {
         instrumentation = InstrumentationRegistry.getInstrumentation();
+        correctProcess = "io.github.twinquill:krkr".equals(instrumentation.getProcessName());
+        assertEquals("Rebuild and reinstall the test APK with -PtwinquillKrkrRuntimeInstrumentation=true",
+            "io.github.twinquill:krkr", instrumentation.getProcessName());
         context = instrumentation.getTargetContext();
     }
 
     @After
     public void tearDown() throws Exception {
+        if (!correctProcess) return;
         if (runtime != null && !runtime.isFinishing() && !runtime.isDestroyed()) {
             instrumentation.runOnMainSync(runtime::onBackPressed);
         }
         waitForScriptsReleased();
         for (File fixture : fixtures) deleteFixture(fixture);
+        for (String root : new ArrayList<>(m3Grants.keySet())) revokeM3(root,m3Grants.get(root));
     }
 
     @Test
@@ -695,6 +702,216 @@ public final class KrkrRuntimeHostInstrumentedTest {
         } finally { unblock.countDown(); session.close(); }
         waitForScriptsReleased();
         assertEquals(releases + 1, scriptStats()[2]);
+    }
+
+    @Test
+    public void m3LooseAndCompressedResourcesMatchAcrossLocalAndSaf() throws Exception {
+        for (boolean saf : new boolean[] {false, true}) {
+            for (String asset : new String[] {"m3-loose", "m3-compressed"}) {
+                KrkrScriptSession session;
+                if (saf) session = launchM3Saf(asset, "m3-" + asset + "-" + android.os.SystemClock.elapsedRealtime());
+                else {
+                    File directory = fixture(asset);
+                    copyM3Asset(asset, directory);
+                    File entry = new File(directory, asset.equals("m3-loose") ? "startup.tjs" : "data.xp3");
+                    session = launchM3Storage(asset.equals("m3-loose") ? 2 : 3, entry.getCanonicalPath(), directory.getName());
+                }
+                waitForGameColor(16, 16, 50, 90, 220);
+                waitForGameColor(96, 24, 20, 180, 80);
+                waitForGameColor(160, 100, 108, 34, 56);
+                assertEquals(0, session.poll(0));
+                pressKey(KeyEvent.KEYCODE_ENTER, 0);
+                waitForScriptsReleased();
+                runtime = null;
+            }
+        }
+    }
+
+    @Test
+    public void m3SafPatchesAndExplicitCp932ResolveCorrectly() throws Exception {
+        for (String root : new String[] {"m3-patches", "m3-cp932"}) {
+            KrkrScriptSession session = launchM3Saf(root, "m3-" + root + "-" + android.os.SystemClock.elapsedRealtime());
+            if (root.equals("m3-patches")) waitForGameColor(160, 100, 34, 136, 68);
+            else waitForGameColor(160, 100, 102, 51, 153);
+            assertEquals(0, session.poll(0));
+            pressKey(KeyEvent.KEYCODE_ENTER, 0);
+            waitForScriptsReleased(); runtime = null;
+        }
+    }
+
+    @Test
+    public void m3RejectsUnconfiguredAndMalformedLegacyEncoding() throws Exception {
+        File directory = fixture("m3-encoding");
+        copyM3Asset("m3-cp932", directory);
+        File config = new File(directory, "twinquill-krkr.conf");
+        assertTrue(config.delete());
+        try {
+            KrkrScriptSession.start(3, new File(directory,"data.xp3").getCanonicalPath());
+            throw new AssertionError("Legacy encoding was guessed without configuration");
+        } catch (KrkrScriptSession.StartupException expected) { assertEquals(20, expected.diagnostic); }
+        File startup = new File(directory,"startup.tjs");
+        Files.write(startup.toPath(),new byte[] {(byte)0x81});
+        Files.write(config.toPath(),"textEncoding=cp932\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        try {
+            KrkrScriptSession.start(2,startup.getCanonicalPath());
+            throw new AssertionError("Malformed CP932 was replaced silently");
+        } catch (KrkrScriptSession.StartupException expected) { assertEquals(20, expected.diagnostic); }
+        Files.write(config.toPath(),"textEncoding=cp932\ntextEncoding=utf-8\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        try {
+            KrkrScriptSession.start(2,startup.getCanonicalPath());
+            throw new AssertionError("Duplicate configuration was accepted");
+        } catch (KrkrScriptSession.StartupException expected) { assertEquals(20, expected.diagnostic); }
+        waitForScriptsReleased();
+    }
+
+    @Test
+    public void m3PrivateSavesPersistAcrossVmRestartAndKeepOnsLayout() throws Exception {
+        File directory = fixture("m3-save");
+        copyM3Asset("m3-save",directory);
+        String id = directory.getName();
+        File save = new File(context.getFilesDir(),"saves/"+id);
+        assertTrue(save.mkdirs()); fixtures.add(save);
+        File legacy = new File(save,"ons-legacy.dat");
+        Files.write(legacy.toPath(),"ONS".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        for (int run=1;run<=2;++run) {
+            KrkrScriptSession session = launchM3Storage(2,new File(directory,"startup.tjs").getCanonicalPath(),id);
+            if(run==1) waitForGameColor(160,100,51,102,204);
+            else waitForGameColor(160,100,34,170,102);
+            assertEquals(0,session.poll(0));
+            assertEquals(String.valueOf(run),new String(Files.readAllBytes(new File(save,"krkr/checks/counter.tjs").toPath()),java.nio.charset.StandardCharsets.UTF_8));
+            assertEquals("ONS",new String(Files.readAllBytes(legacy.toPath()),java.nio.charset.StandardCharsets.UTF_8));
+            pressKey(KeyEvent.KEYCODE_ENTER,0);
+            waitForScriptsReleased(); runtime=null;
+        }
+        String other = id+"-other";
+        File otherSave = new File(context.getFilesDir(),"saves/"+other); fixtures.add(otherSave);
+        KrkrScriptSession session=launchM3Storage(2,new File(directory,"startup.tjs").getCanonicalPath(),other);
+        waitForGameColor(160,100,51,102,204);
+        assertEquals("1",new String(Files.readAllBytes(new File(otherSave,"krkr/checks/counter.tjs").toPath()),java.nio.charset.StandardCharsets.UTF_8));
+        assertEquals(0,session.poll(0));
+    }
+
+    @Test
+    public void m3RejectsSaveDirectorySymlinkToAnotherGame() throws Exception {
+        File directory = fixture("m3-save-link");
+        File startup = new File(directory, "startup.tjs");
+        Files.write(startup.toPath(), "var accepted=true;".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        String id = directory.getName();
+        File other = new File(context.getFilesDir(), "saves/" + id + "-other");
+        assertTrue(other.mkdirs());
+        fixtures.add(other);
+        File link = new File(context.getFilesDir(), "saves/" + id);
+        Files.createSymbolicLink(link.toPath(), other.toPath());
+        try {
+            KrkrRuntimeRequest.fromBroker(context, 2, startup.getCanonicalPath(), link.getPath(), id);
+            throw new AssertionError("Another game's save directory was admitted through a symbolic link");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("game-private"));
+        } finally {
+            Files.deleteIfExists(link.toPath());
+        }
+        assertTrue(other.isDirectory());
+    }
+
+    @Test
+    public void m3FailedTextSerializationKeepsLastValidPrivateFile() throws Exception {
+        File directory = fixture("m3-atomic");
+        Files.write(new File(directory,"large.bin").toPath(),new byte[1024*1024]);
+        File startup = new File(directory,"startup.tjs");
+        Files.write(startup.toPath(),
+            ("var p=System.dataPath+'last.tjs'; Storages.writeText(p,'GOOD');"
+            + "var bytes=Storages.readBytes('large.bin'); var a=[];for(var i=0;i<32;++i)a[i]=bytes;"
+            + "var failed=false;try{(Array.saveStruct incontextof a)(p);}catch(e){failed=e.message.indexOf('32 MiB')>=0;}"
+            + "if(!failed||Storages.readText(p)!='GOOD')throw 'Partial save committed';").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        File save = new File(context.getFilesDir(),"saves/"+directory.getName());
+        assertTrue(save.mkdirs()); fixtures.add(save);
+        KrkrScriptSession session=KrkrScriptSession.start(2,startup.getCanonicalPath(),save.getCanonicalPath());
+        try { assertEquals(0,session.poll(0)); assertEquals("GOOD",new String(Files.readAllBytes(new File(save,"krkr/last.tjs").toPath()),java.nio.charset.StandardCharsets.UTF_8)); }
+        finally { session.close(); }
+        waitForScriptsReleased();
+    }
+
+    @Test
+    public void m3BoundsUnknownSizePipeAndRejectsRevokedArchiveCache() throws Exception {
+        File many = fixture("m3-many-local");
+        File startup = new File(many, "startup.tjs");
+        Files.write(startup.toPath(), "var accepted=true;".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        for (int i = 0; i < 4096; ++i) assertTrue(new File(many, "folder-" + i).mkdir());
+        try {
+            KrkrScriptSession.start(2, startup.getCanonicalPath());
+            throw new AssertionError("Excessive local directory entries were admitted");
+        } catch (KrkrScriptSession.StartupException expected) {
+            assertEquals(20, expected.diagnostic);
+        }
+        io.github.twinquill.nativevfs.NativeVfs.install(context);
+        for (String root : new String[] {"m3-large","m3-many"}) {
+        android.net.Uri large = grantM3(root);
+        try {
+            try {
+                KrkrScriptSession.start(1,large.toString());
+                throw new AssertionError("Oversized unknown-size pipe was admitted");
+            } catch (KrkrScriptSession.StartupException expected) { assertEquals(20,expected.diagnostic); }
+        } finally { revokeM3(root,large); }
+        }
+        File[] spoolLeaks = new File(context.getCacheDir(), "native-vfs")
+            .listFiles((parent, name) -> name.startsWith("tq-vfs-"));
+        assertTrue("Rejected SAF stream leaked its spool", spoolLeaks != null && spoolLeaks.length == 0);
+        android.net.Uri tree=grantM3("m3-revoke");
+        KrkrScriptSession session=KrkrScriptSession.start(1,tree.toString());
+        try {
+            assertEquals(0,session.poll(0));
+            revokeM3("m3-revoke",tree);
+            session.event(KrkrScriptSession.EVENT_KEY,0,66,0);
+            long deadline=android.os.SystemClock.uptimeMillis()+5000;
+            while(session.poll(0)==0&&android.os.SystemClock.uptimeMillis()<deadline)Thread.sleep(25);
+            assertEquals("cached archive concealed grant revocation",40,session.poll(0));
+        } finally {session.close();}
+        waitForScriptsReleased();
+        try {
+            KrkrScriptSession.start(1,tree.toString());
+            throw new AssertionError("Revoked archive grant was reused");
+        } catch (KrkrScriptSession.StartupException expected) { assertEquals(40,expected.diagnostic); }
+    }
+
+    private KrkrScriptSession launchM3Saf(String root,String id) throws Exception {
+        io.github.twinquill.nativevfs.NativeVfs.install(context);
+        return launchM3Storage(1,grantM3(root).toString(),id);
+    }
+    private android.net.Uri grantM3(String root) {
+        Bundle grant=context.getContentResolver().call("io.github.twinquill.test.grants","grant",root,null);
+        android.net.Uri tree=grant.getParcelable("uri");
+        context.getContentResolver().takePersistableUriPermission(tree,Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        m3Grants.put(root,tree);
+        return tree;
+    }
+    private void revokeM3(String root,android.net.Uri tree) {
+        m3Grants.remove(root);
+        context.getContentResolver().releasePersistableUriPermission(tree,Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        context.getContentResolver().call("io.github.twinquill.test.grants","revoke",root,null);
+    }
+    private KrkrScriptSession launchM3Storage(int kind,String source,String id) throws Exception {
+        KrkrRuntimeRequest request=KrkrRuntimeRequest.fromBroker(context,kind,source,
+            new File(context.getFilesDir(),"saves/"+id).getPath(),id);
+        File saveDirectory = new File(request.saveDirectory());
+        if (!fixtures.contains(saveDirectory)) fixtures.add(saveDirectory);
+        KrkrScriptSession session=KrkrScriptSession.prepare(kind,source,request.saveDirectory());
+        request.withScriptSession(session);
+        Intent intent=new Intent(context,KrkrRuntimeActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        request.putInto(intent);
+        runtime=instrumentation.startActivitySync(intent);
+        renderer=renderer(runtime); surface=surface(runtime);
+        waitForCounter(KrkrRuntimeRenderer.COUNTER_FRAME_COUNT,1);
+        return session;
+    }
+    private void copyM3Asset(String name,File destination) throws Exception {
+        android.content.res.AssetManager assets=instrumentation.getContext().getAssets();
+        String[] children=assets.list(name);
+        if(children.length>0) {
+            assertTrue(destination.isDirectory()||destination.mkdirs());
+            for(String child:children)copyM3Asset(name+"/"+child,new File(destination,child));
+        } else {
+            try(InputStream input=assets.open(name)){Files.write(destination.toPath(),input.readAllBytes());}
+        }
     }
 
     private File fixture(String suffix) throws Exception {

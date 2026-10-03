@@ -3,6 +3,9 @@
 更新：2026-10-03。分支：`refactor/krkr-direct-integration`。
 M2 基础显示已于 2026-10-03 通过用户模拟器验收；**尚未执行完整 KAG 框架**。
 
+本文件保留 M2 签收时的接口范围；M3 后续存储/编码/序列化能力见
+[存储契约](KRKR_M3_STORAGE_CONTRACT.md) 与 [M3 交接](KRKR_M3_HANDOFF.md)。
+
 ## 固定的框架和源码
 
 - 主要核心保持 Kirikiroid2 `d1c2b1259423542c893e0b65eaeb46c848848f2b`。

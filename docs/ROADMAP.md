@@ -1,6 +1,6 @@
 # TwinQuill：Krkr 直接集成路线图
 
-更新日期：2026-10-03。适用分支：`refactor/krkr-direct-integration`。M0、M1、M2 已验收；M2 代码与签收记录一并提交，后续进入 M3。
+更新日期：2026-10-03。适用分支：`refactor/krkr-direct-integration`。M0–M3 已验收，M2 提交为 `db8f24b`；用户于 2026-10-03 确认 M3 测试完成，继续 M4。
 
 ## 目标与范围
 
@@ -16,16 +16,16 @@ ONS 融合已完成，按用户确认作为本分支的现有基线。本分支�
 
 | 能力 | 当前证据与边界 |
 | --- | --- |
-| 双引擎路由 | `GameDetector`、`EngineRouter`、`EngineLaunchRequest` 已存在；冲突或未知目录可选择引擎。XP3 检测目前只覆盖受支持的原始索引。 |
+| 双引擎路由 | `GameDetector`、`EngineRouter`、`EngineLaunchRequest` 已存在；冲突或未知目录可选择引擎。XP3 检测与读取共用边界矩阵，支持标准未保护的 raw/zlib 及续索引；探测不校验所有资源内容。 |
 | 游戏库 | Compose + Room，保存目录授权、引擎覆盖、封面和最近启动时间；支持从列表删除。重新授权、重命名、存档管理界面仍需完善。 |
 | ONS 接入 | `engine-ons/` 已融合；运行参数传入游戏根目录和 `--save-dir`，存档目录按游戏分配。作为持续回归基线。 |
 | Krkr M0 | 源码与工具链、隔离进程、SAF 桥接、原始未保护 XP3 的根 `startup.tjs`、Cocos 图像/数学子集及 GLES 测试宿主，已验收。 |
 | Krkr M1 | Unicode TJS 启动、持久会话、基础 `Scripts/Storages/System/Debug`、输入和生命周期回调、错误恢复；Home/最近任务返回已修复并验收。 |
 | Krkr M2 | 已固定 KAG3 用于审计；标准 Window/Layer/Font 基础显示、PNG/JPEG、中文文字、合成、输入、Timer/AsyncTrigger、宿主时序及有界退出已于 2026-10-03 通过模拟器验收。支持子集见 M2 交接。 |
-| 存储基础 | `native-vfs` 提供读、seek、stat、list 等能力；有目录变更接口，但当前文件打开仅支持读。Krkr 仅接入有限脚本读取。 |
-| 存档基础 | 已分配并验证 `filesDir/saves/<game-id>`；ONS 使用该目录。Krkr 目前只接收目录参数，尚未接入实际存档写入和读档。 |
+| 存储基础 | M3 统一松散/SAF/XP3、子目录、补丁优先级、搜索路径和有界缓存；严格 Unicode 与显式 CP932 配置已接入。游戏介质只读。 |
+| 存档基础 | ONS 保持 `filesDir/saves/<game-id>` 布局；M3 在其 `krkr/` 子目录实现原子文本/字节写入与序列化读回。KAG 游戏状态存读档仍属 M5。 |
 
-M1 的 `TwinQuillHost` 和彩色方块是验证接口；M2 新场景通过标准 `Window/Layer` 显示实际图片与文字。KAG 游戏框架、通用资源系统及 Krkr 存档运行能力仍按后续阶段推进；受控绑定与 Android 基础后端不等同于完整引擎兼容。
+M1 的 `TwinQuillHost` 和彩色方块是验证接口；M2 新场景通过标准 `Window/Layer` 显示实际图片与文字。M3 已提供通用资源及私有写入基础；KAG 游戏框架与 Krkr 游戏状态存读档仍按后续阶段推进；受控绑定与 Android 基础后端不等同于完整引擎兼容。
 
 已验收提交：M0 `6bd353b`；M1 启动入口 `001ddc6`、持久会话 `ed42b76`、后台返回修复与签收 `6f42083`。M1 签收时的自动化基线为 Python 89 项、JVM 9 项、默认设备测试 21 项、Krkr 隔离测试 7 项全部通过，Debug/Release 和 APK 检查通过，lint 0 错误、7 警告。M2 新增显示、事件和边界覆盖，最新结果见其交接文档。
 
@@ -36,7 +36,7 @@ M1 的 `TwinQuillHost` 和彩色方块是验证接口；M2 新场景通过标准
 | M0 | 源码、构建、进程隔离、存储与渲染验证基础 | — | 已验收 |
 | M1 | 正式 TJS 入口与持久脚本会话（历史 Task 3） | M0 | 已验收 |
 | M2 | TVP 宿主、Window/Layer、事件循环与基础绘制 | M1 | 已验收 |
-| M3 | 通用资源存储、XP3、编码及私有写入基础 | M2 | 待开始 |
+| M3 | 通用资源存储、XP3、编码及私有写入基础 | M2 | 已验收 |
 | M4 | KAG 框架和最小可运行游戏 | M2、M3 | 待开始 |
 | M5 | Krkr 游戏内存档、读档与状态恢复 | M3、M4 | 待开始 |
 | M6 | 媒体、图像扩展及常见开源插件兼容 | M4、M5 | 待开始 |
@@ -62,7 +62,7 @@ M1 的 `TwinQuillHost` 和彩色方块是验证接口；M2 新场景通过标准
 
 ## M3：资源系统、XP3 与编码
 
-主要位置：`krkr_vfs_storage.*`、`krkr_xp3.*`、`native-vfs/`、`Xp3ArchiveProbe.java`；参考上游 `StorageIntf`、`StorageImpl`、`XP3Archive`。
+主要位置：`krkr_resource.*`、`krkr_resource_backend.cpp`、`krkr_xp3.*`、`krkr_game_text.*`、`krkr_private_storage.*`、`native-vfs/`、`Xp3ArchiveProbe.java`；参考上游 `StorageIntf`、`StorageImpl`、`XP3Archive`。
 
 - **M3.1 统一 TVP 存储介质。** 将松散文件、SAF 和 XP3 纳入上游兼容的流与路径解析，支持图片、字体、脚本及媒体资源；实现子目录、搜索路径、归档成员查询及缓存。非 seekable Provider、权限撤销和大文件读取必须有明确处理。
 - **M3.2 完成标准 XP3。** 从当前“仅原始根 startup”扩展到多成员、子目录、压缩索引及压缩段；实现多归档、补丁归档和松散文件的搜索顺序，并依据选定上游语义固定回归样例。同步探测器与实际加载器，避免识别通过但引擎找错归档。
@@ -71,7 +71,11 @@ M1 的 `TwinQuillHost` 和彩色方块是验证接口；M2 新场景通过标准
 
 **交付与验收：** 存储/路径契约、归档与编码夹具、`KRKR_M3_HANDOFF.md`。同一场景从松散目录和压缩 XP3，经 SAF 均能读到相同资源；补丁覆盖顺序正确；大文件、损坏索引、解压膨胀和权限失效不会导致越界或无限资源占用；私有写入失败不破坏上一份有效数据。
 
-本阶段覆盖标准未保护 XP3。需要专用过滤器的包单独列入 M6 的兼容评估；未知保护格式应报告不支持。
+M3.1–M3.4 已实现，支持与额度见 [存储契约](KRKR_M3_STORAGE_CONTRACT.md)，
+自动化证据及完整模拟器验收见 [M3 交接](KRKR_M3_HANDOFF.md)。
+验收步骤 2 发现后台返回时重复应用入口遮挡游戏；已修复并加入真实启动任务回归，
+用户已完成重新验收并授权继续 M4。
+本阶段覆盖标准未保护 XP3。需要专用过滤器的包单独列入 M6 的兼容评估；未知保护格式报告不支持。
 
 ## M4：KAG 框架与最小游戏
 
@@ -136,8 +140,8 @@ M1 的 `TwinQuillHost` 和彩色方块是验证接口；M2 新场景通过标准
 
 ## 下一步执行入口
 
-当前入口为 **M3.1 通用资源存储**。以已验收 M2 为基线，统一松散/SAF/XP3
-资源流、路径和搜索顺序，随后完成压缩归档、显式编码配置和私有原子写入。
-M3 开发持续保持标准显示、生命周期和 ONS 回归，完成后提供专门交接和模拟器验收。
+当前入口为 **M3 模拟器验收**，按 [M3 交接](KRKR_M3_HANDOFF.md) 检查
+松散/压缩场景一致性、补丁覆盖、CP932 和每游戏私有持久写入。
+验收签收后提交 M3，再进入 **M4.1 KAG 完整启动链**；保留 M2 显示、生命周期与 ONS 回归。
 
 相关记录：[架构](ARCHITECTURE.md)、[M0 交接](KRKR_M0_HANDOFF.md)、[M1 交接与验收](KRKR_M1_TJS_ENTRY.md)、[源码政策](SOURCE_POLICY.md)。

@@ -55,6 +55,7 @@ set(TJS2_PATCHES
     "${TWINQUILL_ROOT}/vendor/patches/kirikiroid2/0005-tjs-shutdown-finalizer-cleanup.patch"
     "${TWINQUILL_ROOT}/vendor/patches/kirikiroid2/0006-android-basic-visual-bindings.patch"
     "${TWINQUILL_ROOT}/vendor/patches/kirikiroid2/0007-tvp-async-worker-admission.patch"
+    "${TWINQUILL_ROOT}/vendor/patches/kirikiroid2/0008-tjs-text-stream-abort.patch"
 )
 file(REMOVE_RECURSE "${KIRIKIROID2_BUILD_DIR}")
 file(MAKE_DIRECTORY "${TJS2_BUILD_DIR}")
@@ -186,6 +187,10 @@ add_library(twinquill_engine_krkr SHARED
     krkr_tvp_events.cpp
     krkr_tvp_visual.cpp
     ${TVP_HOST_SOURCES}
+    krkr_resource.cpp
+    krkr_resource_backend.cpp
+    krkr_private_storage.cpp
+    krkr_game_text.cpp
     krkr_xp3.cpp
     krkr_vfs_storage.cpp
 )
@@ -193,6 +198,7 @@ target_compile_features(twinquill_engine_krkr PRIVATE cxx_std_17)
 target_compile_definitions(twinquill_engine_krkr PRIVATE TWINQUILL_ANDROID_BASIC_TVP=1)
 target_include_directories(twinquill_engine_krkr BEFORE PRIVATE
     "${CMAKE_CURRENT_LIST_DIR}/tvp"
+    "${KRKR_ZLIB_DIR}"
     "${TVP_TIMER_BUILD_DIR}"
     "${KRKR2_CORE}/visual"
 )
@@ -217,6 +223,15 @@ target_include_directories(twinquill_krkr_tjs_text_test PRIVATE "${CMAKE_CURRENT
 target_compile_features(twinquill_krkr_tjs_text_test PRIVATE cxx_std_17)
 target_link_options(twinquill_krkr_tjs_text_test PRIVATE -Wl,-z,max-page-size=16384)
 
+add_executable(twinquill_krkr_storage_test EXCLUDE_FROM_ALL
+    "${TWINQUILL_ROOT}/tests/native/krkr_storage_test.cpp"
+    krkr_resource.cpp krkr_xp3.cpp krkr_private_storage.cpp krkr_game_text.cpp krkr_tjs_text.cpp
+)
+target_include_directories(twinquill_krkr_storage_test PRIVATE "${CMAKE_CURRENT_LIST_DIR}")
+target_compile_features(twinquill_krkr_storage_test PRIVATE cxx_std_17)
+target_link_libraries(twinquill_krkr_storage_test PRIVATE twinquill_krkr_zlib)
+target_link_options(twinquill_krkr_storage_test PRIVATE -static-libstdc++ -Wl,-z,max-page-size=16384)
+
 # Every engine link runs the dynamic boundary checker against the exact
 # generated Ninja closure and final shared object.  The executable path and
 # readelf tool are explicit so an ambient host tool cannot silently bypass it.
@@ -238,4 +253,5 @@ add_dependencies(twinquill_engine_krkr
 )
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_dependencies(twinquill_engine_krkr twinquill_krkr_tjs_text_test)
+    add_dependencies(twinquill_engine_krkr twinquill_krkr_storage_test)
 endif()

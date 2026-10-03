@@ -4,6 +4,8 @@
  */
 package io.github.twinquill.engine.krkr;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -28,6 +30,7 @@ final class KrkrScriptSession {
     private final long handle;
     private final int sourceKind;
     private final String source;
+    private final String saveDirectory;
     private final ThreadPoolExecutor worker;
     private final Object queueLock = new Object();
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -37,7 +40,8 @@ final class KrkrScriptSession {
     private final AtomicLong droppedEvents = new AtomicLong();
     private volatile int workerDiagnostic;
 
-    private KrkrScriptSession(long handle, int sourceKind, String source, boolean deferred) {
+    private KrkrScriptSession(long handle, int sourceKind, String source, boolean deferred, String saveDirectory) {
+        this.saveDirectory = saveDirectory;
         this.handle = handle;
         this.sourceKind = sourceKind;
         this.source = source;
@@ -50,15 +54,30 @@ final class KrkrScriptSession {
 
     /** Called from the broker startup worker (or an instrumentation worker). */
     static KrkrScriptSession start(int sourceKind, String source) {
-        return create(sourceKind, source, false);
+        return create(sourceKind, source, false, "");
     }
 
     /** Reserve and decode the source, leaving startup for the ready Android host. */
     static KrkrScriptSession prepare(int sourceKind, String source) {
-        return create(sourceKind, source, true);
+        return create(sourceKind, source, true, "");
     }
 
-    private static KrkrScriptSession create(int sourceKind, String source, boolean deferred) {
+    static KrkrScriptSession start(int sourceKind, String source, String saveDirectory) {
+        return create(sourceKind, source, false, saveDirectory);
+    }
+
+    static KrkrScriptSession prepare(int sourceKind, String source, String saveDirectory) {
+        return create(sourceKind, source, true, saveDirectory);
+    }
+
+    private static KrkrScriptSession create(int sourceKind, String source, boolean deferred, String saveDirectory) {
+        if (!saveDirectory.isEmpty()) {
+            try {
+                saveDirectory = new File(saveDirectory).getCanonicalPath();
+            } catch (IOException exception) {
+                throw new StartupException(41);
+            }
+        }
         System.loadLibrary("twinquill_engine_krkr");
         for (KrkrScriptSession previous : LIVE.values()) {
             if (previous.closed.get()) {
@@ -72,10 +91,10 @@ final class KrkrScriptSession {
                 }
             }
         }
-        long handle = deferred ? nativePrepare(sourceKind, source) : nativeStart(sourceKind, source);
+        long handle = deferred ? nativePrepare(sourceKind, source, saveDirectory) : nativeStart(sourceKind, source, saveDirectory);
         if (handle <= 0) throw new StartupException(handle < 0 ? (int) -handle : 21);
         try {
-            KrkrScriptSession session = new KrkrScriptSession(handle, sourceKind, source, deferred);
+            KrkrScriptSession session = new KrkrScriptSession(handle, sourceKind, source, deferred, saveDirectory);
             LIVE.put(handle, session);
             return session;
         } catch (RuntimeException | Error exception) {
@@ -93,7 +112,8 @@ final class KrkrScriptSession {
     }
 
     boolean matches(KrkrRuntimeRequest request) {
-        return sourceKind == request.sourceKind() && source.equals(request.source());
+        return sourceKind == request.sourceKind() && source.equals(request.source())
+            && (saveDirectory.isEmpty() || saveDirectory.equals(request.saveDirectory()));
     }
 
     long handle() { return handle; }
@@ -182,9 +202,17 @@ final class KrkrScriptSession {
         }
     }
 
-    private static native long nativeStart(int sourceKind, String source);
+    // The platform mapping is explicit CP932, with no replacement characters or guessing.
+    private static String decodeCp932(byte[] bytes) throws java.nio.charset.CharacterCodingException {
+        return java.nio.charset.Charset.forName("windows-31j").newDecoder()
+            .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+            .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+            .decode(java.nio.ByteBuffer.wrap(bytes)).toString();
+    }
+
+    private static native long nativeStart(int sourceKind, String source, String saveDirectory);
     static native void nativeSetAssets(android.content.res.AssetManager assets);
-    private static native long nativePrepare(int sourceKind, String source);
+    private static native long nativePrepare(int sourceKind, String source, String saveDirectory);
     static native int nativeActivate(long handle, int width, int height);
     private static native void nativeCancel(long handle);
     static native int nativeEvent(long handle, int kind, double[] args);

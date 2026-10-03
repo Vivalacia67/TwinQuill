@@ -75,6 +75,15 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // A launcher intent can arrive above a running engine when the task
+        // was originally opened by an explicit intent (for example, adb).
+        // Dismiss that duplicate entry so the existing game resumes intact.
+        if (!isTaskRoot && intent.action == Intent.ACTION_MAIN &&
+            intent.hasCategory(Intent.CATEGORY_LAUNCHER)
+        ) {
+            finish()
+            return
+        }
         enableEdgeToEdge()
         repository = GameRepository(this)
         setContent {
@@ -86,11 +95,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        repository.refreshPermissions()
+        if (::repository.isInitialized) repository.refreshPermissions()
     }
 
     override fun onDestroy() {
-        repository.close()
+        if (::repository.isInitialized) repository.close()
         super.onDestroy()
     }
 }

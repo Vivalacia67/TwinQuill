@@ -21,14 +21,21 @@ the admitted `Scripts`, `Storages`, `System`, and `Debug` native-class subset.
 `TwinQuillHost` is a first-party callback/color extension for the existing GLES
 test surface; KAG/game rendering is later work.
 
+M2 added standard Window/Layer/Font display and Timer/AsyncTrigger scheduling.
+M3, awaiting simulator acceptance, unifies loose/SAF/XP3 resources, compressed
+and chained XP3 indexes, search ordering, explicit CP932, and atomic private
+writes under `filesDir/saves/<game-id>/krkr/`. See the
+[M3 storage contract](KRKR_M3_STORAGE_CONTRACT.md) for format and memory limits.
+Complete KAG execution and game-state save/load remain M4/M5 work.
+
 ## Module graph
 
 - `launcher-app` packages the application and owns the Compose/Room game
   library, directory grants, and engine routing.
 - `engine-api` defines detection, launch requests, and structured results.
 - `native-vfs` provides read-only Krkr SAF startup and subsequent script reads via
-  `tqsaf`/`native-vfs`; generic media registration and writable/save
-  capabilities remain future work.
+  `tqsaf`/`native-vfs`. M3 adds bounded seekable resource access and directory
+  enumeration; game media stays read-only, with separate private save streams.
 - `engine-ons` builds ONScripterYuri, SDL2, FreeType, Lua, bzip2, and selected
   codecs from pinned source.
 - `engine-krkr` currently builds the Kirikiroid2 TJS2 core and the exact krkrz
@@ -68,8 +75,10 @@ silent exception so script catch blocks cannot absorb cancellation. Script, synt
 and text errors return `SCRIPT_ERROR`; SAF permission/VFS errors retain their
 existing result categories. Storage names are relative to the game root; traversal,
 absolute paths, NULs, and canonical paths escaping through symlinks are rejected.
-Writable Krkr save-media, broader KAG/Cocos rendering, media, and playable support
-remain future work. See `KRKR_M1_TJS_ENTRY.md` for the API subset and checks.
+M3 maps `System.dataPath` to game-private atomic text/byte streams; broader KAG
+rendering, game-state saving and media playback remain later work. Historical
+M1 API checks are in `KRKR_M1_TJS_ENTRY.md`; current storage is documented in
+`KRKR_M3_STORAGE_CONTRACT.md`.
 
 M2 admits the pinned Window/Layer/Font TJS bindings and upstream Timer and
 AsyncTrigger bindings. An Android backend supplies a bounded layer tree,
@@ -105,11 +114,11 @@ runtime must have PT_LOAD alignment at least 16 KiB (0x4000); the only 4 KiB
 (0x1000) exception is a validated ELF32/EM_ARM
 `lib/armeabi-v7a/libc++_shared.so` from that pinned NDK.
 
-## M0 XP3 boundary
+## XP3 storage
 
-The M0 XP3 reader accepts the standard header and `File`, `info`, `segm`, and
-`adlr` chunk layout with strict bounds and size limits. It locates only a root
-`startup.tjs` in raw, unprotected segments. It explicitly rejects compressed
-indices or segments, protected files, malformed chunk sizes, oversized startup
-scripts, and unsupported names. Full upstream-compatible archive search,
-compression, filters, and plugin behavior belong to M3.
+M0 initially admitted only a root startup script in raw, unprotected XP3.
+M3 replaces that startup-only path with bounded multi-member/subdirectory
+resources, raw/zlib and chained indexes, mixed segments, deterministic archive
+search, and metadata-only launcher detection. Dedicated filters and plugins
+remain M6 work; supported formats and limits are recorded in
+[the M3 storage contract](KRKR_M3_STORAGE_CONTRACT.md).

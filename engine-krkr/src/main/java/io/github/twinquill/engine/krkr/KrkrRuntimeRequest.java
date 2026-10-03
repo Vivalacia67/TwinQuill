@@ -119,8 +119,11 @@ final class KrkrRuntimeRequest {
         if (gameId == null || !gameId.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,127}")) {
             throw new IllegalArgumentException("Krkr gameId is not a safe path segment");
         }
-        File saveBase = new File(context.getFilesDir(), "saves").getCanonicalFile();
-        File expectedSave = new File(saveBase, gameId).getCanonicalFile();
+        File saveBase = new File(context.getFilesDir().getCanonicalFile(), "saves");
+        if (!saveBase.getCanonicalFile().equals(saveBase)) {
+            throw new IllegalArgumentException("Krkr save base must not be a symbolic link");
+        }
+        File expectedSave = new File(saveBase, gameId);
         File requestedSave = new File(
             saveDirectory == null ? "" : saveDirectory
         ).getCanonicalFile();

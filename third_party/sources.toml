@@ -17,6 +17,7 @@ patches = [
     "vendor/patches/kirikiroid2/0005-tjs-shutdown-finalizer-cleanup.patch",
     "vendor/patches/kirikiroid2/0006-android-basic-visual-bindings.patch",
     "vendor/patches/kirikiroid2/0007-tvp-async-worker-admission.patch",
+    "vendor/patches/kirikiroid2/0008-tjs-text-stream-abort.patch",
 ]
 patch_sha256 = [
     "49dd651830e8a3ee2d8c3e776c1335435e9228b115d2f333338c84e70e71b4ae",
@@ -26,6 +27,7 @@ patch_sha256 = [
     "b49cf0130e834c2410b1dc16fb3cc36e9a252d564a666b9c9b311c2dfdca43ee",
     "0b379abffc7abc917e90fb030db83927999bdc53a8e4b4f8f788a1dfdfe050fe",
     "236cb2f05da0fb4fb6e345237701edeec6d76f6c589057cea8a16075bc89af2b",
+    "be1f5624d1096f7425bb38f870c68230c6afbf18f4540efceb841bb376ac81d4",
 ]
 
 [[sources]]

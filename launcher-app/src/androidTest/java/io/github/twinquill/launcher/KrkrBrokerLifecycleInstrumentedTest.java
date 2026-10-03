@@ -40,6 +40,8 @@ public final class KrkrBrokerLifecycleInstrumentedTest {
     @Before
     public void setUp() {
         instrumentation = InstrumentationRegistry.getInstrumentation();
+        assertEquals("Rebuild and reinstall the test APK with -PtwinquillKrkrRuntimeInstrumentation=true",
+            "io.github.twinquill:krkr", instrumentation.getProcessName());
         context = instrumentation.getTargetContext();
     }
 

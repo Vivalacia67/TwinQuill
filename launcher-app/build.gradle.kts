@@ -17,6 +17,7 @@ val krkrRuntimeTestClasses = listOf(
 ).joinToString(",")
 
 android {
+    sourceSets.getByName("androidTest").assets.srcDir(rootProject.file("tests/fixtures/krkr-m3"))
     namespace = "io.github.twinquill.launcher"
     compileSdk = 36
 

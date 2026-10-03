@@ -1,0 +1,97 @@
+[
+  {
+    "file": "raw.xp3",
+    "status": 0,
+    "detect": true
+  },
+  {
+    "file": "compressed.xp3",
+    "status": 0,
+    "detect": true
+  },
+  {
+    "file": "chained.xp3",
+    "status": 0,
+    "detect": true
+  },
+  {
+    "file": "protected.xp3",
+    "status": 35,
+    "detect": false
+  },
+  {
+    "file": "missing.xp3",
+    "status": 31,
+    "detect": false
+  },
+  {
+    "file": "duplicate.xp3",
+    "status": 34,
+    "detect": false
+  },
+  {
+    "file": "traversal.xp3",
+    "status": 34,
+    "detect": false
+  },
+  {
+    "file": "segment-bomb.xp3",
+    "status": 34,
+    "detect": false
+  },
+  {
+    "file": "segment-total.xp3",
+    "status": 34,
+    "detect": false
+  },
+  {
+    "file": "index-bomb.xp3",
+    "status": 34,
+    "detect": false
+  },
+  {
+    "file": "bad-index-zlib.xp3",
+    "status": 34,
+    "detect": false
+  },
+  {
+    "file": "unsupported.xp3",
+    "status": 33,
+    "detect": false
+  },
+  {
+    "file": "cycle.xp3",
+    "status": 34,
+    "detect": false
+  },
+  {
+    "file": "bad-resource-zlib.xp3",
+    "status": 0,
+    "detect": true
+  },
+  {
+    "file": "invalid-utf16.xp3",
+    "status": 34,
+    "detect": false
+  },
+  {
+    "file": "missing-adlr.xp3",
+    "status": 34,
+    "detect": false
+  },
+  {
+    "file": "segment-outside.xp3",
+    "status": 34,
+    "detect": false
+  },
+  {
+    "file": "index-tail.xp3",
+    "status": 34,
+    "detect": false
+  },
+  {
+    "file": "zlib-trailing.xp3",
+    "status": 34,
+    "detect": false
+  }
+]

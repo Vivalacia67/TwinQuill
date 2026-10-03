@@ -83,10 +83,11 @@ public final class KrkrEngineActivity extends Activity {
             return;
         }
 
-        if (retainedPreflight != null && retainedPreflight.matches(target)) {
+        String saveDirectory = request == null ? "" : request.saveDirectoryPath();
+        if (retainedPreflight != null && retainedPreflight.matches(target, saveDirectory)) {
             preflight = retainedPreflight;
         } else {
-            preflight = new PreflightCoordinator(target, request != null);
+            preflight = new PreflightCoordinator(target, request != null, saveDirectory);
         }
         runtimeLaunchIssued.set(preflight.runtimeLaunched());
         preflight.attach(this);
@@ -220,8 +221,11 @@ public final class KrkrEngineActivity extends Activity {
 
     private void requirePrivateSaveDirectory(EngineLaunchRequest request)
         throws IOException {
-        File saveBase = new File(getFilesDir(), "saves").getCanonicalFile();
-        File expected = new File(saveBase, request.gameId()).getCanonicalFile();
+        File saveBase = new File(getFilesDir().getCanonicalFile(), "saves");
+        if (!saveBase.getCanonicalFile().equals(saveBase)) {
+            throw new IllegalArgumentException("Krkr save base must not be a symbolic link");
+        }
+        File expected = new File(saveBase, request.gameId());
         File requested = new File(request.saveDirectoryPath()).getCanonicalFile();
         if (!requested.equals(expected)) {
             throw new IllegalArgumentException(
@@ -304,6 +308,7 @@ public final class KrkrEngineActivity extends Activity {
 
         private final LaunchTarget target;
         private final boolean persistent;
+        private final String saveDirectory;
         private final AtomicBoolean started = new AtomicBoolean();
         private final AtomicBoolean runtimeLaunched = new AtomicBoolean();
         private final Object lock = new Object();
@@ -314,9 +319,10 @@ public final class KrkrEngineActivity extends Activity {
         private boolean cancelled;
         private KrkrScriptSession session;
 
-        PreflightCoordinator(LaunchTarget target, boolean persistent) {
+        PreflightCoordinator(LaunchTarget target, boolean persistent, String saveDirectory) {
             this.target = target;
             this.persistent = persistent;
+            this.saveDirectory = saveDirectory;
         }
 
         KrkrScriptSession session() {
@@ -334,8 +340,8 @@ public final class KrkrEngineActivity extends Activity {
             if (retired != null) retired.close();
         }
 
-        boolean matches(LaunchTarget other) {
-            return target.matches(other);
+        boolean matches(LaunchTarget other, String save) {
+            return target.matches(other) && saveDirectory.equals(save);
         }
 
         boolean runtimeLaunched() {
@@ -397,7 +403,7 @@ public final class KrkrEngineActivity extends Activity {
                         int kind = runTarget.saf ? KrkrRuntimeRequest.SOURCE_SAF
                             : runTarget.xp3 ? KrkrRuntimeRequest.SOURCE_XP3 : KrkrRuntimeRequest.SOURCE_LOOSE;
                         created = KrkrScriptSession.prepare(kind,
-                            runTarget.saf ? runTarget.treeUri : runTarget.file.getAbsolutePath());
+                            runTarget.saf ? runTarget.treeUri : runTarget.file.getAbsolutePath(), saveDirectory);
                         nativeResult = 0;
                     } else nativeResult = runTarget.runNative();
                 } catch (KrkrScriptSession.StartupException exception) {

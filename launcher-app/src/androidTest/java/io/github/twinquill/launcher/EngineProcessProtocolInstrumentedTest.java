@@ -509,6 +509,32 @@ public final class EngineProcessProtocolInstrumentedTest {
     }
 
     @Test
+    public void runsCompressedKrkrResourcesThroughProductionSafBroker() throws Exception {
+        Intent result = launchAndAwait(requestIntent(KrkrEngineActivity.class,EngineType.KRKR,
+            "m3-broker-compressed-"+android.os.SystemClock.elapsedRealtime(),
+            grantFixture("m3-broker-compressed"),Bundle.EMPTY));
+        assertEquals(Activity.RESULT_OK,host.engineResultCode());
+        assertEquals(EngineResult.NORMAL_EXIT.code(),result.getIntExtra(EngineContract.EXTRA_RESULT,-1));
+        assertEquals(0,result.getIntExtra(KrkrEngineActivity.EXTRA_RESULT_CODE,-1));
+    }
+
+    @Test
+    public void productionBrokerBindsPrivateSavesAndPreservesCounterAcrossRestart() throws Exception {
+        String id="m3-broker-save-"+android.os.SystemClock.elapsedRealtime();
+        File save=new File(context.getFilesDir(),"saves/"+id);
+        try {
+            for(int run=1;run<=2;++run) {
+                Intent result=launchAndAwait(requestIntent(KrkrEngineActivity.class,EngineType.KRKR,
+                    id,grantFixture("m3-broker-save"),Bundle.EMPTY));
+                assertEquals(Activity.RESULT_OK,host.engineResultCode());
+                assertEquals(EngineResult.NORMAL_EXIT.code(),result.getIntExtra(EngineContract.EXTRA_RESULT,-1));
+                assertEquals(String.valueOf(run),new String(Files.readAllBytes(new File(save,
+                    "krkr/checks/counter.tjs").toPath()),java.nio.charset.StandardCharsets.UTF_8));
+            }
+        } finally {deleteFixture(save);}
+    }
+
+    @Test
     public void runsStandardKrkrDisplayAndTimerFromReadOnlySafThenClosesNormally() throws Exception {
         Uri counterProvider = Uri.parse("content://" + LauncherGrantBrokerProvider.AUTHORITY);
         assertNotNull(context.getContentResolver().call(counterProvider,

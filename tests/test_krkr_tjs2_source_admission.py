@@ -30,6 +30,7 @@ PATCH_RELATIVES = (
     Path("vendor/patches/kirikiroid2/0005-tjs-shutdown-finalizer-cleanup.patch"),
     Path("vendor/patches/kirikiroid2/0006-android-basic-visual-bindings.patch"),
     Path("vendor/patches/kirikiroid2/0007-tvp-async-worker-admission.patch"),
+    Path("vendor/patches/kirikiroid2/0008-tjs-text-stream-abort.patch"),
 )
 
 
@@ -115,6 +116,8 @@ class KrkrTjs2SourceAdmissionTests(unittest.TestCase):
             shutil.copy2(TJS2_DIR / "tjsInterCodeExec.cpp", generated_tjs2 / "tjsInterCodeExec.cpp")
             shutil.copy2(TJS2_DIR / "tjsLex.cpp", generated_tjs2 / "tjsLex.cpp")
             shutil.copy2(TJS2_DIR / "tjsObject.cpp", generated_tjs2 / "tjsObject.cpp")
+            for name in ("tjs.h", "tjsArray.cpp", "tjsDictionary.cpp"):
+                shutil.copy2(TJS2_DIR / name, generated_tjs2 / name)
             generated_utils = generated_root / "src" / "core" / "utils"
             generated_utils.mkdir(parents=True)
             shutil.copy2(TJS2_DIR.parent / "utils" / "TimerIntf.cpp", generated_utils / "TimerIntf.cpp")

@@ -29,6 +29,8 @@ enum {
 
 enum {
     TQ_VFS_OPEN_READ = 1,
+    // Same read-only access; cap non-seekable provider spooling at 128 MiB.
+    TQ_VFS_OPEN_READ_BOUNDED = 3,
 };
 
 enum {
@@ -59,6 +61,12 @@ TQ_VFS_API int tq_vfs_stat_path(
     const char* relative_path_utf8,
     tq_vfs_stat* output);
 TQ_VFS_API int tq_vfs_list(
+    const char* tree_uri_utf8,
+    const char* relative_path_utf8,
+    tq_vfs_list_callback callback,
+    void* user_data);
+// Read-only enumeration capped before the Java result frame is allocated.
+TQ_VFS_API int tq_vfs_list_bounded(
     const char* tree_uri_utf8,
     const char* relative_path_utf8,
     tq_vfs_list_callback callback,

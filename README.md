@@ -18,8 +18,8 @@ startup and callback session, basic TVP interfaces, and a script-controlled test
 - Both engine entry points run in app-private Android processes.
 
 The Compose/Room launcher imports game directories and routes engine requests.
-Game compatibility, save redirection, full KAG/Cocos rendering,
-compressed XP3 support, media, and plugin handling remain future milestones.
+Full KAG execution, game-state save/load, wider media and plugin compatibility,
+and unified save management remain future milestones.
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), the accepted
 [`M0 handoff`](docs/KRKR_M0_HANDOFF.md), and the
 [`M1 TJS entry handoff and acceptance`](docs/KRKR_M1_TJS_ENTRY.md).
@@ -34,6 +34,13 @@ composition and input. Script cancellation and lifecycle recovery are bounded.
 The pinned KAG3 framework remains an audit source until M4. M2 implementation
 was accepted on the simulator on 2026-10-03; supported members, limits and instructions
 are in the [M2 handoff](docs/KRKR_M2_HANDOFF.md).
+
+M3 development adds unified loose/SAF/XP3 resources, raw/zlib and chained XP3
+indexes, patch/search-path ordering, strict Unicode or explicit per-game CP932,
+and atomic private writes under `filesDir/saves/<game-id>/krkr/`. ONS keeps
+its existing parent-directory layout. M3 has passed simulator acceptance;
+see the [storage contract](docs/KRKR_M3_STORAGE_CONTRACT.md) and
+[M3 handoff and emulator procedure](docs/KRKR_M3_HANDOFF.md).
 
 ## Modules
 

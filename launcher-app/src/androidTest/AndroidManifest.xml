@@ -11,6 +11,12 @@
 
     <application>
         <provider
+            android:name="io.github.twinquill.launcher.KrkrM3FixtureDocumentsProvider"
+            android:authorities="io.github.twinquill.test.m3.documents"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS" />
+        <provider
             android:name="io.github.twinquill.launcher.LauncherFixtureDocumentsProvider"
             android:authorities="io.github.twinquill.test.documents"
             android:exported="true"

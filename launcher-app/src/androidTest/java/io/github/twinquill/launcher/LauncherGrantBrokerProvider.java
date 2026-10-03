@@ -82,7 +82,7 @@ public final class LauncherGrantBrokerProvider extends ContentProvider {
             if (argument == null) {
                 throw new IllegalArgumentException("A fixture root is required");
             }
-            Uri treeUri = LauncherFixtureDocumentsProvider.treeUri(argument);
+            Uri treeUri = fixtureTree(argument);
             getContext().revokeUriPermission(
                 "io.github.twinquill",
                 treeUri,
@@ -99,12 +99,17 @@ public final class LauncherGrantBrokerProvider extends ContentProvider {
                 | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION;
         Uri treeUri = argument == null
             ? LauncherFixtureDocumentsProvider.treeUri()
-            : LauncherFixtureDocumentsProvider.treeUri(argument);
+            : fixtureTree(argument);
         getContext().grantUriPermission("io.github.twinquill", treeUri, flags);
         Bundle result = new Bundle();
         result.putParcelable("uri", treeUri);
         result.putInt("flags", flags);
         return result;
+    }
+
+    private static Uri fixtureTree(String argument) {
+        return argument.startsWith("m3-") ? KrkrM3FixtureDocumentsProvider.treeUri(argument)
+            : LauncherFixtureDocumentsProvider.treeUri(argument);
     }
 
     @Override
