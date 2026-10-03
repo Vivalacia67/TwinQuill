@@ -2,6 +2,7 @@
 
 更新日期：2026-10-04。分支：`refactor/krkr-direct-integration`。
 M3 已验收并提交为 `abcd6fc`。M4.1–M4.4 已完成，用户于 2026-10-04 确认模拟器验收通过、无报错。
+M4 代码与签收记录已提交为 `78bb0b5`；下一轮入口见 [M5 开发计划](KRKR_M5_PLAN.md)。
 支持范围见 [M4 接口审计](KRKR_M4_INTERFACE_AUDIT.md)，后续任务见 [ROADMAP](ROADMAP.md)。
 
 ## 本阶段交付

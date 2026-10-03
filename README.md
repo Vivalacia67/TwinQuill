@@ -29,6 +29,8 @@ Game-state save/load, wider media/plugins and unified save management remain
 M5–M7 work; representative-game compatibility is verified in M8. The
 [roadmap](docs/ROADMAP.md) defines dependencies and acceptance gates. Self-authored
 fixtures passing does not establish arbitrary commercial-game compatibility.
+The [M5 development plan](docs/KRKR_M5_PLAN.md) defines the next save/load tasks;
+implementation has not started.
 Architecture and earlier acceptance records are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md),
 [the M0 handoff](docs/KRKR_M0_HANDOFF.md) and
 [the M1 handoff](docs/KRKR_M1_TJS_ENTRY.md).
