@@ -5,6 +5,7 @@
 #include <atomic>
 #include <cerrno>
 #include <fcntl.h>
+#include <regex>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -21,11 +22,51 @@ PrivateStorage::PrivateStorage(const std::string& save) {
     if (save.empty()) return; // Legacy isolated entry has no write capability.
     Fd base{open(save.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)};
     io_check(base.fd >= 0);
+    Fd lease{openat(base.fd, ".krkr-session.lock", O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0600)};
+    io_check(lease.fd >= 0);
+    struct stat lease_stat{};
+    io_check(fstat(lease.fd, &lease_stat) == 0 && S_ISREG(lease_stat.st_mode));
+    // Match Java FileChannel's byte-range lock across the launcher/runtime processes.
+    // The Java owner table prevents another descriptor being opened by same-process
+    // management while this session is live (POSIX locks are process-owned).
+    struct flock lock{};
+    lock.l_type = F_WRLCK; lock.l_whence = SEEK_SET; lock.l_len = 1;
+    if (fcntl(lease.fd, F_SETLK, &lock) < 0)
+        throw StorageError(41, ("Krkr save directory lock failed: " + std::to_string(errno)).c_str());
+    struct stat marker{};
+    if (fstatat(base.fd, ".krkr-restore.pending", &marker, AT_SYMLINK_NOFOLLOW) == 0) {
+        io_check(S_ISREG(marker.st_mode) && marker.st_size > 0 && marker.st_size <= 128);
+        Fd input{openat(base.fd, ".krkr-restore.pending", O_RDONLY | O_CLOEXEC | O_NOFOLLOW)};
+        io_check(input.fd >= 0);
+        std::string stage(static_cast<std::size_t>(marker.st_size), '\0');
+        io_check(::read(input.fd, stage.data(), stage.size()) == static_cast<ssize_t>(stage.size()));
+        io_check(stage.size() > 14 && stage.rfind(".krkr-restore-", 0) == 0 && stage.find_first_not_of(
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-") == std::string::npos);
+        struct stat current{};
+        if (fstatat(base.fd, "krkr", &current, AT_SYMLINK_NOFOLLOW) == 0) {
+            io_check(S_ISDIR(current.st_mode));
+        } else {
+            io_check(errno == ENOENT);
+            struct stat previous{};
+            const char* candidate = ".krkr-previous";
+            if (fstatat(base.fd, candidate, &previous, AT_SYMLINK_NOFOLLOW) < 0) {
+                io_check(errno == ENOENT); candidate = stage.c_str();
+                io_check(fstatat(base.fd, candidate, &previous, AT_SYMLINK_NOFOLLOW) == 0);
+            }
+            io_check(S_ISDIR(previous.st_mode));
+            io_check(renameat(base.fd, candidate, base.fd, "krkr") == 0 && fsync(base.fd) == 0);
+        }
+        // Offline management removes obsolete staged/previous trees under its lease.
+    } else io_check(errno == ENOENT);
     if (mkdirat(base.fd, "krkr", 0700) < 0 && errno != EEXIST) io_check(false);
     root_ = openat(base.fd, "krkr", O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
     io_check(root_ >= 0);
+    lock_ = lease.fd; lease.fd = -1;
 }
-PrivateStorage::~PrivateStorage() { if (root_ >= 0) close(root_); }
+PrivateStorage::~PrivateStorage() {
+    if (root_ >= 0) close(root_);
+    if (lock_ >= 0) close(lock_);
+}
 bool PrivateStorage::owns(const std::string& name) { return name.rfind(kDataPath, 0) == 0; }
 std::string PrivateStorage::relative(const std::string& name, bool folder) const {
     if (root_ < 0 || !owns(name)) throw StorageError(10, "Writes require System.dataPath");
@@ -35,6 +76,8 @@ std::string PrivateStorage::relative(const std::string& name, bool folder) const
     while (!suffix.empty() && suffix.front() == '/') suffix.erase(0, 1);
     auto path = storage_path(suffix, folder);
     if (path.find('>') != std::string::npos) throw StorageError(10, "Private archives are not writable");
+    static const std::regex temporary_name(R"((^|/)\.tq-[0-9]+-[0-9]+($|/))");
+    if (std::regex_search(path, temporary_name)) throw StorageError(10, "Reserved private temporary name");
     return path;
 }
 int PrivateStorage::parent(const std::string& path, bool create) {

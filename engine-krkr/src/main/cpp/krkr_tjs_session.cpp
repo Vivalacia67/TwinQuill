@@ -34,6 +34,7 @@
 #include <stdexcept>
 
 void TVPRegisterAndroidKagHost(TJS::tTJS*);
+void TVPRecoverAndroidKagSaves(TJS::tTJS*);
 void TVPShutdownAndroidKagHost();
 
 namespace twinquill::krkr {
@@ -264,6 +265,7 @@ public:
             register_classes();
             if (kag_host_) TVPRegisterAndroidKagHost(engine_);
             engine_->ExecScript(script_, nullptr, nullptr, &startup_name_);
+            if (kag_host_) TVPRecoverAndroidKagSaves(engine_);
             script_.Clear();
         }, std::chrono::seconds(kag_host_ ? 20 : 5));
         if (result == 0) ++g_startups;

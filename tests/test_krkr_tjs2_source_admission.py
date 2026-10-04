@@ -34,6 +34,7 @@ PATCH_RELATIVES = (
     Path("vendor/patches/kirikiroid2/0009-android-kag-parser.patch"),
     Path("vendor/patches/kirikiroid2/0010-android-kag-bindings.patch"),
     Path("vendor/patches/kirikiroid2/0011-tjs-call-depth-budget.patch"),
+    Path("vendor/patches/kirikiroid2/0012-android-kag-restore-bindings.patch"),
 )
 
 

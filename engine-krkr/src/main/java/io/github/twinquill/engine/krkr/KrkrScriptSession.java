@@ -91,14 +91,21 @@ final class KrkrScriptSession {
                 }
             }
         }
-        long handle = deferred ? nativePrepare(sourceKind, source, saveDirectory) : nativeStart(sourceKind, source, saveDirectory);
-        if (handle <= 0) throw new StartupException(handle < 0 ? (int) -handle : 21);
+        if (!KrkrSaveStore.reserve(saveDirectory)) throw new StartupException(41);
+        long handle;
+        try {
+            handle = deferred ? nativePrepare(sourceKind, source, saveDirectory) : nativeStart(sourceKind, source, saveDirectory);
+            if (handle <= 0) throw new StartupException(handle < 0 ? (int) -handle : 21);
+        } catch (RuntimeException | Error exception) {
+            KrkrSaveStore.release(saveDirectory);
+            throw exception;
+        }
         try {
             KrkrScriptSession session = new KrkrScriptSession(handle, sourceKind, source, deferred, saveDirectory);
             LIVE.put(handle, session);
             return session;
         } catch (RuntimeException | Error exception) {
-            nativeClose(handle);
+            try { nativeClose(handle); } finally { KrkrSaveStore.release(saveDirectory); }
             throw exception;
         }
     }
@@ -181,6 +188,7 @@ final class KrkrScriptSession {
             worker.execute(() -> {
                 try { nativeClose(handle); }
                 finally {
+                    KrkrSaveStore.release(saveDirectory);
                     LIVE.remove(handle, this);
                     released.countDown();
                 }

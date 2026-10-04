@@ -157,6 +157,7 @@ public:
     void SetMainPixel(tjs_int x, tjs_int y, tjs_uint32 value);
     void CopyRect(tjs_int x, tjs_int y, const tTJSNI_Layer* source, const tTVPRect&, bool operate, int mode, int opacity);
     void AssignImages(const tTJSNI_Layer*);
+    void StopTransition();
     void ColorRect(const tTVPRect&, tjs_uint32, int);
     unsigned GetProvincePixel(tjs_int x, tjs_int y) const;
     void SetProvincePixel(tjs_int x, tjs_int y, unsigned);

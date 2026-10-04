@@ -21,5 +21,6 @@ private:
     std::string relative(const std::string& name, bool folder = false) const;
     int parent(const std::string& relative, bool create);
     int root_ = -1;
+    int lock_ = -1;
 };
 }

@@ -1,0 +1,23 @@
+Subject: [PATCH] Admit stopping an inactive Layer transition during KAG restore
+Tested-by: M5 full KAG slot/visual/audio/call-stack restore instrumentation
+Tested-by: tests/test_krkr_tjs2_source_admission.py focused git-apply unittest and forced Android CMake configure
+
+KAG restoreFlags stops all transitions before restoring any layer. Android's
+selected display backend cannot start transitions, so stopping an inactive
+transition succeeds after validating the native Layer. Active transition
+creation remains an explicit unsupported operation until M6.
+
+diff --git a/src/core/visual/LayerIntf.cpp b/src/core/visual/LayerIntf.cpp
+--- a/src/core/visual/LayerIntf.cpp
++++ b/src/core/visual/LayerIntf.cpp
+@@ -9302,7 +9302,8 @@
+ TJS_BEGIN_NATIVE_METHOD_DECL(stopTransition)
+ {
+-	TJS_eTJSError(TJS_W("Unsupported M2 method: stopTransition"));
+-	return TJS_E_NOTIMPL;
++	TJS_GET_NATIVE_INSTANCE(_this, tTJSNI_Layer);
++	_this->StopTransition();
++	return TJS_S_OK;
+ }
+ TJS_END_NATIVE_METHOD_DECL(stopTransition)
+ #endif

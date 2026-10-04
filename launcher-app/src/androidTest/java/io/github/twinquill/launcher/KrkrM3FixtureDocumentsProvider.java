@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class KrkrM3FixtureDocumentsProvider extends DocumentsProvider {
     public static final String AUTHORITY = "io.github.twinquill.test.m3.documents";
     private static final Set<String> ROOTS = Set.of("m3-loose", "m3-compressed", "m3-patches",
-        "m3-cp932", "m3-save", "m3-vectors", "m3-large", "m3-revoke", "m3-many", "m3-broker-compressed", "m3-broker-save", "m4-loose", "m4-compressed", "m4-missing", "m4-script-error", "m4-broker", "m4-slow", "m4-batch");
+        "m3-cp932", "m3-save", "m3-vectors", "m3-large", "m3-revoke", "m3-many", "m3-broker-compressed", "m3-broker-save", "m4-loose", "m4-compressed", "m4-missing", "m4-script-error", "m4-broker", "m4-slow", "m4-batch", "m5-loose", "m5-compressed", "m5-other", "m5-broker", "m5-kill");
     private final ConcurrentHashMap<String, Long> sizes = new ConcurrentHashMap<>();
     private static final AtomicInteger lookupQueries = new AtomicInteger();
     private static volatile boolean lookupFilePresent;

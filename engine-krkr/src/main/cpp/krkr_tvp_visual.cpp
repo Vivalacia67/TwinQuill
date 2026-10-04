@@ -600,6 +600,10 @@ void tTJSNI_Layer::AssignImages(const tTJSNI_Layer* source) {
     font_height = source->font_height;
     dirty();
 }
+void tTJSNI_Layer::StopTransition() {
+    if (!owner) error(TJS_W("Layer has been invalidated"));
+    // startTransition is rejected by this backend; no active transition exists.
+}
 void tTJSNI_Layer::CopyRect(tjs_int x, tjs_int y, const tTJSNI_Layer* source,
         const tTVPRect& area, bool operate, int mode, int opa) {
     if (!source || !source->owner || source->window != window) error(TJS_W("Invalid source Layer"));

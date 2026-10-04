@@ -121,7 +121,7 @@ public final class LauncherGrantBrokerProvider extends ContentProvider {
     }
 
     private static Uri fixtureTree(String argument) {
-        return (argument.startsWith("m3-") || argument.startsWith("m4-")) ? KrkrM3FixtureDocumentsProvider.treeUri(argument)
+        return (argument.startsWith("m3-") || argument.startsWith("m4-") || argument.startsWith("m5-")) ? KrkrM3FixtureDocumentsProvider.treeUri(argument)
             : LauncherFixtureDocumentsProvider.treeUri(argument);
     }
 

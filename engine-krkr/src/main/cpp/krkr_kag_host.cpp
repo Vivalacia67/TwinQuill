@@ -9,6 +9,11 @@ void TVPRegisterAndroidKagHost(TJS::tTJS* engine) {
     engine->ExecScript(kAndroidKagHost, nullptr, nullptr, &name);
 }
 
+void TVPRecoverAndroidKagSaves(TJS::tTJS* engine) {
+    ttstr name(TJS_W("AndroidKagRecovery.tjs"));
+    engine->ExecScript(kAndroidKagRecovery, nullptr, nullptr, &name);
+}
+
 iTJSDispatch2* TVPCreateAndroidMenu(iTJSDispatch2* owner) {
     tTJSVariant menu;
     if (!kag_engine || TJS_FAILED(kag_engine->GetGlobalNoAddRef()->PropGet(0,

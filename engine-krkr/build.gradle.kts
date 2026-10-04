@@ -31,6 +31,11 @@ android {
         prefab = true
     }
 
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
 }
 
 androidComponents.onVariants { variant ->
@@ -41,4 +46,5 @@ androidComponents.onVariants { variant ->
 dependencies {
     implementation(project(":engine-api"))
     implementation(project(":native-vfs"))
+    testImplementation("junit:junit:4.13.2")
 }

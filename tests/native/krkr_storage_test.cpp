@@ -4,6 +4,7 @@
 #include "krkr_resource.h"
 #include "krkr_xp3.h"
 #include "krkr_private_storage.h"
+#include <sys/wait.h>
 #include "krkr_game_text.h"
 #include <filesystem>
 #include <fstream>
@@ -143,11 +144,23 @@ int main(int count, char** args) {
         std::filesystem::create_directories(saves/"two");
         std::ofstream(saves/"one/ons-legacy.dat") << "ONS";
         PrivateStorage one((saves/"one").string()), two((saves/"two").string());
+        const pid_t contender = fork();
+        check(contender >= 0, "Cannot create the lock contender");
+        if (contender == 0) {
+            try { PrivateStorage unexpected((saves/"one").string()); _exit(1); }
+            catch (const StorageError& busy) { _exit(busy.status == 41 ? 0 : 2); }
+            catch (...) { _exit(3); }
+        }
+        int contender_status = 0;
+        check(waitpid(contender, &contender_status, 0) == contender
+            && WIFEXITED(contender_status) && WEXITSTATUS(contender_status) == 0,
+            "Another process entered a live private save directory");
         const std::string name = std::string(kDataPath)+"nested/state";
         one.write(name, "OLD");
         check(one.read(name) == "OLD", "Private round trip failure");
         check(!two.exists(std::string(kDataPath)+"state"), "Game save isolation failure");
         error(10, [&] { one.write("../escape", "BAD"); });
+        error(10, [&] { one.write(std::string(kDataPath)+"nested/.tq-1-2", "BAD"); });
         error(20, [&] { one.write(name, std::string(kResourceReadLimit + 1, 'X')); });
         check(one.read(name) == "OLD", "Failed oversized write corrupted previous data");
         // Force an actual partial temporary-file write, not just a preflight
@@ -174,7 +187,16 @@ int main(int count, char** args) {
         check(read_source(*open_local_source((saves/"one/ons-legacy.dat").string())) == "ONS", "ONS layout changed");
         for (const auto& item : std::filesystem::recursive_directory_iterator(saves/"one/krkr"))
             check(item.path().filename().string().rfind(".tq-", 0) != 0, "Atomic temporary file leaked");
-        std::cout << "M3 storage: " << vectors << " shared XP3 vectors, seeks, precedence, cache access, configuration and private atomic writes passed\n";
+        auto recovery = saves/"recovery";
+        std::filesystem::create_directories(recovery/".krkr-previous");
+        std::filesystem::create_directories(recovery/".krkr-restore-probe");
+        { std::ofstream previous(recovery/".krkr-previous/kept.tjs"); previous << "GOOD"; }
+        { std::ofstream staged(recovery/".krkr-restore-probe/kept.tjs"); staged << "NEW"; }
+        { std::ofstream marker(recovery/".krkr-restore.pending"); marker << ".krkr-restore-probe"; }
+        PrivateStorage recovered(recovery.string());
+        check(recovered.read("tqsave://./kept.tjs") == "GOOD", "Interrupted management restore lost the prior tree");
+        check(std::filesystem::is_directory(recovery/"krkr"), "Runtime did not recover the private root");
+        std::cout << "M3/M5 storage: " << vectors << " shared XP3 vectors, seeks, precedence, cache access, configuration, atomic writes and restore recovery passed\n";
         return 0;
     } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }

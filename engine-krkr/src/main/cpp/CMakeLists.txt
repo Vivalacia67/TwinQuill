@@ -59,6 +59,7 @@ set(TJS2_PATCHES
     "${TWINQUILL_ROOT}/vendor/patches/kirikiroid2/0009-android-kag-parser.patch"
     "${TWINQUILL_ROOT}/vendor/patches/kirikiroid2/0010-android-kag-bindings.patch"
     "${TWINQUILL_ROOT}/vendor/patches/kirikiroid2/0011-tjs-call-depth-budget.patch"
+    "${TWINQUILL_ROOT}/vendor/patches/kirikiroid2/0012-android-kag-restore-bindings.patch"
 )
 file(REMOVE_RECURSE "${KIRIKIROID2_BUILD_DIR}")
 file(MAKE_DIRECTORY "${TJS2_BUILD_DIR}")
@@ -186,7 +187,9 @@ set(TVP_HOST_SOURCES
 )
 
 file(READ "${CMAKE_CURRENT_LIST_DIR}/krkr_kag_host.tjs" KAG_HOST_SCRIPT)
+file(READ "${CMAKE_CURRENT_LIST_DIR}/krkr_kag_recovery.tjs" KAG_RECOVERY_SCRIPT)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/krkr_kag_host.tjs")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/krkr_kag_recovery.tjs")
 configure_file(krkr_kag_host_script.h.in "${CMAKE_BINARY_DIR}/krkr_kag_host_script.h" @ONLY)
 
 add_library(twinquill_engine_krkr SHARED

@@ -899,6 +899,172 @@ public final class KrkrRuntimeHostInstrumentedTest {
         } finally { bounded.close(); waitForScriptsReleased(); }
     }
 
+    @Test
+    public void m5KagSlotsAndSystemDataSurviveSessionRestart() throws Exception {
+        for (String root : new String[] {"m5-loose", "m5-compressed"}) {
+            String id = "m5-slots-" + root + "-" + android.os.SystemClock.elapsedRealtime();
+            File save = new File(context.getFilesDir(),"saves/" + id + "/krkr");
+            File ready = new File(save,"m5-ready.tjs");
+            KrkrScriptSession session = launchM3Saf(root, id);
+            waitForM4Color(300,100,70,50,95);
+            waitForFileValue(ready,"menu");
+            assertEquals(0,session.poll(0));
+            Thread.sleep(1000);
+            try (BitmapCloser shot = new BitmapCloser(captureSurface());
+                 java.io.OutputStream out = Files.newOutputStream(new File(context.getExternalFilesDir(null), "m5-menu.png").toPath())) {
+                assertTrue(shot.bitmap.compress(Bitmap.CompressFormat.PNG,100,out));
+            }
+            // KAG suppresses a second selection at an unchanged pointer position.
+            touchGame(105,343,640,480);
+            waitForM4Color(300,100,40,80,64);
+            waitForFileValue(ready,"station");
+            assertAudioAdvances();
+            Thread.sleep(800);
+            try (BitmapCloser shot = new BitmapCloser(captureSurface());
+                 java.io.OutputStream out = Files.newOutputStream(new File(context.getExternalFilesDir(null), "m5-station.png").toPath())) {
+                assertTrue(shot.bitmap.compress(Bitmap.CompressFormat.PNG,100,out));
+            }
+            touchGame(80,343,640,480);
+            waitForFile(new File(save,"data0.kdt"));
+            assertTrue(new File(save,"datasc.ksd").isFile());
+            assertTrue(new File(save,"datasu.ksd").isFile());
+            touchGame(80,369,640,480);
+            waitForM4Color(300,100,32,64,176);
+            waitForFileValue(ready,"chapterALPHA8");
+            touchGame(80,343,640,480);
+            waitForFile(new File(save,"data1.kdt"));
+            byte[] slot0=Files.readAllBytes(new File(save,"data0.kdt").toPath());
+            assertEquals(0,session.poll(0));
+            instrumentation.runOnMainSync(runtime::onBackPressed);
+            waitForScriptsReleased(); runtime=null;
+            session=launchM3Saf(root,id);
+            waitForM4Color(300,100,70,50,95);
+            waitForFileValue(ready,"menu");
+            touchGame(80,369,640,480);
+            waitForM4Color(300,100,40,80,64);
+            waitForFileValue(ready,"station");
+            assertEquals("Real KAG restore must succeed",0,session.poll(0));
+            waitForM4Color(480,85,216,192,120);
+            assertAudioAdvances(); assertM4Text();
+            org.junit.Assert.assertArrayEquals("Loading must not overwrite its slot",slot0,
+                Files.readAllBytes(new File(save,"data0.kdt").toPath()));
+            instrumentation.runOnMainSync(runtime::onBackPressed);
+            waitForScriptsReleased(); runtime=null;
+            session=launchM3Saf(root,id);
+            waitForM4Color(300,100,70,50,95);
+            waitForFileValue(ready,"menu");
+            touchGame(80,395,640,480);
+            waitForM4Color(300,100,32,64,176);
+            waitForFileValue(ready,"chapterALPHA8");
+            assertEquals(0,session.poll(0));
+            waitForM4Color(480,85,216,192,120);
+            touchGame(80,369,640,480);
+            waitForFileValue(ready,"returnedALPHA8");
+            assertEquals("Restored call must return normally",0,session.poll(0));
+            assertAudioAdvances();
+            instrumentation.runOnMainSync(runtime::onBackPressed);
+            waitForScriptsReleased(); runtime=null;
+            File verifier=fixture("m5-system-verifier");
+            File startup=new File(verifier,"startup.tjs");
+            Files.write(startup.toPath(), ("var sf=Scripts.evalStorage(System.dataPath+'datasu.ksd');"
+                + "if(sf.boots!=3 || sf.saves!=1) throw new Exception('Persistent system variables failed: '+sf.boots+'/'+sf.saves);"
+                + "if(!(sf.trail_first_checkpoint>0) || !(sf.trail_chapter_inside>0))"
+                + "throw new Exception('Persistent read records failed');"
+                + "var sc=Scripts.evalStorage(System.dataPath+'datasc.ksd');"
+                + "if(sc.userChSpeed!=12) throw new Exception('Persistent text configuration failed');"
+                + "if(sc.bookMarkNames[0]!=='Station checkpoint' || sc.bookMarkNames[1]!=='Chapter checkpoint')"
+                + "throw new Exception('Persistent slot metadata failed');")
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            KrkrScriptSession check=KrkrScriptSession.start(2,startup.getCanonicalPath(),save.getParentFile().getCanonicalPath());
+            try {assertEquals(0,check.poll(0));}finally {check.close();waitForScriptsReleased();}
+        }
+    }
+
+    @Test
+    public void m5SaveManagementExcludesActiveNativeSessionsAndRestoresOffline() throws Exception {
+        File directory=fixture("m5-lock");
+        File startup=new File(directory,"startup.tjs");
+        Files.write(startup.toPath(),"Storages.writeText(System.dataPath+'counter.tjs','GOOD');".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        String id=directory.getName();
+        File parent=new File(context.getFilesDir(),"saves/"+id);
+        assertTrue(parent.mkdirs());fixtures.add(parent);
+        KrkrSaveStore store=new KrkrSaveStore(context.getFilesDir(),id);
+        KrkrScriptSession session=KrkrScriptSession.start(2,startup.getCanonicalPath(),parent.getCanonicalPath());
+        try {
+            assertEquals(0,session.poll(0));
+            try(KrkrSaveStore.Lease unexpected=store.acquire()) {throw new AssertionError("Management entered a live runtime");}
+            catch(java.io.IOException expected) {assertTrue(expected.getMessage().contains("use"));}
+        }finally {session.close();waitForScriptsReleased();}
+        KrkrSaveStore.Snapshot snapshot;
+        try(KrkrSaveStore.Lease lease=store.acquire()) {
+            snapshot=lease.snapshot(); assertEquals(4,lease.bytes());
+            try {KrkrScriptSession unexpected=KrkrScriptSession.start(2,startup.getCanonicalPath(),parent.getCanonicalPath());
+                unexpected.close();throw new AssertionError("Runtime entered offline management");}
+            catch(KrkrScriptSession.StartupException expected) {assertTrue(expected.diagnostic!=0);}
+            lease.clear(); assertTrue(lease.list().isEmpty()); lease.restore(snapshot);
+        }
+        assertEquals("GOOD",new String(Files.readAllBytes(new File(parent,"krkr/counter.tjs").toPath()),java.nio.charset.StandardCharsets.UTF_8));
+        session=KrkrScriptSession.start(2,startup.getCanonicalPath(),parent.getCanonicalPath());
+        try {assertEquals(0,session.poll(0));}finally {session.close();waitForScriptsReleased();}
+    }
+
+    private void waitForFile(File file) throws Exception {
+        long deadline=android.os.SystemClock.uptimeMillis()+15000;
+        while(!file.isFile() && android.os.SystemClock.uptimeMillis()<deadline)Thread.sleep(25);
+        assertTrue("Missing KAG file: "+file.getName(),file.isFile());
+        Thread.sleep(300);
+    }
+
+    private void waitForFileValue(File file,String value) throws Exception {
+        long deadline=android.os.SystemClock.uptimeMillis()+15000;
+        while(android.os.SystemClock.uptimeMillis()<deadline) {
+            if(file.isFile() && value.equals(new String(Files.readAllBytes(file.toPath()),
+                java.nio.charset.StandardCharsets.UTF_8)))return;
+            Thread.sleep(25);
+        }
+        throw new AssertionError("KAG did not finish scene: "+value);
+    }
+
+    @Test
+    public void m5RepairsInterruptedMetadataAndRejectsDamagedOrForeignSlots() throws Exception {
+        String id="m5-recovery-"+android.os.SystemClock.elapsedRealtime();
+        File save=new File(context.getFilesDir(),"saves/"+id+"/krkr");
+        launchM3Saf("m5-broker",id);
+        waitForFile(new File(save,"data0.kdt"));
+        waitForM5Completion();runtime=null;
+        byte[] good=Files.readAllBytes(new File(save,"data0.kdt").toPath());
+        Files.write(new File(save,"data1.kdt").toPath(),good);
+        assertTrue(new File(save,"datasc.ksd").delete());
+        // Death between slot replacement and system metadata replacement leaves
+        // the slot authoritative. The host rebuilds names/dates on startup.
+        launchM3Saf("m5-broker",id);
+        waitForM5Completion();runtime=null;
+        File verifier=fixture("m5-metadata-verifier"), startup=new File(verifier,"startup.tjs");
+        Files.write(startup.toPath(), ("var sc=Scripts.evalStorage(System.dataPath+'datasc.ksd');"
+            + "if(sc.bookMarkNames[0]!=='Broker checkpoint' || sc.bookMarkNames[1]!=='Broker checkpoint')"
+            + "throw new Exception('Interrupted metadata was not rebuilt');")
+            .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        KrkrScriptSession check=KrkrScriptSession.start(2,startup.getCanonicalPath(),save.getParentFile().getCanonicalPath());
+        try {assertEquals(0,check.poll(0));}finally {check.close();waitForScriptsReleased();}
+        for(boolean foreign:new boolean[]{true,false}) {
+            byte[] candidate=foreign?good:"%%% corrupt slot".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            Files.write(new File(save,"data0.kdt").toPath(),candidate);
+            KrkrScriptSession failed=launchM3Saf(foreign?"m5-other":"m5-loose",id);
+            waitForM4Color(300,100,70,50,95);
+            touchGame(80,369,640,480);
+            long until=android.os.SystemClock.uptimeMillis()+15000;
+            while(failed.poll(0)==0 && android.os.SystemClock.uptimeMillis()<until)Thread.sleep(25);
+            assertTrue("Invalid slot must report a load error",failed.poll(0)==20 || failed.poll(0)==11);
+            waitForScriptsReleased();runtime=null;
+            org.junit.Assert.assertArrayEquals(candidate,Files.readAllBytes(new File(save,"data0.kdt").toPath()));
+            org.junit.Assert.assertArrayEquals(good,Files.readAllBytes(new File(save,"data1.kdt").toPath()));
+        }
+        Files.write(new File(save,"data0.kdt").toPath(),good);
+        KrkrScriptSession healthy=launchM3Saf("m5-loose",id);
+        waitForM4Color(300,100,70,50,95);assertEquals(0,healthy.poll(0));
+        instrumentation.runOnMainSync(runtime::onBackPressed);waitForScriptsReleased();runtime=null;
+    }
+
     private void assertAudioAdvances() throws Exception {
         long before=KrkrPcmAudio.renderedFrames();
         long deadline=android.os.SystemClock.uptimeMillis()+4000;
@@ -906,15 +1072,27 @@ public final class KrkrRuntimeHostInstrumentedTest {
         assertTrue("Android AudioTrack must render PCM frames",KrkrPcmAudio.renderedFrames()>before+200);
     }
 
+    private void waitForM5Completion() throws Exception {
+        long deadline=android.os.SystemClock.uptimeMillis()+35000;
+        while((scriptStats()[0]!=0 || KrkrScriptSession.hasLiveSessions())
+            && android.os.SystemClock.uptimeMillis()<deadline)Thread.sleep(25);
+        waitForScriptsReleased();
+    }
+
     private void assertM4Text() throws Exception {
-        try(BitmapCloser shot=new BitmapCloser(captureSurface())) {
-            int glyphs=0;
-            for(int y=270;y<400;y++)for(int x=26;x<390;x++) {
-                int color=gamePixel(shot.bitmap,x,y,640,480);
-                if(Color.red(color)>180 && Color.green(color)>180 && Color.blue(color)>180)glyphs++;
+        long deadline=android.os.SystemClock.uptimeMillis()+15000;
+        while(android.os.SystemClock.uptimeMillis()<deadline) {
+            try(BitmapCloser shot=new BitmapCloser(captureSurface())) {
+                int glyphs=0;
+                for(int y=270;y<400;y++)for(int x=26;x<390;x++) {
+                    int color=gamePixel(shot.bitmap,x,y,640,480);
+                    if(Color.red(color)>180 && Color.green(color)>180 && Color.blue(color)>180)glyphs++;
+                }
+                if(glyphs>100)return;
             }
-            assertTrue("KAG must draw readable glyphs in its message layer",glyphs>100);
+            Thread.sleep(25);
         }
+        throw new AssertionError("KAG must draw readable glyphs in its message layer");
     }
 
     private void waitForM4PageGlyph() throws Exception {

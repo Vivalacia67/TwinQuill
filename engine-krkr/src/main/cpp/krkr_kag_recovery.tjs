@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Reconcile plain KAG3 slot metadata after a completed slot write and process death.
+// Slot files are authoritative. Never replace a slot or roll back system variables.
+(function() {
+    if(typeof global.kag == "undefined" || !(global.kag instanceof "KAGWindow")) return;
+    var window = global.kag;
+    if(window.readOnlyMode || window.saveThumbnail || window.saveDataMode != ""
+        || window.saveDataLocation != System.dataPath) return;
+    for(var slot=0; slot<Math.min(window.numBookMarks,64); slot++) {
+        var file=window.getBookMarkFileNameAtNum(slot);
+        if(!Storages.isExistentStorage(file)) continue;
+        try {
+            var data=Scripts.evalStorage(file);
+            if(data.id != window.saveDataID || typeof data.core != "Object"
+                || typeof data.core.currentPageName != "String"
+                || (typeof data.core.storeTime != "Integer" && typeof data.core.storeTime != "Real")) {
+                Debug.message("KAG slot metadata recovery rejected slot " + slot);
+                continue;
+            }
+            var date=new Date(); date.setTime(data.core.storeTime);
+            var stamp="%04d/%02d/%02d %02d:%02d".sprintf(date.getYear(),date.getMonth()+1,
+                date.getDate(),date.getHours(),date.getMinutes());
+            if(window.bookMarkNames[slot] != data.core.currentPageName || window.bookMarkDates[slot] != stamp)
+                window.getBookMarkInfoFromData(data.core,slot);
+        } catch(error) {
+            Debug.message("KAG slot metadata recovery failed for slot " + slot + ": " + error.message);
+            continue;
+        }
+    }
+})();

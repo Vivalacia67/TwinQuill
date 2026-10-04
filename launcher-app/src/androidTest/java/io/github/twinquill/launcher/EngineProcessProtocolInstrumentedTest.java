@@ -33,6 +33,7 @@ import io.github.twinquill.engine.api.EngineResult;
 import io.github.twinquill.engine.api.EngineType;
 import io.github.twinquill.engine.krkr.KrkrEngineActivity;
 import io.github.twinquill.engine.krkr.KrkrRuntimeActivity;
+import io.github.twinquill.engine.krkr.KrkrSaveStore;
 import io.github.twinquill.engine.ons.OnsEngineActivity;
 import io.github.twinquill.engine.ons.OnsRuntimeActivity;
 
@@ -535,6 +536,61 @@ public final class EngineProcessProtocolInstrumentedTest {
     }
 
     @Test
+    public void productionBrokerRestoresKagSlotAfterRuntimeProcessExit() throws Exception {
+        String id="m5-broker-"+android.os.SystemClock.elapsedRealtime();
+        File save=new File(context.getFilesDir(),"saves/"+id);
+        try {
+            for(int run=1;run<=2;++run) {
+                Intent result=launchAndAwait(requestIntent(KrkrEngineActivity.class,EngineType.KRKR,
+                    id,grantFixture("m5-broker"),Bundle.EMPTY));
+                assertEquals(Activity.RESULT_OK,host.engineResultCode());
+                assertEquals(EngineResult.NORMAL_EXIT.code(),result.getIntExtra(EngineContract.EXTRA_RESULT,-1));
+                assertTrue(new File(save,"krkr/data0.kdt").isFile());
+                if(run==1) {
+                    // Android may retain or immediately recreate a cached engine
+                    // process. Terminate this completed test's PID explicitly.
+                    int completedPid=requireProcessPid(context.getPackageName()+":krkr");
+                    android.os.Process.killProcess(completedPid);
+                    assertTrue("Completed runtime PID must die before restoring the slot",
+                        waitForPidToDisappear(completedPid,10_000));
+                }
+            }
+        } finally {deleteFixture(save);}
+    }
+
+    @Test
+    public void completedKagSaveSurvivesKilledRuntimeAndExcludesLauncherManagement() throws Exception {
+        String id="m5-killed-"+android.os.SystemClock.elapsedRealtime();
+        File save=new File(context.getFilesDir(),"saves/"+id);
+        try {
+            Intent intent=requestIntent(KrkrEngineActivity.class,EngineType.KRKR,
+                id,grantFixture("m5-kill"),Bundle.EMPTY);
+            instrumentation.runOnMainSync(() -> host.launchEngine(intent));
+            File slot=new File(save,"krkr/data0.kdt");
+            long deadline=android.os.SystemClock.uptimeMillis()+30_000;
+            while(!slot.isFile() && android.os.SystemClock.uptimeMillis()<deadline)Thread.sleep(25);
+            assertTrue("Completed slot must exist before killing the runtime",slot.isFile());
+            Thread.sleep(300);
+            byte[] completed=Files.readAllBytes(slot.toPath());
+            KrkrSaveStore store=new KrkrSaveStore(context.getFilesDir(),id);
+            try(KrkrSaveStore.Lease unexpected=store.acquire()) {fail("Launcher management entered the live Krkr process");}
+            catch(IOException busy) {assertTrue(busy.getMessage().contains("use"));}
+            int killedPid=requireProcessPid(context.getPackageName()+":krkr");
+            android.os.Process.killProcess(killedPid);
+            assertTrue(host.awaitEngineResult(ENGINE_RESULT_TIMEOUT_SECONDS,TimeUnit.SECONDS));
+            assertTrue(waitForPidToDisappear(killedPid,10_000));
+            try(KrkrSaveStore.Lease lease=store.acquire()) {
+                assertArrayEquals(completed,lease.snapshot().files().get("data0.kdt"));
+            }
+            Intent result=launchAndAwait(requestIntent(KrkrEngineActivity.class,EngineType.KRKR,
+                id,grantFixture("m5-kill"),Bundle.EMPTY));
+            assertEquals(Activity.RESULT_OK,host.engineResultCode());
+            assertEquals(EngineResult.NORMAL_EXIT.code(),result.getIntExtra(EngineContract.EXTRA_RESULT,-1));
+            assertArrayEquals(completed,Files.readAllBytes(slot.toPath()));
+        }finally {deleteFixture(save);}
+    }
+
+    @Test
     public void productionBrokerBindsPrivateSavesAndPreservesCounterAcrossRestart() throws Exception {
         String id="m3-broker-save-"+android.os.SystemClock.elapsedRealtime();
         File save=new File(context.getFilesDir(),"saves/"+id);
@@ -907,6 +963,18 @@ public final class EngineProcessProtocolInstrumentedTest {
             Thread.sleep(50);
         }
         return findProcessPid(processName) == 0;
+    }
+
+    private boolean waitForPidToDisappear(int pid,long timeoutMillis) throws InterruptedException {
+        long deadline=android.os.SystemClock.elapsedRealtime()+timeoutMillis;
+        do {
+            try {android.system.Os.kill(pid,0);}
+            catch(android.system.ErrnoException missing) {
+                if(missing.errno==android.system.OsConstants.ESRCH)return true;
+            }
+            Thread.sleep(25);
+        }while(android.os.SystemClock.elapsedRealtime()<deadline);
+        return false;
     }
 
     private Intent requestIntent(

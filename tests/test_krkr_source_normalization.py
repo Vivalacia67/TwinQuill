@@ -86,7 +86,8 @@ class KrkrSourceNormalizationTests(unittest.TestCase):
         self.assertIn("core.fsmonitor=false apply", cmake)
         self.assertNotIn("string(REPLACE", cmake)
         reads = re.findall(r'file\(READ\s+"([^"\n]+)"', cmake)
-        self.assertEqual(reads, ["${CMAKE_CURRENT_LIST_DIR}/krkr_kag_host.tjs"])
+        self.assertEqual(reads, ["${CMAKE_CURRENT_LIST_DIR}/krkr_kag_host.tjs",
+                                 "${CMAKE_CURRENT_LIST_DIR}/krkr_kag_recovery.tjs"])
         self.assertIn("configure_file(krkr_kag_host_script.h.in", cmake)
         self.assertNotIn("file(WRITE", cmake)
 
